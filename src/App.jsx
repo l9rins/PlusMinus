@@ -5,7 +5,7 @@ import Dashboard from "./components/Dashboard";
 import Players from "./components/Players";
 import { Scores, Standings, Betting, BetTracker } from "./components/Views";
 
-function Placeholder({ title }) {
+function Placeholder({ title, description }) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 6 }}
@@ -15,7 +15,9 @@ function Placeholder({ title }) {
       className="text-center py-20"
     >
       <div className="font-display text-4xl tracking-widest text-pitch-600 mb-3">{title}</div>
-      <div className="text-pitch-500 text-sm">Coming soon — hook up the API and build this section out</div>
+      <div className="text-pitch-500 text-sm max-w-sm mx-auto leading-relaxed">
+        {description || "Coming soon — hook up the API and build this section out"}
+      </div>
     </motion.div>
   );
 }
@@ -25,13 +27,20 @@ export default function App() {
 
   const renderContent = () => {
     switch (tab) {
-      case "dashboard": return <Dashboard   key="dashboard" onNavigate={setTab} />;
-      case "scores":    return <Scores      key="scores"    />;
-      case "standings": return <Standings   key="standings" />;
-      case "players":   return <Players     key="players"   />;
-      case "betting":   return <Betting     key="betting"   />;
-      case "tracker":   return <BetTracker  key="tracker"   />;
-      case "analytics": return <Placeholder key="analytics" title="Analytics" />;
+      case "dashboard": return <Dashboard key="dashboard" onNavigate={setTab} />;
+      case "scores": return <Scores key="scores" />;
+      case "standings": return <Standings key="standings" />;
+      case "players": return <Players key="players" />;
+      case "betting": return <Betting key="betting" />;
+      case "tracker": return <BetTracker key="tracker" />;
+      case "analytics":
+        return (
+          <Placeholder
+            key="analytics"
+            title="Analytics"
+            description="Four Factors, Elo Ratings, Lineup Builder, Shot Quality charts — coming in the next phase."
+          />
+        );
       default:
         console.warn("[PlusMinus] Unknown tab:", tab);
         return <Dashboard key="dashboard" onNavigate={setTab} />;

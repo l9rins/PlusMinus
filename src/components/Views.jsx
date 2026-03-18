@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { motion } from "framer-motion";
 import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip,
@@ -13,7 +13,7 @@ import { calcPL } from "../utils";
 const container = { hidden: {}, show: { transition: { staggerChildren: 0.04 } } };
 const item = {
   hidden: { opacity: 0, y: 8 },
-  show:   { opacity: 1, y: 0, transition: { duration: 0.2 } },
+  show: { opacity: 1, y: 0, transition: { duration: 0.2 } },
 };
 
 // ── SCORES ────────────────────────────────────────────────────
@@ -27,7 +27,7 @@ export function Scores() {
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         {TODAY_GAMES.map(g => {
-          const fav        = g.homeP > g.awayP ? "home" : "away";
+          const fav = g.homeP > g.awayP ? "home" : "away";
           const isSelected = selected === g.id;
           return (
             <motion.div
@@ -94,7 +94,7 @@ export function Standings() {
   return (
     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
       <div className="flex gap-2 mb-4">
-        {[["east","Eastern Conference"],["west","Western Conference"]].map(([id, label]) => (
+        {[["east", "Eastern Conference"], ["west", "Western Conference"]].map(([id, label]) => (
           <button
             key={id}
             onClick={() => setConf(id)}
@@ -108,12 +108,11 @@ export function Standings() {
         ))}
       </div>
 
-      {/* overflow wrapper + min-width on table for mobile horizontal scroll */}
       <div className="pm-card overflow-x-auto">
         <table className="w-full text-sm min-w-[640px]">
           <thead>
             <tr className="border-b border-pitch-600">
-              {["#","Team","W","L","PCT","L10","HOME","ROAD","STREAK"].map(h => (
+              {["#", "Team", "W", "L", "PCT", "L10", "HOME", "ROAD", "STREAK"].map(h => (
                 <th key={h} className="px-3 py-2.5 text-left pm-label font-medium">{h}</th>
               ))}
             </tr>
@@ -171,9 +170,9 @@ export function Betting() {
         {ODDS_GAMES.map(g => {
           const diff = g.modelP - g.impliedP;
           const edgeColor =
-            g.edge === "high" ? "text-win border-win/30 bg-win/10"   :
-            g.edge === "mid"  ? "text-draw border-draw/30 bg-draw/10" :
-            "text-pitch-400 border-pitch-600 bg-pitch-700";
+            g.edge === "high" ? "text-win border-win/30 bg-win/10" :
+              g.edge === "mid" ? "text-draw border-draw/30 bg-draw/10" :
+                "text-pitch-400 border-pitch-600 bg-pitch-700";
 
           return (
             <motion.div key={g.matchup} variants={item} className="pm-tile p-4">
@@ -227,45 +226,60 @@ export function Betting() {
 }
 
 // ── BET TRACKER ───────────────────────────────────────────────
-// calcPL imported from src/utils.js — single source of truth.
 export function BetTracker() {
   const [bets, setBets] = useState([
-    { id: 1, game: "OKC @ BKN",  type: "Spread",     pick: "OKC -16",  odds: -110, stake: 50,  result: "win"     },
-    { id: 2, game: "GSW @ BOS",  type: "Moneyline",  pick: "BOS ML",   odds: -240, stake: 100, result: "win"     },
-    { id: 3, game: "POR @ IND",  type: "Over/Under", pick: "Over 228", odds: -112, stake: 40,  result: "loss"    },
-    { id: 4, game: "LAL @ HOU",  type: "Spread",     pick: "HOU -1",   odds: -108, stake: 55,  result: "pending" },
+    { id: 1, game: "OKC @ BKN", type: "Spread", pick: "OKC -16", odds: -110, stake: 50, result: "win" },
+    { id: 2, game: "GSW @ BOS", type: "Moneyline", pick: "BOS ML", odds: -240, stake: 100, result: "win" },
+    { id: 3, game: "POR @ IND", type: "Over/Under", pick: "Over 228", odds: -112, stake: 40, result: "loss" },
+    { id: 4, game: "LAL @ HOU", type: "Spread", pick: "HOU -1", odds: -108, stake: 55, result: "pending" },
   ]);
 
   const [form, setForm] = useState({
     game: "", type: "Moneyline", pick: "", odds: "", stake: "", result: "pending",
   });
 
+  const [formError, setFormError] = useState("");
+
   const addBet = () => {
-    if (!form.game || !form.pick || !form.odds || !form.stake) return;
+    if (!form.game || !form.pick || !form.odds || !form.stake) {
+      setFormError("Please fill in Game, Pick, Odds, and Stake before adding.");
+      return;
+    }
+    setFormError("");
     setBets(prev => [{
       ...form,
-      id:    Date.now(),
-      odds:  +form.odds,
+      id: Date.now(),
+      odds: +form.odds,
       stake: +form.stake,
     }, ...prev]);
     setForm({ game: "", type: "Moneyline", pick: "", odds: "", stake: "", result: "pending" });
   };
 
-  const settled    = bets.filter(b => b.result !== "pending");
-  const wins       = bets.filter(b => b.result === "win").length;
-  const totalPL    = bets.reduce((s, b) => s + calcPL(b.stake, b.odds, b.result), 0);
-  const totalStake = settled.reduce((s, b) => s + b.stake, 0);
-  const roi        = totalStake > 0 ? (totalPL / totalStake * 100) : 0;
+  // Memoised stats — only recompute when bets changes, not on every form keystroke.
+  // Win rate and ROI exclude pushes: a push is neither a win nor a loss.
+  const stats = useMemo(() => {
+    const decisiveBets = bets.filter(b => b.result === "win" || b.result === "loss");
+    const wins = bets.filter(b => b.result === "win").length;
+    const totalPL = bets.reduce((s, b) => s + calcPL(b.stake, b.odds, b.result), 0);
+    const totalStake = decisiveBets.reduce((s, b) => s + b.stake, 0);
+    const roi = totalStake > 0 ? (totalPL / totalStake * 100) : 0;
+    const winRate = decisiveBets.length > 0
+      ? (wins / decisiveBets.length * 100).toFixed(1) + "%"
+      : "—";
+    return { wins, totalPL, totalStake, roi, winRate, decisiveCount: decisiveBets.length };
+  }, [bets]);
 
-  // Cumulative P&L for the chart
-  let running = 0;
-  const chartData = [...bets]
-    .filter(b => b.result !== "pending")
-    .reverse()
-    .map((b, i) => {
-      running += calcPL(b.stake, b.odds, b.result);
-      return { bet: i + 1, pl: +running.toFixed(2) };
-    });
+  // Chart data also memoised
+  const chartData = useMemo(() => {
+    let running = 0;
+    return [...bets]
+      .filter(b => b.result !== "pending")
+      .reverse()
+      .map((b, i) => {
+        running += calcPL(b.stake, b.odds, b.result);
+        return { bet: i + 1, pl: +running.toFixed(2) };
+      });
+  }, [bets]);
 
   const inputCls = `bg-pitch-700 border border-pitch-600 rounded-md px-2.5 py-1.5
     text-sm text-pitch-200 placeholder:text-pitch-500 w-full
@@ -277,10 +291,10 @@ export function BetTracker() {
       {/* Metrics */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
         {[
-          { lbl: "Total bets", val: bets.length,                                                    cls: "" },
-          { lbl: "Win rate",   val: settled.length ? (wins/settled.length*100).toFixed(1)+"%" : "—", cls: "" },
-          { lbl: "Net P&L",    val: `${totalPL >= 0 ? "+" : ""}$${totalPL.toFixed(2)}`,             cls: totalPL >= 0 ? "text-win" : "text-loss" },
-          { lbl: "ROI",        val: `${roi >= 0 ? "+" : ""}${roi.toFixed(1)}%`,                     cls: roi  >= 0 ? "text-win" : "text-loss" },
+          { lbl: "Total bets", val: bets.length, cls: "" },
+          { lbl: "Win rate", val: stats.winRate, cls: "" },
+          { lbl: "Net P&L", val: `${stats.totalPL >= 0 ? "+" : ""}$${stats.totalPL.toFixed(2)}`, cls: stats.totalPL >= 0 ? "text-win" : "text-loss" },
+          { lbl: "ROI", val: `${stats.roi >= 0 ? "+" : ""}${stats.roi.toFixed(1)}%`, cls: stats.roi >= 0 ? "text-win" : "text-loss" },
         ].map(m => (
           <div key={m.lbl} className="pm-tile p-4 text-center">
             <div className="pm-label mb-1">{m.lbl}</div>
@@ -294,32 +308,37 @@ export function BetTracker() {
         <div className="pm-label mb-3">Log a bet</div>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-3">
           <input className={inputCls} placeholder="Game (e.g. OKC @ BKN)"
-            value={form.game}   onChange={e => setForm(f => ({...f, game:   e.target.value}))} />
+            value={form.game} onChange={e => setForm(f => ({ ...f, game: e.target.value }))} />
           <select className={inputCls}
-            value={form.type}   onChange={e => setForm(f => ({...f, type:   e.target.value}))}>
-            {["Moneyline","Spread","Over/Under","Player prop","Parlay"].map(t => <option key={t}>{t}</option>)}
+            value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))}>
+            {["Moneyline", "Spread", "Over/Under", "Player prop", "Parlay"].map(t => <option key={t}>{t}</option>)}
           </select>
           <input className={inputCls} placeholder="Pick (e.g. OKC -16)"
-            value={form.pick}   onChange={e => setForm(f => ({...f, pick:   e.target.value}))} />
+            value={form.pick} onChange={e => setForm(f => ({ ...f, pick: e.target.value }))} />
           <input className={inputCls} placeholder="Odds (-110)" type="number"
-            value={form.odds}   onChange={e => setForm(f => ({...f, odds:   e.target.value}))} />
-          <input className={inputCls} placeholder="Stake ($)"   type="number"
-            value={form.stake}  onChange={e => setForm(f => ({...f, stake:  e.target.value}))} />
+            value={form.odds} onChange={e => setForm(f => ({ ...f, odds: e.target.value }))} />
+          <input className={inputCls} placeholder="Stake ($)" type="number"
+            value={form.stake} onChange={e => setForm(f => ({ ...f, stake: e.target.value }))} />
           <select className={inputCls}
-            value={form.result} onChange={e => setForm(f => ({...f, result: e.target.value}))}>
+            value={form.result} onChange={e => setForm(f => ({ ...f, result: e.target.value }))}>
             <option value="pending">Pending</option>
             <option value="win">Win</option>
             <option value="loss">Loss</option>
             <option value="push">Push</option>
           </select>
         </div>
-        <button
-          onClick={addBet}
-          className="px-4 py-2 bg-accent/15 text-accent border border-accent/30
-                     rounded-md text-sm font-medium hover:bg-accent/25 transition-colors"
-        >
-          Add bet
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={addBet}
+            className="px-4 py-2 bg-accent/15 text-accent border border-accent/30
+                       rounded-md text-sm font-medium hover:bg-accent/25 transition-colors"
+          >
+            Add bet
+          </button>
+          {formError && (
+            <span className="text-[11px] text-loss">{formError}</span>
+          )}
+        </div>
       </div>
 
       {/* Bet history table */}
@@ -327,7 +346,7 @@ export function BetTracker() {
         <table className="w-full text-sm min-w-[540px]">
           <thead>
             <tr className="border-b border-pitch-600">
-              {["Game","Type","Pick","Odds","Stake","P&L","Result",""].map(h => (
+              {["Game", "Type", "Pick", "Odds", "Stake", "P&L", "Result", ""].map(h => (
                 <th key={h} className="px-3 py-2.5 text-left pm-label">{h}</th>
               ))}
             </tr>
@@ -356,10 +375,10 @@ export function BetTracker() {
                   </td>
                   <td className="px-3 py-2.5">
                     <span className={`pm-badge
-                      ${b.result === "win"     ? "bg-win/10 text-win border border-win/20"
-                      : b.result === "loss"    ? "bg-loss/10 text-loss border border-loss/20"
-                      : b.result === "push"    ? "bg-pitch-700 text-pitch-400 border border-pitch-600"
-                      :                          "bg-pitch-700 text-pitch-500 border border-pitch-600"}`}>
+                      ${b.result === "win" ? "bg-win/10 text-win border border-win/20"
+                        : b.result === "loss" ? "bg-loss/10 text-loss border border-loss/20"
+                          : b.result === "push" ? "bg-pitch-700 text-pitch-400 border border-pitch-600"
+                            : "bg-pitch-700 text-pitch-500 border border-pitch-600"}`}>
                       {b.result.toUpperCase()}
                     </span>
                   </td>
@@ -367,9 +386,7 @@ export function BetTracker() {
                     <button
                       onClick={() => setBets(prev => prev.filter(x => x.id !== b.id))}
                       className="text-pitch-600 hover:text-loss text-base leading-none transition-colors"
-                    >
-                      ×
-                    </button>
+                    >×</button>
                   </td>
                 </tr>
               );
@@ -378,43 +395,21 @@ export function BetTracker() {
         </table>
       </div>
 
-      {/* Cumulative P&L chart — only renders when there are ≥2 settled bets */}
       {chartData.length >= 2 && (
         <div className="pm-card p-4">
           <div className="pm-label mb-3">Cumulative P&amp;L</div>
           <div style={{ height: 140 }}>
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={chartData}>
-                <XAxis
-                  dataKey="bet"
-                  tick={{ fill: "#546480", fontSize: 10 }}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <YAxis
-                  tick={{ fill: "#546480", fontSize: 10 }}
-                  axisLine={false}
-                  tickLine={false}
-                  tickFormatter={v => `$${v}`}
-                />
+                <XAxis dataKey="bet" tick={{ fill: "#546480", fontSize: 10 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: "#546480", fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={v => `$${v}`} />
                 <Tooltip
-                  contentStyle={{
-                    background: "#1a1e2a",
-                    border: "1px solid #2e3a50",
-                    borderRadius: 6,
-                    fontSize: 11,
-                  }}
+                  contentStyle={{ background: "#1a1e2a", border: "1px solid #2e3a50", borderRadius: 6, fontSize: 11 }}
                   labelStyle={{ color: "#7d91ab" }}
                   itemStyle={{ color: "#00d4aa" }}
                   formatter={v => [`$${v}`, "P&L"]}
                 />
-                <Line
-                  type="monotone"
-                  dataKey="pl"
-                  stroke="#00d4aa"
-                  strokeWidth={2}
-                  dot={{ fill: "#00d4aa", r: 3 }}
-                />
+                <Line type="monotone" dataKey="pl" stroke="#00d4aa" strokeWidth={2} dot={{ fill: "#00d4aa", r: 3 }} />
               </LineChart>
             </ResponsiveContainer>
           </div>

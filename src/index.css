@@ -21,7 +21,7 @@
         overflow-x: hidden;
     }
 
-    /* Custom scrollbar */
+    /* Scrollbar — thin, matches dark palette */
     ::-webkit-scrollbar {
         width: 4px;
         height: 4px;
@@ -41,9 +41,26 @@
     }
 }
 
+@layer utilities {
+
+    /* scrollbar-none: used on TopNav horizontal nav overflow container.
+     Tailwind's base stylesheet does not include this — we define it here
+     rather than requiring a plugin. */
+    .scrollbar-none {
+        scrollbar-width: none;
+    }
+
+    .scrollbar-none::-webkit-scrollbar {
+        display: none;
+    }
+}
+
 @layer components {
 
-    /* FM26-style tile — the fundamental building block */
+    /* FM26-style tile — the fundamental building block.
+     NOTE: overflow-hidden is intentionally NOT set here.
+     It belongs on the inner animated div in expandable cards (Players.jsx)
+     so that pm-accent-border's glow box-shadow is not clipped. */
     .pm-tile {
         @apply bg-pitch-800 border border-pitch-600 rounded-lg transition-all duration-200 cursor-pointer hover:border-pitch-500 hover:bg-pitch-750;
         box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
@@ -53,19 +70,20 @@
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
     }
 
-    /* FM26-style card — expanded tile */
+    /* FM26-style card — elevated surface for larger containers */
     .pm-card {
         @apply bg-pitch-800 border border-pitch-600 rounded-xl;
         box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
     }
 
-    /* Accent glow border — for featured/active elements */
+    /* Accent glow border — for selected/active tiles.
+     Requires pm-tile to NOT have overflow-hidden so the glow is visible. */
     .pm-accent-border {
         @apply border border-accent/30 rounded-lg;
-        box-shadow: 0 0 12px rgba(0, 212, 170, 0.1);
+        box-shadow: 0 0 12px rgba(0, 212, 170, 0.12);
     }
 
-    /* Section label — FM26 uses small-caps category labels everywhere */
+    /* Section label — FM26's small-caps category header */
     .pm-label {
         @apply text-[10px] font-medium tracking-[1.6px] uppercase text-pitch-400;
     }
@@ -79,7 +97,7 @@
         @apply h-full rounded-full transition-all duration-700 ease-out;
     }
 
-    /* Badge */
+    /* Badge — small label pill */
     .pm-badge {
         @apply text-[10px] font-medium tracking-wide px-2 py-0.5 rounded;
     }
@@ -93,12 +111,12 @@
         @apply text-accent bg-accent/10;
     }
 
-    /* Number display — mono for all stats */
+    /* Mono number — used for all stats, odds, P&L */
     .pm-number {
         @apply font-mono font-medium tabular-nums;
     }
 
-    /* Win/loss/draw result dot */
+    /* W/L/D result square */
     .pm-result {
         @apply w-5 h-5 rounded-sm text-[9px] font-bold flex items-center justify-center;
     }

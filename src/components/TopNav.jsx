@@ -1,71 +1,60 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   LayoutDashboard, Users, BarChart3, Target,
   TrendingUp, Wallet, ChevronDown, Search, Bell, Settings, X,
 } from "lucide-react";
 
-// Each sub item maps to a real route id handled in App.jsx
 const NAV_ITEMS = [
+  { label: "Dashboard", icon: LayoutDashboard, id: "dashboard", sub: null },
   {
-    label: "Dashboard",
-    icon: LayoutDashboard,
-    id: "dashboard",
-    sub: null,
-  },
-  {
-    label: "Scores",
-    icon: Target,
-    id: "scores",
+    label: "Scores", icon: Target, id: "scores",
     sub: [
-      { label: "Tonight's Games",   id: "scores"    },
-      { label: "Win Probabilities",  id: "scores"    },
+      { label: "Tonight's Games", id: "scores" },
+      { label: "Win Probabilities", id: "scores" },
     ],
   },
   {
-    label: "Standings",
-    icon: BarChart3,
-    id: "standings",
+    label: "Standings", icon: BarChart3, id: "standings",
     sub: [
       { label: "Eastern Conference", id: "standings" },
       { label: "Western Conference", id: "standings" },
     ],
   },
   {
-    label: "Players",
-    icon: Users,
-    id: "players",
+    label: "Players", icon: Users, id: "players",
     sub: [
-      { label: "Player Explorer",    id: "players"   },
-      { label: "Advanced Stats",     id: "players"   },
+      { label: "Player Explorer", id: "players" },
+      { label: "Advanced Stats", id: "players" },
     ],
   },
   {
-    label: "Betting",
-    icon: TrendingUp,
-    id: "betting",
+    label: "Betting", icon: TrendingUp, id: "betting",
     sub: [
-      { label: "Edge Finder",        id: "betting"   },
-      { label: "Bet Tracker",        id: "tracker"   },
+      { label: "Edge Finder", id: "betting" },
+      { label: "Bet Tracker", id: "tracker" },
     ],
   },
   {
-    label: "Analytics",
-    icon: Wallet,
-    id: "analytics",
+    label: "Analytics", icon: Wallet, id: "analytics",
     sub: [
-      { label: "Four Factors",       id: "analytics" },
-      { label: "Elo Ratings",        id: "analytics" },
-      { label: "Lineup Tool",        id: "analytics" },
+      { label: "Four Factors", id: "analytics" },
+      { label: "Elo Ratings", id: "analytics" },
+      { label: "Lineup Tool", id: "analytics" },
     ],
   },
 ];
 
 export default function TopNav({ activeTab, onTabChange }) {
-  const [hoveredItem, setHoveredItem]   = useState(null);
-  const [searchOpen, setSearchOpen]     = useState(false);
-  const [searchQuery, setSearchQuery]   = useState("");
+  const [hoveredItem, setHoveredItem] = useState(null);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const timeoutRef = useRef(null);
+
+  // Clean up pending timeout on unmount to prevent state updates on unmounted component
+  useEffect(() => {
+    return () => clearTimeout(timeoutRef.current);
+  }, []);
 
   const handleMouseEnter = (id) => {
     clearTimeout(timeoutRef.current);
@@ -81,8 +70,6 @@ export default function TopNav({ activeTab, onTabChange }) {
       setSearchOpen(false);
       setSearchQuery("");
     }
-    // When Enter is pressed, navigate to Players with the query
-    // (Players will receive the query via a future prop; for now just navigate)
     if (e.key === "Enter" && searchQuery.trim()) {
       onTabChange("players");
       setSearchOpen(false);
@@ -110,11 +97,11 @@ export default function TopNav({ activeTab, onTabChange }) {
 
           <div className="w-px h-6 bg-pitch-600 mx-2" />
 
-          {/* Nav items — hide text labels below md, show only icons */}
+          {/* Nav items */}
           <div className="flex items-center flex-1 overflow-x-auto scrollbar-none">
             {NAV_ITEMS.map((item) => {
               const Icon = item.icon;
-              const isActive  = activeTab === item.id ||
+              const isActive = activeTab === item.id ||
                 (item.id === "betting" && activeTab === "tracker");
               const isHovered = hoveredItem === item.id;
 
@@ -140,7 +127,6 @@ export default function TopNav({ activeTab, onTabChange }) {
                     )}
                   </button>
 
-                  {/* Submenu */}
                   <AnimatePresence>
                     {isHovered && item.sub && (
                       <motion.div
@@ -155,10 +141,7 @@ export default function TopNav({ activeTab, onTabChange }) {
                         {item.sub.map((sub) => (
                           <button
                             key={sub.label}
-                            onClick={() => {
-                              onTabChange(sub.id);
-                              setHoveredItem(null);
-                            }}
+                            onClick={() => { onTabChange(sub.id); setHoveredItem(null); }}
                             className="w-full text-left px-3 py-2 text-xs text-pitch-300
                                        hover:text-pitch-100 hover:bg-pitch-700
                                        transition-colors duration-100 flex items-center gap-2"
@@ -184,7 +167,6 @@ export default function TopNav({ activeTab, onTabChange }) {
               }
             </button>
 
-            {/* Bell — placeholder until notifications are built */}
             <button
               className="pm-nav-btn relative"
               title="Notifications (coming soon)"
@@ -194,7 +176,6 @@ export default function TopNav({ activeTab, onTabChange }) {
               <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-accent" />
             </button>
 
-            {/* Settings — placeholder */}
             <button
               className="pm-nav-btn"
               title="Settings (coming soon)"

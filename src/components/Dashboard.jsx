@@ -1,8 +1,8 @@
 import { motion } from "framer-motion";
-import { TrendingUp, TrendingDown, Target, Users, BarChart2, Zap, ChevronRight } from "lucide-react";
+import { TrendingUp, TrendingDown, Target, BarChart2, Zap, ChevronRight } from "lucide-react";
 import { TODAY_GAMES, TEAM_NAMES, EAST_STANDINGS, WEST_STANDINGS, PLAYERS } from "../data";
 
-// ── Stagger animation variants ───────────────────────────────
+// ── Animation variants ────────────────────────────────────────
 const container = {
     hidden: {},
     show: { transition: { staggerChildren: 0.05 } },
@@ -12,30 +12,9 @@ const tile = {
     show: { opacity: 1, y: 0, transition: { duration: 0.25 } },
 };
 
-// ── Stat number ───────────────────────────────────────────────
-function StatNum({ value, suffix = "", positive = null, size = "xl" }) {
-    const col = positive === null ? "text-pitch-50"
-        : positive ? "text-win" : "text-loss";
-    return (
-        <span className={`font-mono font-medium text-${size} ${col} tabular-nums`}>
-            {value}{suffix}
-        </span>
-    );
-}
-
-// ── Result form dot ───────────────────────────────────────────
-function FormDot({ result }) {
-    const cfg = {
-        W: "bg-win text-white",
-        L: "bg-loss text-white",
-        D: "bg-draw text-white",
-    };
-    return (
-        <span className={`pm-result ${cfg[result] || "bg-pitch-600 text-pitch-300"}`}>
-            {result}
-        </span>
-    );
-}
+// ── Module-level constants — computed once, not on every render
+// PLAYERS is static data so sorting at module level costs nothing.
+const TOP_SCORERS = [...PLAYERS].sort((a, b) => b.pts - a.pts).slice(0, 5);
 
 // ── Today's game tile ─────────────────────────────────────────
 function GameTile({ game }) {
@@ -50,7 +29,6 @@ function GameTile({ game }) {
             </div>
 
             <div className="flex items-center gap-2 mb-3">
-                {/* Away */}
                 <div className="flex-1 text-center">
                     <div className={`font-display text-xl tracking-wider leading-none mb-0.5
             ${fav === "away" ? "text-accent" : "text-pitch-200"}`}>
@@ -62,7 +40,6 @@ function GameTile({ game }) {
 
                 <div className="text-pitch-500 text-xs font-mono">vs</div>
 
-                {/* Home */}
                 <div className="flex-1 text-center">
                     <div className={`font-display text-xl tracking-wider leading-none mb-0.5
             ${fav === "home" ? "text-accent" : "text-pitch-200"}`}>
@@ -73,15 +50,10 @@ function GameTile({ game }) {
                 </div>
             </div>
 
-            {/* Probability bar */}
             <div className="pm-stat-bar mb-2">
-                <div
-                    className="pm-stat-bar-fill bg-accent"
-                    style={{ width: `${game.awayP}%` }}
-                />
+                <div className="pm-stat-bar-fill bg-accent" style={{ width: `${game.awayP}%` }} />
             </div>
 
-            {/* Spread / total */}
             <div className="flex justify-between text-[10px] text-pitch-400">
                 <span>Spread: <span className="text-pitch-300">{game.spread}</span></span>
                 <span>O/U: <span className="text-pitch-300">{game.total}</span></span>
@@ -122,16 +94,11 @@ function MiniStandings({ teams, conf }) {
 // ── Top player tile ───────────────────────────────────────────
 function PlayerTile({ player, rank }) {
     return (
-        <motion.div
-            variants={tile}
-            className="pm-tile p-3 flex items-center gap-3"
-        >
+        <motion.div variants={tile} className="pm-tile p-3 flex items-center gap-3">
             <span className="pm-number text-lg text-pitch-600 w-6 text-center">{rank}</span>
             <div className="flex-1 min-w-0">
                 <div className="text-sm font-medium text-pitch-100 truncate">{player.name}</div>
-                <div className="text-[10px] text-pitch-400">
-                    {player.pos} · {player.team}
-                </div>
+                <div className="text-[10px] text-pitch-400">{player.pos} · {player.team}</div>
             </div>
             <div className="text-right">
                 <div className="pm-number text-lg text-accent">{player.pts}</div>
@@ -167,8 +134,6 @@ function SummaryTile({ label, value, sub, icon: Icon, trend }) {
 
 // ── Main Dashboard ────────────────────────────────────────────
 export default function Dashboard({ onNavigate }) {
-    const topScorers = [...PLAYERS].sort((a, b) => b.pts - a.pts).slice(0, 5);
-
     return (
         <motion.div
             variants={container}
@@ -176,7 +141,7 @@ export default function Dashboard({ onNavigate }) {
             animate="show"
             className="grid grid-cols-12 gap-3"
         >
-            {/* ── Summary row ───────────────────────────────────── */}
+            {/* Summary row */}
             <motion.div variants={tile} className="col-span-12">
                 <div className="pm-label mb-2">Overview · Mar 19, 2026</div>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -187,7 +152,7 @@ export default function Dashboard({ onNavigate }) {
                 </div>
             </motion.div>
 
-            {/* ── Tonight's games (wide) ────────────────────────── */}
+            {/* Tonight's games */}
             <div className="col-span-12 lg:col-span-8">
                 <div className="flex items-center justify-between mb-2">
                     <div className="pm-label">Tonight's games</div>
@@ -205,10 +170,8 @@ export default function Dashboard({ onNavigate }) {
                 </div>
             </div>
 
-            {/* ── Right column ─────────────────────────────────── */}
+            {/* Right column */}
             <div className="col-span-12 lg:col-span-4 space-y-4">
-
-                {/* Standings mini */}
                 <motion.div variants={tile} className="pm-card p-4">
                     <div className="flex items-center justify-between mb-3">
                         <div className="pm-label">Standings</div>
@@ -226,7 +189,6 @@ export default function Dashboard({ onNavigate }) {
                     </div>
                 </motion.div>
 
-                {/* Top scorers */}
                 <div>
                     <div className="flex items-center justify-between mb-2">
                         <div className="pm-label">Scoring leaders</div>
@@ -238,13 +200,12 @@ export default function Dashboard({ onNavigate }) {
                         </button>
                     </div>
                     <div className="space-y-2">
-                        {topScorers.map((p, i) => (
+                        {TOP_SCORERS.map((p, i) => (
                             <PlayerTile key={p.id} player={p} rank={i + 1} />
                         ))}
                     </div>
                 </div>
             </div>
-
         </motion.div>
     );
 }

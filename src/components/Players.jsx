@@ -2,10 +2,18 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Search, SlidersHorizontal, ChevronDown, X } from "lucide-react";
 import { PLAYERS, TEAM_COLORS } from "../data";
+import { signed } from "../utils";
 
 // ── Attribute bar (FM26-style) ────────────────────────────────
-function AttrBar({ label, value, max = 100 }) {
-    const pct = Math.min(100, (value / max) * 100);
+// D-RTG is lower-is-better: we invert it so elite defenders fill the bar fully.
+// All other metrics are higher-is-better.
+function AttrBar({ label, value, max = 100, invert = false }) {
+    const raw = invert
+        ? Math.max(0, max - value)          // e.g. drtg 106 → 120-106 = 14 out of 20 range
+        : value;
+    const effectiveMax = invert ? (max - 100) : max; // D-RTG range: 120-100 = 20
+    const pct = Math.min(100, (raw / effectiveMax) * 100);
+
     const color =
         pct >= 80 ? "bg-tier-elite" :
             pct >= 65 ? "bg-tier-good" :
@@ -23,9 +31,7 @@ function AttrBar({ label, value, max = 100 }) {
                     transition={{ duration: 0.6, ease: "easeOut", delay: 0.1 }}
                 />
             </div>
-            <span className="font-mono text-[11px] text-pitch-200 w-8 text-right">
-                {value}
-            </span>
+            <span className="font-mono text-[11px] text-pitch-200 w-8 text-right">{value}</span>
         </div>
     );
 }
@@ -56,15 +62,15 @@ function PlayerCard({ player }) {
     const initials = player.name.split(" ").map(w => w[0]).join("").slice(0, 2);
 
     return (
+        // overflow-hidden is on the inner animated div, not pm-tile,
+        // so the accent glow box-shadow on pm-accent-border is not clipped.
         <motion.div
             layout
-            className={`pm-tile overflow-hidden transition-all
-        ${expanded ? "pm-accent-border" : ""}`}
+            className={`pm-tile transition-all ${expanded ? "pm-accent-border" : ""}`}
             onClick={() => setExpanded(!expanded)}
         >
             {/* Collapsed header */}
             <div className="p-3 flex items-center gap-3">
-                {/* Avatar */}
                 <div
                     className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 text-xs font-semibold"
                     style={{ background: color + "28", color, border: `1px solid ${color}44` }}
@@ -72,7 +78,6 @@ function PlayerCard({ player }) {
                     {initials}
                 </div>
 
-                {/* Name + meta */}
                 <div className="flex-1 min-w-0">
                     <div className="text-sm font-medium text-pitch-100 truncate">{player.name}</div>
                     <div className="text-[10px] text-pitch-400 mt-0.5">
@@ -80,7 +85,6 @@ function PlayerCard({ player }) {
                     </div>
                 </div>
 
-                {/* Key stats */}
                 <div className="flex gap-4 flex-shrink-0">
                     {[
                         { lbl: "PTS", val: player.pts },
@@ -94,7 +98,6 @@ function PlayerCard({ player }) {
                     ))}
                 </div>
 
-                {/* Expand icon */}
                 <ChevronDown
                     size={14}
                     strokeWidth={1.8}
@@ -111,12 +114,13 @@ function PlayerCard({ player }) {
                         animate={{ opacity: 1, height: "auto" }}
                         exit={{ opacity: 0, height: 0 }}
                         transition={{ duration: 0.22 }}
+                        className="overflow-hidden"
                         onClick={e => e.stopPropagation()}
                     >
-                        <div className="px-3 pb-4 border-t border-pitch-600 mt-0 pt-4">
+                        <div className="px-3 pb-4 border-t border-pitch-600 pt-4">
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
 
-                                {/* Left: advanced stats bars */}
+                                {/* Left: FM26-style attribute bars */}
                                 <div>
                                     <div className="pm-label mb-3">Advanced metrics</div>
                                     <AttrBar label="PER" value={player.per} max={35} />
@@ -124,10 +128,11 @@ function PlayerCard({ player }) {
                                     <AttrBar label="BPM" value={player.bpm} max={12} />
                                     <AttrBar label="VORP" value={player.vorp} max={9} />
                                     <AttrBar label="O-RTG" value={player.ortg} max={135} />
-                                    <AttrBar label="D-RTG" value={player.drtg} max={120} />
+                                    {/* D-RTG: lower is better — invert so elite defenders get a full bar */}
+                                    <AttrBar label="D-RTG" value={player.drtg} max={120} invert />
                                 </div>
 
-                                {/* Right: numbers grid + form */}
+                                {/* Right: stat grid + form */}
                                 <div>
                                     <div className="pm-label mb-3">Season averages</div>
                                     <div className="grid grid-cols-3 gap-2 mb-4">
@@ -137,7 +142,8 @@ function PlayerCard({ player }) {
                                             { lbl: "REB", val: player.reb },
                                             { lbl: "PER", val: player.per },
                                             { lbl: "TS%", val: player.ts + "%" },
-                                            { lbl: "BPM", val: "+" + player.bpm },
+                                            // signed() from utils handles negative BPM correctly: no "+-3.1"
+                                            { lbl: "BPM", val: signed(player.bpm) },
                                         ].map(s => (
                                             <div key={s.lbl} className="bg-pitch-700 rounded-md p-2 text-center">
                                                 <div className="font-mono font-medium text-pitch-50 text-base">{s.val}</div>
@@ -179,7 +185,6 @@ export default function Players() {
         >
             {/* Filters */}
             <div className="flex flex-wrap items-center gap-2 mb-4">
-                {/* Search */}
                 <div className="relative flex-1 min-w-[180px]">
                     <Search size={13} strokeWidth={1.8} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-pitch-500" />
                     <input
@@ -198,7 +203,6 @@ export default function Players() {
                     )}
                 </div>
 
-                {/* Position filter */}
                 <div className="flex gap-1">
                     {["", "PG", "SG", "SF", "PF", "C"].map(p => (
                         <button
@@ -214,7 +218,6 @@ export default function Players() {
                     ))}
                 </div>
 
-                {/* Sort */}
                 <div className="flex items-center gap-1 ml-auto">
                     <SlidersHorizontal size={12} className="text-pitch-500" />
                     <select
@@ -236,9 +239,7 @@ export default function Players() {
             {/* Player list */}
             <div className="space-y-2">
                 <AnimatePresence>
-                    {filtered.map(p => (
-                        <PlayerCard key={p.id} player={p} />
-                    ))}
+                    {filtered.map(p => <PlayerCard key={p.id} player={p} />)}
                 </AnimatePresence>
 
                 {filtered.length === 0 && (
