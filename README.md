@@ -1,283 +1,388 @@
-# CourtIQ — NBA Analytics Platform
+# ± PlusMinus — NBA Analytics Platform
 
-> A full-featured NBA analytics web app for data scientists, fans, and sports bettors.
-> Built with vanilla HTML/CSS/JS — no framework, no build step, just open `index.html`.
+> A full-stack NBA analytics dashboard inspired by the UI/UX of Football Manager 2026.
+> Built with React, Vite, Framer Motion, Tailwind CSS, and Recharts.
+> Dark-first. Data-dense. Smooth as hell.
 
 ---
 
 ## What is this?
 
-CourtIQ is a browser-based NBA dashboard that pulls together everything an NBA nerd needs in one place:
+PlusMinus is a browser-based NBA analytics platform built for three types of people:
 
-- **Live scores** with win probability bars
-- **Standings** for both conferences with playoff cutlines
-- **Player explorer** — searchable, filterable, sortable stats cards
-- **Shot chart** — half-court zone heat maps per player
-- **Betting edge** — model probability vs market-implied odds
-- **Bet tracker** — log bets, track ROI, export CSV
-- **Win probability model** — live logistic regression with adjustable sliders
-- **Analytics tools** — launch pad for deeper analysis tools
+- **NBA fans** — live scores, tonight's games, win probabilities, standings, player cards
+- **Data scientists** — advanced metrics (PER, BPM, VORP, ORTG, DRTG), expandable player cards with FM26-style attribute bars, sortable/filterable explorer
+- **Bettors** — model vs market edge finder, bet tracker with P&L math, cumulative ROI chart
 
-The app currently runs on **static demo data** (2025-26 season snapshot). To make it fully live, swap the data arrays in `src/data.js` for real API calls — every fetch hook is described below.
+The design language is directly inspired by **Football Manager 2026** — dense tile-based layouts, a dark charcoal palette, hover submenus, staggered entrance animations, and FM-style color-coded attribute bars that animate on expand.
+
+Everything runs on static demo data right now (2025-26 NBA season snapshot). The data layer is one file — swap `src/data.js` for real API calls and you're live.
 
 ---
 
-## Who is this for?
+## Live repo
 
-| Audience | What they use |
-|---|---|
-| **NBA fans / hobbyists** | Scores, standings, player cards, shot charts |
-| **Data scientists** | Model builder, Python code output, CSV exports, analytics tools |
-| **Sports bettors** | Betting edge panel, EV model, bet tracker with ROI chart |
+```
+https://github.com/l9rins/plusminus
+```
 
 ---
 
 ## Project structure
 
 ```
-courtiq/
-├── index.html          ← Single HTML shell; loads all JS modules
-├── src/
-│   ├── styles.css      ← All styles; CSS variables for light/dark theme
-│   ├── data.js         ← All static data (replace with API calls to go live)
-│   ├── app.js          ← Tab switching, theme toggle
-│   ├── scores.js       ← Tonight's games + win probability bars
-│   ├── standings.js    ← East/West conference tables
-│   ├── players.js      ← Searchable player grid + CSV export
-│   ├── shotchart.js    ← SVG half-court heat map renderer
-│   ├── betting.js      ← Model vs market edge cards
-│   ├── tracker.js      ← Bet logger, P&L calculator, ROI chart
-│   ├── model.js        ← Logistic regression model + Python code output
-│   └── tools.js        ← Analytics tool launch cards
-└── README.md
+plusminus/
+├── index.html                ← Entry point; loads Google Fonts (Bebas Neue, DM Sans, DM Mono)
+├── package.json              ← Dependencies: React 18, Framer Motion, Recharts, Lucide, Tailwind
+├── vite.config.js            ← Vite + React plugin, @ alias → src/
+├── tailwind.config.js        ← Full custom design system (pitch palette, accent, tier colors)
+├── postcss.config.js         ← Tailwind + autoprefixer
+└── src/
+    ├── main.jsx              ← ReactDOM.createRoot, mounts <App />
+    ├── App.jsx               ← Root: tab state, AnimatePresence page transitions, route switch
+    ├── index.css             ← Tailwind base + all .pm-* component classes
+    ├── data.js               ← All static NBA data (replace with API calls to go live)
+    └── components/
+        ├── TopNav.jsx        ← Sticky nav bar with hover submenus, search slide-in, live dot
+        ├── Dashboard.jsx     ← Home portal: summary tiles, game tiles, mini standings, top scorers
+        ├── Players.jsx       ← Searchable/filterable player list with expandable FM26-style cards
+        └── Views.jsx         ← Scores, Standings, Betting Edge, BetTracker (all named exports)
 ```
 
 ---
 
-## How to run it
+## Getting started
+
+### Prerequisites
+
+- Node.js 18+
+- npm or pnpm
+
+### Install and run
 
 ```bash
-# Option 1: just double-click
-open index.html   # macOS
-# or drag index.html into any browser
-
-# Option 2: local dev server (prevents CORS issues if you add fetch() calls)
-npx serve .
-# or
-python3 -m http.server 8080
+git clone https://github.com/l9rins/plusminus.git
+cd plusminus
+npm install
+npm run dev
 ```
 
-No npm install. No build step. No framework. It just works.
+Open `http://localhost:5173` and you're in.
+
+### Build for production
+
+```bash
+npm run build       # outputs to dist/
+npm run preview     # serve the build locally
+```
+
+Deploy the `dist/` folder to Vercel, Netlify, or GitHub Pages — it's a static site.
 
 ---
 
-## How the data layer works
+## Tech stack
 
-All data lives in `src/data.js` as plain JS arrays. Every constant is documented.
-To go from demo to live, replace the arrays with `fetch()` calls at the top of each module.
-
-### Replacing static data with real APIs
-
-#### Scores & win probabilities
-```js
-// In src/scores.js — replace TODAY_GAMES with:
-const res   = await fetch('https://api.sportradar.com/nba/production/v8/en/games/2026/03/19/schedule.json?api_key=YOUR_KEY');
-const json  = await res.json();
-const TODAY_GAMES = json.games.map(g => ({
-  away:  g.away.alias,
-  home:  g.home.alias,
-  awayP: g.away_win_probability * 100,
-  homeP: g.home_win_probability * 100,
-  time:  new Date(g.scheduled).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' }) + ' ET',
-}));
-```
-
-Good free/cheap APIs:
-- [BallDontLie](https://www.balldontlie.io) — free, good for scores and player stats
-- [Sportradar NBA](https://developer.sportradar.com) — paid, comprehensive (scores, odds, play-by-play)
-- [SportsDataIO](https://sportsdata.io) — paid, beginner-friendly
-- [The Odds API](https://the-odds-api.com) — for live betting lines (free tier available)
-
-#### Player stats
-```js
-// In src/data.js — replace PLAYERS with:
-const res     = await fetch('https://www.balldontlie.io/api/v1/season_averages?season=2025&player_ids[]=...');
-const { data } = await res.json();
-```
-
-#### Shot chart data
-NBA.com's stats API has real shot location data (x/y coordinates per shot):
-```
-https://stats.nba.com/stats/shotchartdetail?PlayerID=1629029&Season=2025-26&...
-```
-Note: NBA.com requires browser-like headers. Use a proxy or server-side fetch.
-
-#### Live betting lines
-```js
-// In src/data.js — replace ODDS_GAMES with:
-const res  = await fetch('https://api.the-odds-api.com/v4/sports/basketball_nba/odds/?apiKey=YOUR_KEY&regions=us&markets=h2h,spreads');
-const json = await res.json();
-```
-
----
-
-## The win probability model
-
-The model in `src/model.js` is a **logistic regression** with these features:
-
-| Feature | Weight | Why it matters |
+| Package | Version | Role |
 |---|---|---|
-| Net rating differential | 0.18 | Best single predictor of team strength |
-| Season win% differential | 1.40 | Overall record captures full-season quality |
-| Last-10 form differential | 0.80 | Recent momentum / hot/cold streaks |
-| Rest days advantage | 0.015 | Back-to-backs meaningfully hurt performance |
-| Home court | 0.084 | Home teams win ~58% of NBA games historically |
-
-**Formula:**
-```
-logit = 0.18 × net_rtg_diff
-      + 1.40 × win_pct_diff
-      + 0.80 × form_diff
-      + 0.015 × rest_adv
-      + 0.084 × home_court
-
-home_win_prob = 1 / (1 + e^(-logit))
-```
-
-The model builder tab lets you dial in all 10 inputs and watch the probability update live. It also generates a Python sklearn snippet you can copy into a notebook.
-
-**To train a real model:**
-```python
-import pandas as pd
-from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import train_test_split
-
-# Pull 5 seasons of game logs from Basketball Reference or NBA Stats API
-df = pd.read_csv('nba_games_2020_2025.csv')
-
-features = ['net_rtg_diff', 'win_pct_diff', 'form_10_diff', 'rest_adv', 'home_court']
-X = df[features]
-y = df['home_win']  # 1 if home team won, 0 if away
-
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-model = LogisticRegression()
-model.fit(X_train, y_train)
-
-print("Accuracy:", model.score(X_test, y_test))
-print("Coefficients:", dict(zip(features, model.coef_[0])))
-```
+| `react` + `react-dom` | ^18.3.1 | UI framework |
+| `framer-motion` | ^11.3.0 | All animations — page transitions, tile stagger, stat bar fills, expandable cards |
+| `recharts` | ^2.12.7 | Cumulative P&L line chart in the Bet Tracker |
+| `lucide-react` | ^0.383.0 | All icons (thin stroke, consistent with FM26 aesthetic) |
+| `tailwindcss` | ^3.4.7 | Utility styling — entire design system lives in `tailwind.config.js` |
+| `vite` | ^5.3.4 | Dev server + build |
+| `@radix-ui/*` | various | Installed as peer deps for shadcn; not yet wired to components |
 
 ---
 
-## The shot chart
+## Design system
 
-`src/shotchart.js` draws an SVG half-court (400×380 viewBox) and overlays colored dots per shooting zone.
+The entire visual language is defined in two files: `tailwind.config.js` and `src/index.css`.
 
-- **Orange dot** = above-average FG% for that zone
-- **Blue dot** = below-average FG%
-- Dot **size** = attempt volume (more shots → bigger dot)
-- Dot **opacity** = how far above/below average (more extreme → more opaque)
-- The % printed inside is the player's actual FG% from that zone
+### Color palette — the `pitch` scale
 
-Zone averages used as benchmarks:
-- Paint / post / floater zones: 52% average
-- Mid-range zones: 42% average
-- Three-point zones: 36% average
+Inspired by FM26's deep navy-charcoal UI. 13 stops from near-black to near-white:
 
-To use real shot coordinate data from `stats.nba.com/shotchartdetail`, bucket the x/y coordinates into zones and pass `makes` and `att` per zone.
-
----
-
-## The bet tracker
-
-`src/tracker.js` handles bet logging, P&L math, and the ROI line chart.
-
-**P&L formula:**
-```js
-// American odds → payout
-if (odds > 0)  profit = stake * (odds / 100)       // +150 odds on $50 = $75 profit
-if (odds < 0)  profit = stake * (100 / Math.abs(odds))  // -110 odds on $110 = $100 profit
+```
+pitch-950  #0a0b0d   deepest bg (unused, available)
+pitch-900  #0f1114   main page background  ← body bg
+pitch-850  #141720   nav / sidebar bg
+pitch-800  #1a1e2a   card background       ← .pm-tile, .pm-card
+pitch-750  #1f2535   card hover state
+pitch-700  #252d3d   elevated surface, inputs
+pitch-600  #2e3a50   strong border
+pitch-500  #3d4f6a   default border
+pitch-400  #546480   muted text
+pitch-300  #7d91ab   secondary text
+pitch-200  #adbdd0   body text
+pitch-100  #d4e0ec   primary text
+pitch-50   #eef4fb   brightest text
 ```
 
-**To persist bets across browser sessions**, swap the in-memory `bets` array for localStorage:
-```js
-// Save
-localStorage.setItem('courtiq_bets', JSON.stringify(bets));
+### Accent color
 
-// Load on page start
-const saved = localStorage.getItem('courtiq_bets');
-let bets = saved ? JSON.parse(saved) : [];
+```
+accent         #00d4aa   electric teal-green — FM26's signature action color
+accent/dim     #00a882   hover/pressed
+accent/10-25   opacity variants for backgrounds
 ```
 
-Or wire up a backend (Supabase, Firebase, PocketBase) for multi-device sync.
+### Status + tier colors
 
----
+```
+win   #22c55e   green  — wins, positive P&L, above-average stats
+loss  #ef4444   red    — losses, negative P&L
+draw  #f59e0b   amber  — pending, neutral
 
-## Theme system
+tier-elite  #00d4aa   PER/stat bars: top tier (≥80% of max)
+tier-good   #4ade80   good (≥65%)
+tier-avg    #facc15   average (≥50%)
+tier-poor   #f97316   below average (≥35%)
+tier-bad    #ef4444   poor (<35%)
+```
 
-CourtIQ uses CSS custom properties on `<html data-theme="light|dark">`.
+### Typography
+
+```
+font-display   Bebas Neue     → team abbreviations, logo, big display numbers
+font-sans      DM Sans        → all body text, labels, UI copy
+font-mono      DM Mono        → stats, odds, numbers, monospace values
+```
+
+### Component classes (defined in `src/index.css`)
 
 ```css
-:root {
-  --bb:     #E8531A;   /* brand orange */
-  --bg:     #ffffff;   /* card background */
-  --bg2:    #f5f4f0;   /* surface */
-  --text:   #1a1a1a;
-  --text2:  #6b6b6b;
-  --border: rgba(0,0,0,0.10);
-}
+.pm-tile          Base tile — bg-pitch-800 card with hover state
+.pm-card          Elevated card — same fill, slightly heavier shadow
+.pm-accent-border Teal glow border for active/selected state
+.pm-label         10px uppercase tracking label (section headers)
+.pm-stat-bar      3px attribute bar container
+.pm-stat-bar-fill Animated fill inside stat bar
+.pm-badge         Small pill badge
+.pm-nav-btn       Navigation button with active state
+.pm-number        Mono tabular-nums span
+.pm-result        W/L/D result square
+```
 
-[data-theme="dark"] {
-  --bg:     #111113;
-  --bg2:    #1c1c1f;
-  --text:   #f0efeb;
-  /* ... */
+---
+
+## Component breakdown
+
+### `TopNav.jsx`
+
+Sticky top navigation bar. FM26-style horizontal nav with hover-triggered submenus.
+
+- `NAV_ITEMS` array defines each nav item: id, icon, label, and sub-menu items
+- `hoveredItem` state + `useRef` timeout controls submenu visibility with a 120ms delay (prevents flicker on fast mouse movements)
+- Submenus animate in with `framer-motion` `AnimatePresence` (opacity + y: -4 → 0)
+- Right side: search button (toggles slide-in input), bell (notification dot), settings, live indicator
+- Search bar uses `AnimatePresence` with `height: 0 → 40` transition
+
+**Props:**
+```jsx
+<TopNav activeTab="dashboard" onTabChange={(id) => setTab(id)} />
+```
+
+---
+
+### `Dashboard.jsx`
+
+The portal/hub view. Renders as a 12-column CSS grid with staggered tile entrance.
+
+Sub-components:
+- `SummaryTile` — metric card with icon, big number, trend indicator
+- `GameTile` — tonight's game card with team names, win probability bar, spread/total
+- `MiniStandings` — compact 6-team standings list for each conference
+- `PlayerTile` — scoring leader row with rank, name, PPG
+
+All wrapped in Framer Motion `variants` with `staggerChildren: 0.05` — tiles cascade in from bottom on mount.
+
+**Props:**
+```jsx
+<Dashboard onNavigate={(id) => setTab(id)} />
+```
+
+---
+
+### `Players.jsx`
+
+Searchable, filterable player list with FM26-style expandable cards.
+
+- Filter bar: text search, position pills (All/PG/SG/SF/PF/C), sort dropdown
+- Each `PlayerCard` shows collapsed header (avatar, name, PTS/AST/REB) with a `ChevronDown`
+- Click to expand: `AnimatePresence` animates `height: 0 → auto`
+- Expanded view shows:
+  - Left: 6 `AttrBar` components (PER, TS%, BPM, VORP, O-RTG, D-RTG) with color-tiered animated fills
+  - Right: 6-stat number grid + last-5 form dots
+- `TEAM_COLORS` from `data.js` tints each player's avatar with their team brand color
+
+**The `AttrBar` component:**
+```jsx
+// Normalized to max value, colored by tier threshold
+<AttrBar label="PER" value={28.6} max={35} />
+// → 81.7% fill → tier-elite color (#00d4aa)
+```
+
+---
+
+### `Views.jsx`
+
+Four named exports:
+
+**`Scores`** — grid of game tiles, each selectable (accent border on click), animated win-probability bar.
+
+**`Standings`** — East/West toggle. Full table with W, L, PCT, L10, HOME, ROAD, STREAK columns. Rows animate in staggered (x: -4 → 0). Row 7 gets an accent top border marking the playoff/play-in cutline. Streak badges color-coded win/loss.
+
+**`Betting`** — 6 game cards showing model win probability vs market-implied probability. Edge badges: `★ EDGE` (≥10% gap, green), `MOD` (5–9%, amber), `SMALL` (<5%, muted). Explainer card at bottom.
+
+**`BetTracker`** — Full bet logger with:
+- 4 metric tiles: total bets, win rate, net P&L, ROI
+- Add-bet form (6 inputs: game, type, pick, odds, stake, result)
+- Bet history table with P&L calculation and delete button
+- `calcPL` handles American odds math (positive and negative)
+- Cumulative P&L `LineChart` (Recharts) renders when ≥2 settled bets exist
+
+---
+
+## Data layer — `src/data.js`
+
+All data is plain JS exported constants. The file is structured so every section is self-contained and documented.
+
+### What's in there
+
+| Export | Shape | Used in |
+|---|---|---|
+| `TEAM_COLORS` | `{ OKC: "#007AC1", ... }` | `Players.jsx` avatar tinting |
+| `PLAYERS` | Array of 12 player objects | `Players.jsx`, `Dashboard.jsx` |
+| `TODAY_GAMES` | Array of 9 game objects | `Dashboard.jsx`, `Views.jsx` (Scores) |
+| `EAST_STANDINGS` | Array of 15 team objects | `Dashboard.jsx`, `Views.jsx` (Standings) |
+| `WEST_STANDINGS` | Array of 15 team objects | `Dashboard.jsx`, `Views.jsx` (Standings) |
+| `TEAM_NAMES` | `{ GSW: "Warriors", ... }` | `Dashboard.jsx`, `Views.jsx` |
+
+### Player object shape
+
+```js
+{
+  id: 1,
+  name: "Shai Gilgeous-Alexander",
+  pos: "PG",
+  team: "OKC",
+  age: 27,
+  pts: 32.4,    // points per game
+  ast: 6.1,     // assists per game
+  reb: 5.3,     // rebounds per game
+  per: 28.6,    // player efficiency rating
+  ts: 62.8,     // true shooting %
+  bpm: 9.2,     // box plus/minus
+  vorp: 7.1,    // value over replacement
+  ortg: 123,    // offensive rating (points per 100 poss)
+  drtg: 110,    // defensive rating
+  form: ["W","W","W","L","W"],  // last 5 results
 }
 ```
 
-Every color in the app pulls from these variables, so the toggle in the header flips the whole UI instantly.
+### Game object shape
+
+```js
+{
+  id: "g1",
+  away: "GSW",
+  home: "BOS",
+  awayP: 16.8,        // model win probability (away)
+  homeP: 83.2,        // model win probability (home)
+  time: "7:00 PM",
+  spread: "BOS -9.5",
+  total: "224.5",
+}
+```
 
 ---
 
-## Typography
+## Connecting real APIs
 
-| Font | Use |
-|---|---|
-| [Bebas Neue](https://fonts.google.com/specimen/Bebas+Neue) | Logo, team abbreviations, big display numbers |
-| [DM Sans](https://fonts.google.com/specimen/DM+Sans) | All body text, labels, UI |
-| [DM Mono](https://fonts.google.com/specimen/DM+Mono) | Stats, odds, numbers, code |
+Everything in `data.js` is swappable. Here's how to go live:
 
-Loaded from Google Fonts in `index.html`.
+### Scores + win probabilities
+```js
+// BallDontLie (free) — good for scores, basic game data
+const res = await fetch("https://www.balldontlie.io/api/v1/games?dates[]=2026-03-19");
+const { data } = await res.json();
+
+// Sportradar NBA (paid) — win probabilities + live data
+const res = await fetch(`https://api.sportradar.com/nba/v8/games/2026/03/19/schedule.json?api_key=${KEY}`);
+```
+
+### Player stats
+```js
+// BallDontLie season averages
+const res = await fetch("https://www.balldontlie.io/api/v1/season_averages?season=2025&player_ids[]=...");
+
+// NBA Stats API (free, needs spoofed headers)
+// Use a serverless proxy (Vercel Edge Function) to avoid CORS + header requirements
+```
+
+### Live betting lines
+```js
+// The Odds API (free tier: 500 requests/month)
+const res = await fetch(
+  `https://api.the-odds-api.com/v4/sports/basketball_nba/odds/?apiKey=${KEY}&regions=us&markets=h2h,spreads,totals`
+);
+```
+
+### Recommended proxy pattern (avoid CORS + rate limits)
+```
+Client → Vercel Edge Function → External API
+```
+
+Create `api/nba.js` as a Vercel serverless function, cache responses for 60s, and fetch from your React app.
 
 ---
 
-## Extending the app
+## What's stubbed / not built yet
 
-| Feature | Where to add | Notes |
+| Feature | Status | Notes |
 |---|---|---|
-| Player detail modal | `src/players.js` → `card.onclick` | Replace `alert()` with a slide-in panel |
-| Real shot coordinates | `src/shotchart.js` | Swap `SHOT_DATA` with NBA Stats API response |
-| Live odds refresh | `src/betting.js` | Add `setInterval(() => fetchOdds(), 60000)` |
-| Bet persistence | `src/tracker.js` | Swap `let bets = []` for localStorage or a DB |
-| More players | `src/data.js` | Add to the `PLAYERS` array or replace with API |
-| Push notifications | New `src/alerts.js` | Use the Web Notifications API |
-| User accounts | Backend + auth | Supabase or Firebase for multi-device bet tracking |
+| Analytics tab | Placeholder | Shows "Coming soon" — wire up Four Factors, Elo, etc. |
+| Shot chart | Data in `data.js`, no view yet | SVG court renderer built in the vanilla version — needs porting to React |
+| Model builder | Not in React version yet | Full logistic regression slider UI exists in vanilla JS version |
+| Nav submenu routing | Submenus exist but all route to parent tab | Each sub-item needs its own view |
+| `@radix-ui` components | Installed, not wired | shadcn components ready to add — Dialog, Tooltip, Progress, Avatar |
+| Bet persistence | In-memory only (resets on refresh) | Add `localStorage` or Supabase for persistence |
+| Search | Input renders, no logic | Wire up to filter across players, teams, games |
+
+---
+
+## Roadmap
+
+```
+Phase 1 — current         Static data, core views working
+Phase 2 — real data       Wire BallDontLie + Odds API
+Phase 3 — shot chart      Port SVG court renderer to React component
+Phase 4 — model builder   Port logistic regression sliders to React
+Phase 5 — persistence     localStorage bets, user preferences
+Phase 6 — auth            Supabase auth + per-user bet history
+Phase 7 — mobile          Bottom tab bar, touch-optimized cards
+```
+
+---
+
+## Notes for contributors / future Claude instances
+
+This codebase has a deliberate aesthetic. If you're adding something, keep these rules:
+
+1. **Never use white backgrounds** — everything is `pitch-800` or darker
+2. **Accent color (`#00d4aa`) is for one thing** — the active/highlighted state. Don't spray it everywhere
+3. **All numbers go in `font-mono`** — stats, odds, percentages, counts, all of them
+4. **Framer Motion for everything that moves** — no CSS transitions on layout changes, use `motion.div` with `layout` prop
+5. **`pm-tile` is the atom** — build new sections out of tiles, not custom card components
+6. **Labels are always `pm-label`** — 10px, uppercase, tracked, muted. Never `text-sm font-bold` for a section header
+7. **The `pitch` scale is your only gray** — never `gray-*` or `slate-*` from default Tailwind
 
 ---
 
 ## License
 
-MIT. Use it, fork it, build on it. If you ship something cool with it, give a shout.
+MIT. Build something great.
 
 ---
 
-## Credits
-
-Built with:
-- [Chart.js](https://chartjs.org) — ROI line chart
-- [Google Fonts](https://fonts.google.com) — Bebas Neue, DM Sans, DM Mono
-- NBA data structure inspired by [Basketball Reference](https://www.basketball-reference.com) and [NBA Stats](https://stats.nba.com)
-
----
-
-*CourtIQ was designed as a complete starting point. The demo data is a snapshot of the 2025-26 NBA season as of March 19, 2026. Wire up the APIs listed above and it becomes a fully live platform.*
+*PlusMinus — commit `6ead1de` · React + Vite · NBA 2025-26 season data*
