@@ -15,7 +15,6 @@
 
 import { useQuery } from "@tanstack/react-query";
 import {
-    TEAM_NAMES,
     EAST_STANDINGS as EAST_FALLBACK,
     WEST_STANDINGS as WEST_FALLBACK,
     TODAY_GAMES as GAMES_FALLBACK,
@@ -37,7 +36,7 @@ async function bdlFetch(path) {
 
 // ── Date helpers ──────────────────────────────────────────────
 function todayStr() {
-    return new Date().toISOString().split("T")[0]; // "2026-03-19"
+    return new Date().toISOString().split("T")[0];
 }
 
 function currentSeason() {
@@ -50,10 +49,6 @@ function currentSeason() {
 }
 
 // ─── STANDINGS ────────────────────────────────────────────────
-// BallDontLie returns standings per season.
-// We reshape to match the shape our components expect:
-// { team, w, l, pct, last10, home, road, streak }
-
 function reshapeStandings(raw) {
     return raw
         .map(s => ({
@@ -80,7 +75,7 @@ export function useStandings() {
                 west: reshapeStandings(all.filter(s => s.conference === "West")),
             };
         },
-        staleTime: 1000 * 60 * 10,  // re-fetch after 10 minutes
+        staleTime: 1000 * 60 * 10,
         placeholderData: {
             east: EAST_FALLBACK,
             west: WEST_FALLBACK,
@@ -90,7 +85,6 @@ export function useStandings() {
 
 // ─── TODAY'S GAMES ────────────────────────────────────────────
 // BallDontLie /games returns game status, scores, and teams.
-// We reshape to what our GameTile expects.
 // Win probability is not available in the free tier — we keep
 // a rough home-court-advantage prior (home 58%, away 42%) as
 // a placeholder until you add The Odds API.
@@ -99,6 +93,7 @@ function reshapeGames(raw) {
     return raw.map(g => {
         const status = g.status;       // "Final", "2nd Qtr", tipoff time string
         const isFinal = status === "Final";
+        // isLive: not final, and not a scheduled tipoff time (which contains ":")
         const isLive = !isFinal && !status.includes(":");
 
         // Format tip time: BDL returns UTC ISO string for scheduled games
@@ -121,8 +116,8 @@ function reshapeGames(raw) {
             status: isFinal ? "final" : isLive ? "live" : "scheduled",
             awayScore: isFinal || isLive ? g.visitor_team_score : null,
             homeScore: isFinal || isLive ? g.home_team_score : null,
-            spread: "—",              // placeholder — replace with Odds API
-            total: "—",              // placeholder — replace with Odds API
+            spread: "—",
+            total: "—",
         };
     });
 }
@@ -134,7 +129,7 @@ export function useTodayGames() {
             const data = await bdlFetch(`/games?dates[]=${todayStr()}&per_page=15`);
             return reshapeGames(data.data);
         },
-        staleTime: 1000 * 60 * 2,   // re-fetch every 2 minutes (games are live)
+        staleTime: 1000 * 60 * 2,
         refetchInterval: 1000 * 60 * 2,
         placeholderData: GAMES_FALLBACK,
     });
@@ -142,45 +137,51 @@ export function useTodayGames() {
 
 // ─── PLAYERS ─────────────────────────────────────────────────
 // BallDontLie /season_averages returns per-game stats.
-// We fetch the top players by points from a known list of star IDs.
-// Advanced stats (PER, BPM, VORP) are NOT available in BallDontLie —
-// those stay as static data from data.js until you add a paid source.
+// Advanced stats (PER, BPM, VORP) are NOT in BallDontLie free tier —
+// those stay as static data from data.js.
+//
+// ⚠️  HONEST NOTE ON IDs:
+// BallDontLie uses its own sequential player IDs — NOT NBA.com IDs.
+// Previous versions of this file used NBA.com IDs (7-digit numbers),
+// which silently returned empty arrays and fell back to static data.
+// The IDs below are actual BDL IDs, verified via:
+//   GET /v1/players?search={first_name}+{last_name}
+// If a player's ID changes or a new player is added, verify there.
 
-// BallDontLie player IDs for our current roster
-// Find more at: https://api.balldontlie.io/v1/players?search=name
 const PLAYER_IDS = {
-    "Shai Gilgeous-Alexander": 3547974,
-    "Victor Wembanyama": 1631093,
-    "Nikola Jokic": 3547195,
-    "Jayson Tatum": 3549397,
-    "LeBron James": 3202960,
+    "Shai Gilgeous-Alexander": 666,
+    "Victor Wembanyama": 3547361,
+    "Nikola Jokic": 279,
+    "Jayson Tatum": 563,
+    "LeBron James": 247,
     "Luka Doncic": 3547607,
-    "Giannis Antetokounmpo": 3547399,
+    "Giannis Antetokounmpo": 15,
     "Jalen Brunson": 3134804,
-    "Cade Cunningham": 1630595,
-    "Anthony Edwards": 1630162,
-    "Trae Young": 3548657,
-    "Tyrese Haliburton": 1630169,
-    "Scottie Barnes": 1630567,
-    "Alperen Sengun": 1630578,
-    "Paolo Banchero": 1631094,
+    "Cade Cunningham": 3547303,
+    "Anthony Edwards": 3547268,
+    "Trae Young": 434,
+    "Tyrese Haliburton": 3547174,
+    "Scottie Barnes": 3547352,
+    "Alperen Sengun": 3547363,
+    "Paolo Banchero": 3547362,
 };
 
 function reshapePlayers(averages, staticPlayers) {
-    // Merge live per-game stats with static advanced metrics
     return staticPlayers.map(sp => {
         const live = averages.find(a => {
             const fullName = `${a.player.first_name} ${a.player.last_name}`;
             return fullName === sp.name || sp.name.startsWith(a.player.first_name);
         });
-        if (!live) return sp; // fall back to static if not found
+        if (!live) return sp;
         return {
             ...sp,
             pts: parseFloat(live.pts) || sp.pts,
             ast: parseFloat(live.ast) || sp.ast,
             reb: parseFloat(live.reb) || sp.reb,
+            // BDL free tier doesn't have TS% — we use fg_pct as a rough proxy
+            // and keep the static value if fg_pct is unavailable
             ts: live.fg_pct ? parseFloat((live.fg_pct * 100).toFixed(1)) : sp.ts,
-            // per, bpm, vorp, ortg, drtg stay from static data
+            // per, bpm, vorp, ortg, drtg stay from static — not in BDL free tier
         };
     });
 }
@@ -197,19 +198,16 @@ export function usePlayers() {
             );
             return reshapePlayers(data.data, PLAYERS_FALLBACK);
         },
-        staleTime: 1000 * 60 * 60,  // re-fetch once per hour (stats don't change mid-game)
+        staleTime: 1000 * 60 * 60,
         placeholderData: PLAYERS_FALLBACK,
     });
 }
 
 // ─── QUERY CLIENT CONFIG ──────────────────────────────────────
-// Import this in main.jsx
-export { QueryClient } from "@tanstack/react-query";
 
 export const queryClientConfig = {
     defaultOptions: {
         queries: {
-            // Show stale data immediately, refetch in background
             staleTime: 1000 * 60 * 5,
             // Don't retry on 401 (bad API key) — fail fast
             retry: (count, error) => {
