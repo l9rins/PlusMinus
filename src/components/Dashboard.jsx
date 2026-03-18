@@ -1,7 +1,9 @@
+import { useState, useMemo } from "react";
 import { motion } from "framer-motion";
 import { TrendingUp, TrendingDown, Target, BarChart2, Zap, ChevronRight } from "lucide-react";
 import { TEAM_NAMES } from "../data";
 import { useStandings, useTodayGames } from "../api";
+import { calcPL } from "../utils";
 import { TileSkeleton, RowSkeleton, ErrorState, FreshnessTag } from "./ui";
 
 const container = {
@@ -151,6 +153,27 @@ export default function Dashboard({ onNavigate }) {
     const liveCount = gameList.filter(g => g.status === "live").length;
     const gameCount = gameList.length;
 
+    // Read bet stats from same localStorage key as BetTracker
+    const betStats = useMemo(() => {
+        try {
+            const raw = localStorage.getItem("plusminus_bets");
+            if (!raw) return { total: 0, wins: 0, losses: 0, pending: 0, pl: 0 };
+            const bets = JSON.parse(raw);
+            if (!Array.isArray(bets)) return { total: 0, wins: 0, losses: 0, pending: 0, pl: 0 };
+            const wins = bets.filter(b => b.result === "win").length;
+            const losses = bets.filter(b => b.result === "loss").length;
+            const pending = bets.filter(b => b.result === "pending").length;
+            const pl = bets.reduce((s, b) => s + calcPL(b.stake, b.odds, b.result), 0);
+            return { total: bets.length, wins, losses, pending, pl };
+        } catch {
+            return { total: 0, wins: 0, losses: 0, pending: 0, pl: 0 };
+        }
+    }, []);
+
+    const betSub = betStats.total > 0
+        ? `${betStats.wins} wins · ${betStats.losses} losses · ${betStats.pending} open`
+        : "No bets logged yet";
+
     return (
         <motion.div
             variants={container}
@@ -177,7 +200,7 @@ export default function Dashboard({ onNavigate }) {
                     />
                     <SummaryTile label="Top Model Edge" value="+11%" sub="OKC @ BKN" icon={TrendingUp} trend="up" />
                     <SummaryTile label="Best Win Prob" value="94.7%" sub="OKC (away)" icon={Zap} />
-                    <SummaryTile label="Tracked Bets" value="4" sub="2 wins · 1 loss · 1 open" icon={BarChart2} />
+                    <SummaryTile label="Tracked Bets" value={betStats.total || "—"} sub={betSub} icon={BarChart2} />
                 </div>
             </motion.div>
 

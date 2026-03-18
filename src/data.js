@@ -51,15 +51,15 @@ export const PLAYERS = [
 // ─── TODAY'S GAMES ────────────────────────────────────────────
 // id is required — used as React key in game tile lists.
 export const TODAY_GAMES = [
-  { id: "g1", away: "GSW", home: "BOS", awayP: 16.8, homeP: 83.2, time: "7:00 PM", spread: "BOS -9.5", total: "224.5" },
-  { id: "g2", away: "POR", home: "IND", awayP: 84.7, homeP: 15.3, time: "7:30 PM", spread: "POR -8",   total: "228"   },
-  { id: "g3", away: "OKC", home: "BKN", awayP: 94.7, homeP: 5.3,  time: "7:30 PM", spread: "OKC -16",  total: "218"   },
-  { id: "g4", away: "TOR", home: "CHI", awayP: 73.0, homeP: 27.0, time: "8:00 PM", spread: "TOR -5",   total: "226"   },
-  { id: "g5", away: "LAC", home: "NOP", awayP: 44.6, homeP: 55.4, time: "8:00 PM", spread: "NOP -1",   total: "231"   },
-  { id: "g6", away: "UTA", home: "MIN", awayP: 13.3, homeP: 86.7, time: "8:00 PM", spread: "MIN -12",  total: "221"   },
-  { id: "g7", away: "DEN", home: "MEM", awayP: 86.9, homeP: 13.1, time: "8:30 PM", spread: "DEN -10",  total: "222.5" },
-  { id: "g8", away: "ATL", home: "DAL", awayP: 74.5, homeP: 25.5, time: "8:30 PM", spread: "ATL -5.5", total: "233.5" },
-  { id: "g9", away: "LAL", home: "HOU", awayP: 45.1, homeP: 54.9, time: "9:30 PM", spread: "HOU -1",   total: "231"   },
+  { id: "g1", away: "GSW", home: "BOS", awayP: 16.8, homeP: 83.2, time: "7:00 PM", spread: "BOS -9.5", total: "224.5", status: "scheduled" },
+  { id: "g2", away: "POR", home: "IND", awayP: 84.7, homeP: 15.3, time: "7:30 PM", spread: "POR -8",   total: "228",   status: "scheduled" },
+  { id: "g3", away: "OKC", home: "BKN", awayP: 94.7, homeP: 5.3,  time: "7:30 PM", spread: "OKC -16",  total: "218",   status: "scheduled" },
+  { id: "g4", away: "TOR", home: "CHI", awayP: 73.0, homeP: 27.0, time: "8:00 PM", spread: "TOR -5",   total: "226",   status: "scheduled" },
+  { id: "g5", away: "LAC", home: "NOP", awayP: 44.6, homeP: 55.4, time: "8:00 PM", spread: "NOP -1",   total: "231",   status: "scheduled" },
+  { id: "g6", away: "UTA", home: "MIN", awayP: 13.3, homeP: 86.7, time: "8:00 PM", spread: "MIN -12",  total: "221",   status: "scheduled" },
+  { id: "g7", away: "DEN", home: "MEM", awayP: 86.9, homeP: 13.1, time: "8:30 PM", spread: "DEN -10",  total: "222.5", status: "scheduled" },
+  { id: "g8", away: "ATL", home: "DAL", awayP: 74.5, homeP: 25.5, time: "8:30 PM", spread: "ATL -5.5", total: "233.5", status: "scheduled" },
+  { id: "g9", away: "LAL", home: "HOU", awayP: 45.1, homeP: 54.9, time: "9:30 PM", spread: "HOU -1",   total: "231",   status: "scheduled" },
 ];
 
 // ─── STANDINGS ────────────────────────────────────────────────

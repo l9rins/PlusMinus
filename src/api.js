@@ -168,10 +168,10 @@ const PLAYER_IDS = {
 
 function reshapePlayers(averages, staticPlayers) {
     return staticPlayers.map(sp => {
-        const live = averages.find(a => {
-            const fullName = `${a.player.first_name} ${a.player.last_name}`;
-            return fullName === sp.name || sp.name.startsWith(a.player.first_name);
-        });
+        const bdlId = PLAYER_IDS[sp.name];
+        const live = bdlId
+            ? averages.find(a => a.player.id === bdlId)
+            : null;
         if (!live) return sp;
         return {
             ...sp,
