@@ -67,3 +67,10 @@ export function signed(n, decimals = 1) {
 export function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max);
 }
+
+/**
+ * LocalStorage key for persisted bets.
+ * Used by: BetTracker (Views.jsx) and Dashboard summary tile.
+ * Single source of truth — import this instead of hardcoding the string.
+ */
+export const BET_STORAGE_KEY = "plusminus_bets";

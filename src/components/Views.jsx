@@ -5,7 +5,7 @@ import {
 } from "recharts";
 import { TEAM_NAMES, ODDS_GAMES } from "../data";
 import { useStandings, useTodayGames } from "../api";
-import { calcPL } from "../utils";
+import { calcPL, BET_STORAGE_KEY } from "../utils";
 import { TileSkeleton, RowSkeleton, ErrorState, FreshnessTag } from "./ui";
 
 const container = { hidden: {}, show: { transition: { staggerChildren: 0.04 } } };
@@ -286,11 +286,8 @@ export function Betting() {
 }
 
 // ── BET TRACKER ───────────────────────────────────────────────
-// FIXED: Bets now persist in localStorage so switching tabs doesn't wipe the log.
-// Key: "plusminus_bets" — stored as JSON array.
-// Migration: if the key is missing, we seed with the demo bets.
-
-const STORAGE_KEY = "plusminus_bets";
+// Bets persist in localStorage. Key imported from utils.js.
+// If missing, we seed with demo bets.
 
 const DEMO_BETS = [
   { id: 1, game: "OKC @ BKN", type: "Spread", pick: "OKC -16", odds: -110, stake: 50, result: "win" },
@@ -301,7 +298,7 @@ const DEMO_BETS = [
 
 function loadBets() {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(BET_STORAGE_KEY);
     if (!raw) return DEMO_BETS;
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed) && parsed.length > 0) return parsed;
@@ -313,7 +310,7 @@ function loadBets() {
 
 function saveBets(bets) {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(bets));
+    localStorage.setItem(BET_STORAGE_KEY, JSON.stringify(bets));
   } catch {
     // localStorage may be unavailable in some browser contexts — fail silently
     console.warn("[PlusMinus] Could not persist bets to localStorage.");

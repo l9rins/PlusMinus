@@ -1,9 +1,9 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import { TrendingUp, TrendingDown, Target, BarChart2, Zap, ChevronRight } from "lucide-react";
-import { TEAM_NAMES } from "../data";
+import { TEAM_NAMES, ODDS_GAMES } from "../data";
 import { useStandings, useTodayGames } from "../api";
-import { calcPL } from "../utils";
+import { calcPL, BET_STORAGE_KEY } from "../utils";
 import { TileSkeleton, RowSkeleton, ErrorState, FreshnessTag } from "./ui";
 
 const container = {
@@ -153,10 +153,13 @@ export default function Dashboard({ onNavigate }) {
     const liveCount = gameList.filter(g => g.status === "live").length;
     const gameCount = gameList.length;
 
-    // Read bet stats from same localStorage key as BetTracker
-    const betStats = useMemo(() => {
+    // Read bet stats from localStorage — re-reads on storage events from other tabs
+    // and on mount. Uses a version counter to trigger re-computation.
+    const [betVersion, setBetVersion] = useState(0);
+
+    const readBetStats = useCallback(() => {
         try {
-            const raw = localStorage.getItem("plusminus_bets");
+            const raw = localStorage.getItem(BET_STORAGE_KEY);
             if (!raw) return { total: 0, wins: 0, losses: 0, pending: 0, pl: 0 };
             const bets = JSON.parse(raw);
             if (!Array.isArray(bets)) return { total: 0, wins: 0, losses: 0, pending: 0, pl: 0 };
@@ -170,9 +173,30 @@ export default function Dashboard({ onNavigate }) {
         }
     }, []);
 
+    // Re-read on mount and when navigating back to Dashboard
+    const betStats = useMemo(() => readBetStats(), [betVersion, readBetStats]);
+
+    // Listen for storage changes (cross-tab or same-tab via BetTracker)
+    useEffect(() => {
+        const onStorage = (e) => {
+            if (e.key === BET_STORAGE_KEY) setBetVersion(v => v + 1);
+        };
+        window.addEventListener("storage", onStorage);
+        return () => window.removeEventListener("storage", onStorage);
+    }, []);
+
     const betSub = betStats.total > 0
         ? `${betStats.wins} wins · ${betStats.losses} losses · ${betStats.pending} open`
         : "No bets logged yet";
+
+    // Compute edge/prob tiles from ODDS_GAMES instead of hardcoding
+    const topEdge = useMemo(() =>
+        ODDS_GAMES.reduce((best, g) =>
+            (g.modelP - g.impliedP) > (best.modelP - best.impliedP) ? g : best
+        ), []);
+    const bestProb = useMemo(() =>
+        ODDS_GAMES.reduce((best, g) => g.modelP > best.modelP ? g : best
+        ), []);
 
     return (
         <motion.div
@@ -198,8 +222,19 @@ export default function Dashboard({ onNavigate }) {
                         icon={Target}
                         trend={liveCount > 0 ? "up" : null}
                     />
-                    <SummaryTile label="Top Model Edge" value="+11%" sub="OKC @ BKN" icon={TrendingUp} trend="up" />
-                    <SummaryTile label="Best Win Prob" value="94.7%" sub="OKC (away)" icon={Zap} />
+                    <SummaryTile
+                        label="Top Model Edge"
+                        value={`+${topEdge.modelP - topEdge.impliedP}%`}
+                        sub={topEdge.matchup}
+                        icon={TrendingUp}
+                        trend="up"
+                    />
+                    <SummaryTile
+                        label="Best Win Prob"
+                        value={`${bestProb.modelP}%`}
+                        sub={`${bestProb.fav} (${bestProb.matchup.split(" @ ")[0] === bestProb.fav ? "away" : "home"})`}
+                        icon={Zap}
+                    />
                     <SummaryTile label="Tracked Bets" value={betStats.total || "—"} sub={betSub} icon={BarChart2} />
                 </div>
             </motion.div>
