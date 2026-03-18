@@ -16,7 +16,7 @@ PlusMinus is a browser-based NBA analytics platform built for three types of peo
 
 The design language is directly inspired by **Football Manager 2026** — dense tile-based layouts, a dark charcoal palette, hover submenus, staggered entrance animations, and FM-style color-coded attribute bars that animate on expand.
 
-Everything runs on static demo data right now (2025-26 NBA season snapshot). The data layer is one file — swap `src/data.js` for real API calls and you're live.
+Everything runs on static demo data (2025-26 NBA season snapshot). The data layer is one file — swap `src/data.js` for real API calls and you're live.
 
 ---
 
@@ -28,55 +28,44 @@ https://github.com/l9rins/plusminus
 
 ---
 
-## Project structure
-
-```
-plusminus/
-├── index.html                ← Entry point; loads Google Fonts (Bebas Neue, DM Sans, DM Mono)
-├── package.json              ← Dependencies: React 18, Framer Motion, Recharts, Lucide, Tailwind
-├── vite.config.js            ← Vite + React plugin, @ alias → src/
-├── tailwind.config.js        ← Full custom design system (pitch palette, accent, tier colors)
-├── postcss.config.js         ← Tailwind + autoprefixer
-└── src/
-    ├── main.jsx              ← ReactDOM.createRoot, mounts <App />
-    ├── App.jsx               ← Root: tab state, AnimatePresence page transitions, route switch
-    ├── index.css             ← Tailwind base + all .pm-* component classes
-    ├── data.js               ← All static NBA data (replace with API calls to go live)
-    └── components/
-        ├── TopNav.jsx        ← Sticky nav bar with hover submenus, search slide-in, live dot
-        ├── Dashboard.jsx     ← Home portal: summary tiles, game tiles, mini standings, top scorers
-        ├── Players.jsx       ← Searchable/filterable player list with expandable FM26-style cards
-        └── Views.jsx         ← Scores, Standings, Betting Edge, BetTracker (all named exports)
-```
-
----
-
-## Getting started
-
-### Prerequisites
-
-- Node.js 18+
-- npm or pnpm
-
-### Install and run
+## Running it
 
 ```bash
 git clone https://github.com/l9rins/plusminus.git
 cd plusminus
 npm install
-npm run dev
+npm run dev        # http://localhost:5173
+npm run build      # outputs to dist/
+npm run preview    # serve the build locally
 ```
 
-Open `http://localhost:5173` and you're in.
+No framework magic. No config required. Just open and go.
 
-### Build for production
+> **GitHub Pages note:** `vite.config.js` sets `base: "/plusminus/"` for GH Pages deployment. If deploying to Vercel, Netlify, or a root domain, change this to `"/"`.
 
-```bash
-npm run build       # outputs to dist/
-npm run preview     # serve the build locally
+---
+
+## Project structure
+
 ```
-
-Deploy the `dist/` folder to Vercel, Netlify, or GitHub Pages — it's a static site.
+plusminus/
+├── index.html              ← Entry point; loads Google Fonts
+├── package.json            ← React 18, Framer Motion, Recharts, Lucide, Tailwind
+├── vite.config.js          ← Vite + React plugin, @ alias → src/, base path
+├── tailwind.config.js      ← Full custom design system
+├── postcss.config.js
+└── src/
+    ├── main.jsx            ← ReactDOM.createRoot
+    ├── App.jsx             ← Root: tab state, AnimatePresence routing, Placeholder
+    ├── index.css           ← Tailwind base + all .pm-* component classes
+    ├── data.js             ← All static NBA data (replace with API calls to go live)
+    ├── utils.js            ← Pure utility functions: calcPL, oddsToImplied, signed, clamp
+    └── components/
+        ├── TopNav.jsx      ← Sticky nav with hover submenus, search, live indicator
+        ├── Dashboard.jsx   ← Home portal: summary tiles, games, standings, scorers
+        ├── Players.jsx     ← Searchable player list with expandable FM26-style cards
+        └── Views.jsx       ← Scores, Standings, Betting, BetTracker (named exports)
+```
 
 ---
 
@@ -85,29 +74,29 @@ Deploy the `dist/` folder to Vercel, Netlify, or GitHub Pages — it's a static 
 | Package | Version | Role |
 |---|---|---|
 | `react` + `react-dom` | ^18.3.1 | UI framework |
-| `framer-motion` | ^11.3.0 | All animations — page transitions, tile stagger, stat bar fills, expandable cards |
-| `recharts` | ^2.12.7 | Cumulative P&L line chart in the Bet Tracker |
-| `lucide-react` | ^0.383.0 | All icons (thin stroke, consistent with FM26 aesthetic) |
-| `tailwindcss` | ^3.4.7 | Utility styling — entire design system lives in `tailwind.config.js` |
+| `framer-motion` | ^11.3.0 | Page transitions, tile stagger, stat bar fills, card expand |
+| `recharts` | ^2.12.7 | Cumulative P&L line chart in BetTracker |
+| `lucide-react` | ^0.383.0 | All icons (thin stroke, consistent weight) |
+| `tailwindcss` | ^3.4.7 | Utility styling — entire design system in `tailwind.config.js` |
 | `vite` | ^5.3.4 | Dev server + build |
-| `@radix-ui/*` | various | Installed as peer deps for shadcn; not yet wired to components |
+| `@radix-ui/*` | various | Installed as peer deps for future shadcn components |
 
 ---
 
 ## Design system
 
-The entire visual language is defined in two files: `tailwind.config.js` and `src/index.css`.
+The entire visual language lives in `tailwind.config.js` and `src/index.css`.
 
 ### Color palette — the `pitch` scale
 
-Inspired by FM26's deep navy-charcoal UI. 13 stops from near-black to near-white:
+FM26-inspired deep navy-charcoal. 13 stops:
 
 ```
-pitch-950  #0a0b0d   deepest bg (unused, available)
-pitch-900  #0f1114   main page background  ← body bg
-pitch-850  #141720   nav / sidebar bg
-pitch-800  #1a1e2a   card background       ← .pm-tile, .pm-card
-pitch-750  #1f2535   card hover state
+pitch-950  #0a0b0d   deepest bg
+pitch-900  #0f1114   page background          ← body bg
+pitch-850  #141720   nav background
+pitch-800  #1a1e2a   card / tile background   ← .pm-tile, .pm-card
+pitch-750  #1f2535   tile hover state
 pitch-700  #252d3d   elevated surface, inputs
 pitch-600  #2e3a50   strong border
 pitch-500  #3d4f6a   default border
@@ -118,88 +107,106 @@ pitch-100  #d4e0ec   primary text
 pitch-50   #eef4fb   brightest text
 ```
 
-### Accent color
+### Accent + status
 
 ```
-accent         #00d4aa   electric teal-green — FM26's signature action color
-accent/dim     #00a882   hover/pressed
-accent/10-25   opacity variants for backgrounds
+accent     #00d4aa   electric teal — active state, live indicator, top-ranked teams
+win        #22c55e   green  — wins, positive P&L, W streaks
+loss       #ef4444   red    — losses, negative P&L, L streaks
+draw       #f59e0b   amber  — pending bets, moderate edge
 ```
 
-### Status + tier colors
+### Rating tiers (FM26-style attribute bar colors)
 
 ```
-win   #22c55e   green  — wins, positive P&L, above-average stats
-loss  #ef4444   red    — losses, negative P&L
-draw  #f59e0b   amber  — pending, neutral
-
-tier-elite  #00d4aa   PER/stat bars: top tier (≥80% of max)
-tier-good   #4ade80   good (≥65%)
-tier-avg    #facc15   average (≥50%)
-tier-poor   #f97316   below average (≥35%)
-tier-bad    #ef4444   poor (<35%)
+tier-elite  #00d4aa   ≥ 80% of metric max
+tier-good   #4ade80   ≥ 65%
+tier-avg    #facc15   ≥ 50%
+tier-poor   #f97316   ≥ 35%
+tier-bad    #ef4444   < 35%
 ```
 
 ### Typography
 
 ```
-font-display   Bebas Neue     → team abbreviations, logo, big display numbers
-font-sans      DM Sans        → all body text, labels, UI copy
-font-mono      DM Mono        → stats, odds, numbers, monospace values
+font-display   Bebas Neue    team abbreviations, logo, large numbers
+font-sans      DM Sans       all body text, labels, UI
+font-mono      DM Mono       stats, odds, P&L values, code
 ```
 
-### Component classes (defined in `src/index.css`)
+### Component classes (`src/index.css`)
 
 ```css
-.pm-tile          Base tile — bg-pitch-800 card with hover state
-.pm-card          Elevated card — same fill, slightly heavier shadow
-.pm-accent-border Teal glow border for active/selected state
+.pm-tile          Base tile — pitch-800 bg, border, hover state.
+                  NOTE: no overflow-hidden — intentional so .pm-accent-border
+                  glow is not clipped on expanded player cards.
+
+.pm-card          Elevated card — heavier shadow, rounded-xl
+
+.pm-accent-border Teal glow border for selected/active tiles
+
 .pm-label         10px uppercase tracking label (section headers)
-.pm-stat-bar      3px attribute bar container
-.pm-stat-bar-fill Animated fill inside stat bar
+
+.pm-stat-bar      3px attribute bar track
+.pm-stat-bar-fill Animated fill (color set by tier-* class)
+
 .pm-badge         Small pill badge
-.pm-nav-btn       Navigation button with active state
+
+.pm-nav-btn       Nav button with .active state (text-accent + bg-accent/10)
+
 .pm-number        Mono tabular-nums span
-.pm-result        W/L/D result square
+
+.pm-result        5×5 W/L/D result square
+
+.scrollbar-none   Hides scrollbar on nav overflow — defined here since Tailwind
+                  base does not include this utility without a plugin
 ```
 
 ---
 
 ## Component breakdown
 
+### `App.jsx`
+
+Root component. Owns the `tab` state and routes to the correct view via `renderContent()`.
+
+Routes:
+- `dashboard` → `<Dashboard>`
+- `scores` → `<Scores>`
+- `standings` → `<Standings>`
+- `players` → `<Players>`
+- `betting` → `<Betting>`
+- `tracker` → `<BetTracker>` ← accessed via Betting → "Bet Tracker" submenu
+- `analytics` → `<Placeholder>` with description of coming features
+- `default` → console.warn + fallback to Dashboard
+
+`Placeholder` accepts a `title` and optional `description` prop so each stub can describe what it will eventually contain.
+
+---
+
 ### `TopNav.jsx`
 
-Sticky top navigation bar. FM26-style horizontal nav with hover-triggered submenus.
+Sticky nav bar. FM26-style horizontal tabs with 120ms-delayed hover submenus.
 
-- `NAV_ITEMS` array defines each nav item: id, icon, label, and sub-menu items
-- `hoveredItem` state + `useRef` timeout controls submenu visibility with a 120ms delay (prevents flicker on fast mouse movements)
-- Submenus animate in with `framer-motion` `AnimatePresence` (opacity + y: -4 → 0)
-- Right side: search button (toggles slide-in input), bell (notification dot), settings, live indicator
-- Search bar uses `AnimatePresence` with `height: 0 → 40` transition
-
-**Props:**
-```jsx
-<TopNav activeTab="dashboard" onTabChange={(id) => setTab(id)} />
-```
+Key details:
+- `NAV_ITEMS` array drives both the tab buttons and their submenu items, each with a real route `id`
+- "Bet Tracker" submenu item routes to `"tracker"` (distinct from `"betting"`)
+- Betting tab stays highlighted when `activeTab === "tracker"`
+- `useEffect` cleanup: `clearTimeout(timeoutRef.current)` on unmount prevents state updates on unmounted component
+- Search: Escape closes + clears, Enter navigates to Players
+- Labels hidden below `sm:` breakpoint — icon-only on mobile
+- `scrollbar-none` on the nav items container (defined in `index.css`)
+- Bell + Settings buttons have `onClick` handlers (log to console until built)
 
 ---
 
 ### `Dashboard.jsx`
 
-The portal/hub view. Renders as a 12-column CSS grid with staggered tile entrance.
+Portal/hub. 12-column CSS grid with staggered tile entrance animation.
 
-Sub-components:
-- `SummaryTile` — metric card with icon, big number, trend indicator
-- `GameTile` — tonight's game card with team names, win probability bar, spread/total
-- `MiniStandings` — compact 6-team standings list for each conference
-- `PlayerTile` — scoring leader row with rank, name, PPG
-
-All wrapped in Framer Motion `variants` with `staggerChildren: 0.05` — tiles cascade in from bottom on mount.
-
-**Props:**
-```jsx
-<Dashboard onNavigate={(id) => setTab(id)} />
-```
+- `TOP_SCORERS` is computed at **module level** (not inside the component) — PLAYERS is static, so sorting once on import is free
+- Sub-components: `SummaryTile`, `GameTile`, `MiniStandings`, `PlayerTile`
+- All wrapped in Framer `variants` with `staggerChildren: 0.05`
 
 ---
 
@@ -207,20 +214,16 @@ All wrapped in Framer Motion `variants` with `staggerChildren: 0.05` — tiles c
 
 Searchable, filterable player list with FM26-style expandable cards.
 
-- Filter bar: text search, position pills (All/PG/SG/SF/PF/C), sort dropdown
-- Each `PlayerCard` shows collapsed header (avatar, name, PTS/AST/REB) with a `ChevronDown`
-- Click to expand: `AnimatePresence` animates `height: 0 → auto`
-- Expanded view shows:
-  - Left: 6 `AttrBar` components (PER, TS%, BPM, VORP, O-RTG, D-RTG) with color-tiered animated fills
-  - Right: 6-stat number grid + last-5 form dots
-- `TEAM_COLORS` from `data.js` tints each player's avatar with their team brand color
+**`AttrBar` component:**
+- Accepts an `invert` prop for lower-is-better metrics
+- D-RTG uses `invert={true}` — elite defenders (low D-RTG) fill the bar fully; poor defenders barely fill it
+- Formula: `pct = (max - value) / (max - 100) * 100` for inverted metrics, range anchored at 100 (best possible)
+- Color tier thresholds: 80% = elite, 65% = good, 50% = avg, 35% = poor, <35% = bad
 
-**The `AttrBar` component:**
-```jsx
-// Normalized to max value, colored by tier threshold
-<AttrBar label="PER" value={28.6} max={35} />
-// → 81.7% fill → tier-elite color (#00d4aa)
-```
+**`PlayerCard` component:**
+- `overflow-hidden` is on the **inner animated div**, not on `pm-tile`
+- This ensures `pm-accent-border`'s teal glow box-shadow is visible on expanded cards
+- BPM stat uses `signed()` from `utils.js` — correctly handles negative BPM (no `+-3.1`)
 
 ---
 
@@ -228,35 +231,37 @@ Searchable, filterable player list with FM26-style expandable cards.
 
 Four named exports:
 
-**`Scores`** — grid of game tiles, each selectable (accent border on click), animated win-probability bar.
+**`Scores`** — 9 game tiles with win probability bars. Clicking a tile toggles accent border selection.
 
-**`Standings`** — East/West toggle. Full table with W, L, PCT, L10, HOME, ROAD, STREAK columns. Rows animate in staggered (x: -4 → 0). Row 7 gets an accent top border marking the playoff/play-in cutline. Streak badges color-coded win/loss.
+**`Standings`** — East/West toggle. Full 9-column table with `min-w-[640px]` for mobile scroll. Row 7 gets accent top border for playoff/play-in cutline. Staggered row entrance.
 
-**`Betting`** — 6 game cards showing model win probability vs market-implied probability. Edge badges: `★ EDGE` (≥10% gap, green), `MOD` (5–9%, amber), `SMALL` (<5%, muted). Explainer card at bottom.
+**`Betting`** — 6 game cards showing model probability vs market-implied probability. Imports `ODDS_GAMES` from `data.js` (no local duplicate).
 
-**`BetTracker`** — Full bet logger with:
-- 4 metric tiles: total bets, win rate, net P&L, ROI
-- Add-bet form (6 inputs: game, type, pick, odds, stake, result)
-- Bet history table with P&L calculation and delete button
-- `calcPL` handles American odds math (positive and negative)
-- Cumulative P&L `LineChart` (Recharts) renders when ≥2 settled bets exist
+**`BetTracker`**:
+- `calcPL` imported from `utils.js` — single source of truth for P&L math
+- `stats` and `chartData` wrapped in `useMemo([bets])` — no recomputation on form keystrokes
+- Win rate calculated on decisive bets only (wins + losses), **excluding pushes** from denominator
+- ROI stake base uses decisive bets only — pushes return stake so they don't count as risked
+- Form validation: `addBet()` shows a visible `formError` message instead of silently doing nothing
+- ROI chart renders only when `chartData.length >= 2`
 
 ---
 
 ## Data layer — `src/data.js`
 
-All data is plain JS exported constants. The file is structured so every section is self-contained and documented.
+All data is plain JS exported constants. Fully documented inline.
 
-### What's in there
+### Exports
 
 | Export | Shape | Used in |
 |---|---|---|
 | `TEAM_COLORS` | `{ OKC: "#007AC1", ... }` | `Players.jsx` avatar tinting |
-| `PLAYERS` | Array of 12 player objects | `Players.jsx`, `Dashboard.jsx` |
-| `TODAY_GAMES` | Array of 9 game objects | `Dashboard.jsx`, `Views.jsx` (Scores) |
-| `EAST_STANDINGS` | Array of 15 team objects | `Dashboard.jsx`, `Views.jsx` (Standings) |
-| `WEST_STANDINGS` | Array of 15 team objects | `Dashboard.jsx`, `Views.jsx` (Standings) |
 | `TEAM_NAMES` | `{ GSW: "Warriors", ... }` | `Dashboard.jsx`, `Views.jsx` |
+| `PLAYERS` | Array of 15 player objects | `Players.jsx`, `Dashboard.jsx` |
+| `TODAY_GAMES` | Array of 9 game objects | `Dashboard.jsx`, `Views.jsx` |
+| `EAST_STANDINGS` | Array of 15 team objects | `Dashboard.jsx`, `Views.jsx` |
+| `WEST_STANDINGS` | Array of 15 team objects | `Dashboard.jsx`, `Views.jsx` |
+| `ODDS_GAMES` | Array of 6 betting edge objects | `Views.jsx` |
 
 ### Player object shape
 
@@ -270,13 +275,13 @@ All data is plain JS exported constants. The file is structured so every section
   pts: 32.4,    // points per game
   ast: 6.1,     // assists per game
   reb: 5.3,     // rebounds per game
-  per: 28.6,    // player efficiency rating
-  ts: 62.8,     // true shooting %
-  bpm: 9.2,     // box plus/minus
-  vorp: 7.1,    // value over replacement
-  ortg: 123,    // offensive rating (points per 100 poss)
-  drtg: 110,    // defensive rating
-  form: ["W","W","W","L","W"],  // last 5 results
+  per: 28.6,    // player efficiency rating (max ~35 for elite)
+  ts: 62.8,     // true shooting % (max ~75 for elite)
+  bpm: 9.2,     // box plus/minus (can be negative)
+  vorp: 7.1,    // value over replacement player
+  ortg: 123,    // offensive rating: points per 100 possessions
+  drtg: 110,    // defensive rating: lower is better
+  form: ["W","W","W","L","W"],  // last 5 game results
 }
 ```
 
@@ -284,11 +289,11 @@ All data is plain JS exported constants. The file is structured so every section
 
 ```js
 {
-  id: "g1",
+  id: "g1",           // required for React key — do not omit
   away: "GSW",
   home: "BOS",
-  awayP: 16.8,        // model win probability (away)
-  homeP: 83.2,        // model win probability (home)
+  awayP: 16.8,        // model win probability (away team)
+  homeP: 83.2,        // model win probability (home team)
   time: "7:00 PM",
   spread: "BOS -9.5",
   total: "224.5",
@@ -297,17 +302,31 @@ All data is plain JS exported constants. The file is structured so every section
 
 ---
 
+## Utilities — `src/utils.js`
+
+Pure functions, no React. Fully JSDoc'd.
+
+| Function | Used by | Purpose |
+|---|---|---|
+| `calcPL(stake, odds, result)` | `Views.jsx` BetTracker | American odds → P&L in dollars |
+| `oddsToImplied(odds)` | future: `Views.jsx` Betting | American odds → implied probability |
+| `signed(n, decimals)` | `Players.jsx` BPM display | Format number with explicit +/− sign |
+| `clamp(value, min, max)` | future: shot chart, model builder | Bound a value within a range |
+
+`oddsToImplied` and `clamp` are not yet called by any component. Both are documented with the specific future use case they'll serve.
+
+---
+
 ## Connecting real APIs
 
-Everything in `data.js` is swappable. Here's how to go live:
+Everything in `data.js` is swappable. Recommended sources:
 
 ### Scores + win probabilities
 ```js
-// BallDontLie (free) — good for scores, basic game data
+// BallDontLie (free)
 const res = await fetch("https://www.balldontlie.io/api/v1/games?dates[]=2026-03-19");
-const { data } = await res.json();
 
-// Sportradar NBA (paid) — win probabilities + live data
+// Sportradar NBA (paid, has win probabilities)
 const res = await fetch(`https://api.sportradar.com/nba/v8/games/2026/03/19/schedule.json?api_key=${KEY}`);
 ```
 
@@ -315,25 +334,19 @@ const res = await fetch(`https://api.sportradar.com/nba/v8/games/2026/03/19/sche
 ```js
 // BallDontLie season averages
 const res = await fetch("https://www.balldontlie.io/api/v1/season_averages?season=2025&player_ids[]=...");
-
-// NBA Stats API (free, needs spoofed headers)
-// Use a serverless proxy (Vercel Edge Function) to avoid CORS + header requirements
 ```
 
 ### Live betting lines
 ```js
-// The Odds API (free tier: 500 requests/month)
-const res = await fetch(
-  `https://api.the-odds-api.com/v4/sports/basketball_nba/odds/?apiKey=${KEY}&regions=us&markets=h2h,spreads,totals`
-);
+// The Odds API (free tier: 500 req/month)
+const res = await fetch(`https://api.the-odds-api.com/v4/sports/basketball_nba/odds/?apiKey=${KEY}&regions=us&markets=h2h,spreads,totals`);
 ```
 
-### Recommended proxy pattern (avoid CORS + rate limits)
+Once you have real moneyline odds, you can replace the hardcoded `impliedP` in `ODDS_GAMES` with:
+```js
+import { oddsToImplied } from "./utils";
+impliedP: Math.round(oddsToImplied(moneyline) * 100)
 ```
-Client → Vercel Edge Function → External API
-```
-
-Create `api/nba.js` as a Vercel serverless function, cache responses for 60s, and fetch from your React app.
 
 ---
 
@@ -341,48 +354,73 @@ Create `api/nba.js` as a Vercel serverless function, cache responses for 60s, an
 
 | Feature | Status | Notes |
 |---|---|---|
-| Analytics tab | Placeholder | Shows "Coming soon" — wire up Four Factors, Elo, etc. |
-| Shot chart | Data in `data.js`, no view yet | SVG court renderer built in the vanilla version — needs porting to React |
-| Model builder | Not in React version yet | Full logistic regression slider UI exists in vanilla JS version |
-| Nav submenu routing | Submenus exist but all route to parent tab | Each sub-item needs its own view |
-| `@radix-ui` components | Installed, not wired | shadcn components ready to add — Dialog, Tooltip, Progress, Avatar |
-| Bet persistence | In-memory only (resets on refresh) | Add `localStorage` or Supabase for persistence |
-| Search | Input renders, no logic | Wire up to filter across players, teams, games |
+| Analytics tab | Placeholder | Renders description of upcoming Four Factors, Elo, Lineup, Shot Quality views |
+| Shot chart | Not in React version | SVG court renderer exists in the vanilla version — needs porting |
+| Model builder | Not in React version | Logistic regression slider UI exists in vanilla version — needs porting |
+| Nav submenu routing | Partial | "Bet Tracker" routes correctly; other sub-items route to parent tab |
+| Bet persistence | In-memory only | Add `localStorage` or Supabase for cross-session tracking |
+| Search logic | Input wired | Pressing Enter navigates to Players; no query pre-fill yet |
+| `@radix-ui` components | Installed, not wired | shadcn Dialog, Tooltip, Progress, Avatar ready to use |
 
 ---
 
 ## Roadmap
 
 ```
-Phase 1 — current         Static data, core views working
-Phase 2 — real data       Wire BallDontLie + Odds API
-Phase 3 — shot chart      Port SVG court renderer to React component
+Phase 1 — current         Static data, core views, clean architecture
+Phase 2 — real data       Wire BallDontLie + The Odds API
+Phase 3 — shot chart      Port SVG court renderer to React
 Phase 4 — model builder   Port logistic regression sliders to React
 Phase 5 — persistence     localStorage bets, user preferences
 Phase 6 — auth            Supabase auth + per-user bet history
-Phase 7 — mobile          Bottom tab bar, touch-optimized cards
+Phase 7 — mobile          Bottom tab bar, touch-optimised cards
 ```
 
 ---
 
-## Notes for contributors / future Claude instances
+## Design rules for contributors
 
-This codebase has a deliberate aesthetic. If you're adding something, keep these rules:
-
-1. **Never use white backgrounds** — everything is `pitch-800` or darker
-2. **Accent color (`#00d4aa`) is for one thing** — the active/highlighted state. Don't spray it everywhere
-3. **All numbers go in `font-mono`** — stats, odds, percentages, counts, all of them
-4. **Framer Motion for everything that moves** — no CSS transitions on layout changes, use `motion.div` with `layout` prop
-5. **`pm-tile` is the atom** — build new sections out of tiles, not custom card components
-6. **Labels are always `pm-label`** — 10px, uppercase, tracked, muted. Never `text-sm font-bold` for a section header
-7. **The `pitch` scale is your only gray** — never `gray-*` or `slate-*` from default Tailwind
-
----
-
-## License
-
-MIT. Build something great.
+1. Never use white backgrounds — everything is `pitch-800` or darker
+2. Accent color (`#00d4aa`) marks one thing: the active/selected state
+3. All numbers go in `font-mono` — stats, odds, P&L, counts
+4. Framer Motion for everything that moves — no CSS transitions on layout changes
+5. `pm-tile` is the atom — build new sections from tiles
+6. Labels are always `pm-label` — never `text-sm font-bold` for section headers
+7. Only use the `pitch` scale for grays — never default Tailwind `gray-*` or `slate-*`
+8. D-RTG and any future lower-is-better metric uses `invert={true}` on `AttrBar`
+9. New P&L math belongs in `utils.js`, not inline in components
 
 ---
 
-*PlusMinus — commit `6ead1de` · React + Vite · NBA 2025-26 season data*
+## Changelog
+
+### `215304f` — Quality pass 2 (current)
+- `AttrBar`: D-RTG bar inverted — elite defenders now correctly fill the bar
+- `Players.jsx`: BPM display uses `signed()` from utils — no more `+-3.1` for negative values
+- `Views.jsx`: Win rate excludes pushes from denominator; ROI stake base excludes push stakes
+- `Views.jsx`: `stats` and `chartData` wrapped in `useMemo` — no recomputation on form keystrokes
+- `Views.jsx`: Form validation now shows visible error message instead of silent no-op
+- `Dashboard.jsx`: `TOP_SCORERS` moved to module level — computed once, not on every render
+- `TopNav.jsx`: `useEffect` cleanup for `setTimeout` ref on unmount
+- `App.jsx`: `Placeholder` accepts `description` prop; Analytics shows actual upcoming content
+- `index.css`: `overflow-hidden` removed from `.pm-tile`; `.scrollbar-none` utility defined
+
+### `6ae9f50` — Quality pass 1
+- All exports added to `data.js` — previously nothing was exported (silent module failure)
+- `TEAM_COLORS` added to `data.js` — Players.jsx was importing it and crashing
+- `id` field added to all `TODAY_GAMES` entries — React key warnings eliminated
+- Dead `BB` / `BLUE` constants removed from `data.js`
+- `ODDS_GAMES` exported from `data.js`; local `ODDS_DATA` duplicate in `Views.jsx` deleted
+- `BetTracker` routed via `case "tracker"` in `App.jsx` — was previously unreachable
+- `calcPL` extracted to `utils.js` — single source of truth
+- `utils.js` created with `calcPL`, `oddsToImplied`, `signed`, `clamp`
+- Standings table `min-w-[640px]` — mobile horizontal scroll now works
+- `TopNav` submenu items given real route ids; Bell/Settings given onClick handlers
+- Search Escape closes + clears; Enter navigates to Players
+- Nav labels hidden on mobile (icon-only below `sm:`)
+- `vite.config.js`: `base: "/plusminus/"` for GitHub Pages
+- `index.html`: meta description + og tags added
+
+---
+
+*PlusMinus · commit `215304f` · React + Vite · NBA 2025-26 season*

@@ -3,13 +3,13 @@ import react from "@vitejs/plugin-react";
 import path from "path";
 
 export default defineConfig({
-  plugins: [react()],
+    plugins: [react()],
 
-  // Set base to "/plusminus/" when deploying to GitHub Pages.
-  // For local dev or Vercel/Netlify root deploys, change to "/".
-  base: "/plusminus/",
+    // "/" for Netlify, Vercel, or any root domain deploy.
+    // Change to "/plusminus/" only if deploying to GitHub Pages subdirectory.
+    base: "/",
 
-  resolve: {
-    alias: { "@": path.resolve(__dirname, "./src") },
-  },
+    resolve: {
+        alias: { "@": path.resolve(__dirname, "./src") },
+    },
 });
