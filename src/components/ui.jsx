@@ -1,12 +1,17 @@
 // ─── PlusMinus UI Primitives ──────────────────────────────────
 // Reusable loading skeletons and error states.
 // Used by all data-fetching components.
+//
+// ⚠️  FILE LOCATION NOTE:
+// This file must live at src/components/ui.jsx — NOT src/ui.jsx.
+// All components in src/components/ import from "./ui" (relative to
+// their own directory). If this file is at src/ui.jsx, every component
+// that imports it will crash with a module-not-found error.
 
 import { motion } from "framer-motion";
 import { AlertCircle, RefreshCw } from "lucide-react";
 
 // ── Skeleton pulse ────────────────────────────────────────────
-// Pass width + height as Tailwind classes via className.
 export function Skeleton({ className = "" }) {
     return (
         <div
@@ -44,7 +49,6 @@ export function RowSkeleton({ rows = 5 }) {
 }
 
 // ── Inline loading state ──────────────────────────────────────
-// Small spinner for buttons and inline refresh indicators.
 export function Spinner({ size = 14 }) {
     return (
         <motion.div
@@ -109,7 +113,6 @@ export function NoApiKey() {
 }
 
 // ── Data freshness indicator ──────────────────────────────────
-// Shows when data was last updated. Pass isFetching from useQuery.
 export function FreshnessTag({ isFetching, dataUpdatedAt }) {
     if (isFetching) {
         return (

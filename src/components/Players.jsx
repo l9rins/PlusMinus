@@ -7,9 +7,11 @@ import { signed } from "../utils";
 import { TileSkeleton, ErrorState } from "./ui";
 
 function AttrBar({ label, value, max = 100, invert = false }) {
+    // FIXED: the original code set effectiveMax = (max - 100) when invert=true,
+    // which for D-RTG (max=120) gave effectiveMax=20 and broke every bar.
+    // The correct approach: invert just flips the raw value; effectiveMax is always max.
     const raw = invert ? Math.max(0, max - value) : value;
-    const effectiveMax = invert ? (max - 100) : max;
-    const pct = Math.min(100, (raw / effectiveMax) * 100);
+    const pct = Math.min(100, (raw / max) * 100);
     const color =
         pct >= 80 ? "bg-tier-elite" :
             pct >= 65 ? "bg-tier-good" :
@@ -99,6 +101,7 @@ function PlayerCard({ player }) {
                                     <AttrBar label="BPM" value={player.bpm} max={12} />
                                     <AttrBar label="VORP" value={player.vorp} max={9} />
                                     <AttrBar label="O-RTG" value={player.ortg} max={135} />
+                                    {/* invert=true: lower D-RTG = better defense, so bar should fill more for lower values */}
                                     <AttrBar label="D-RTG" value={player.drtg} max={120} invert />
                                 </div>
                                 <div>

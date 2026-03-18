@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip,
@@ -106,7 +106,6 @@ export function Scores() {
                   </div>
                 </div>
 
-                {/* Win probability bar — only for scheduled games */}
                 {g.status === "scheduled" && (
                   <div className="space-y-1">
                     <div className="flex justify-between text-[10px] text-pitch-500">
@@ -222,7 +221,6 @@ export function Standings() {
 }
 
 // ── BETTING ───────────────────────────────────────────────────
-// Static odds data until The Odds API is wired up
 export function Betting() {
   return (
     <motion.div variants={container} initial="hidden" animate="show">
@@ -288,16 +286,49 @@ export function Betting() {
 }
 
 // ── BET TRACKER ───────────────────────────────────────────────
-export function BetTracker() {
-  const [bets, setBets] = useState([
-    { id: 1, game: "OKC @ BKN", type: "Spread", pick: "OKC -16", odds: -110, stake: 50, result: "win" },
-    { id: 2, game: "GSW @ BOS", type: "Moneyline", pick: "BOS ML", odds: -240, stake: 100, result: "win" },
-    { id: 3, game: "POR @ IND", type: "Over/Under", pick: "Over 228", odds: -112, stake: 40, result: "loss" },
-    { id: 4, game: "LAL @ HOU", type: "Spread", pick: "HOU -1", odds: -108, stake: 55, result: "pending" },
-  ]);
+// FIXED: Bets now persist in localStorage so switching tabs doesn't wipe the log.
+// Key: "plusminus_bets" — stored as JSON array.
+// Migration: if the key is missing, we seed with the demo bets.
 
+const STORAGE_KEY = "plusminus_bets";
+
+const DEMO_BETS = [
+  { id: 1, game: "OKC @ BKN", type: "Spread", pick: "OKC -16", odds: -110, stake: 50, result: "win" },
+  { id: 2, game: "GSW @ BOS", type: "Moneyline", pick: "BOS ML", odds: -240, stake: 100, result: "win" },
+  { id: 3, game: "POR @ IND", type: "Over/Under", pick: "Over 228", odds: -112, stake: 40, result: "loss" },
+  { id: 4, game: "LAL @ HOU", type: "Spread", pick: "HOU -1", odds: -108, stake: 55, result: "pending" },
+];
+
+function loadBets() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return DEMO_BETS;
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    return DEMO_BETS;
+  } catch {
+    return DEMO_BETS;
+  }
+}
+
+function saveBets(bets) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(bets));
+  } catch {
+    // localStorage may be unavailable in some browser contexts — fail silently
+    console.warn("[PlusMinus] Could not persist bets to localStorage.");
+  }
+}
+
+export function BetTracker() {
+  const [bets, setBets] = useState(loadBets);
   const [form, setForm] = useState({ game: "", type: "Moneyline", pick: "", odds: "", stake: "", result: "pending" });
   const [formError, setFormError] = useState("");
+
+  // Persist to localStorage whenever bets change
+  useEffect(() => {
+    saveBets(bets);
+  }, [bets]);
 
   const addBet = () => {
     if (!form.game || !form.pick || !form.odds || !form.stake) {
@@ -307,6 +338,12 @@ export function BetTracker() {
     setFormError("");
     setBets(prev => [{ ...form, id: Date.now(), odds: +form.odds, stake: +form.stake }, ...prev]);
     setForm({ game: "", type: "Moneyline", pick: "", odds: "", stake: "", result: "pending" });
+  };
+
+  const clearAll = () => {
+    if (window.confirm("Clear all bets? This cannot be undone.")) {
+      setBets([]);
+    }
   };
 
   const stats = useMemo(() => {
@@ -358,8 +395,10 @@ export function BetTracker() {
           <input className={inputCls} placeholder="Odds (-110)" type="number" value={form.odds} onChange={e => setForm(f => ({ ...f, odds: e.target.value }))} />
           <input className={inputCls} placeholder="Stake ($)" type="number" value={form.stake} onChange={e => setForm(f => ({ ...f, stake: e.target.value }))} />
           <select className={inputCls} value={form.result} onChange={e => setForm(f => ({ ...f, result: e.target.value }))}>
-            <option value="pending">Pending</option><option value="win">Win</option>
-            <option value="loss">Loss</option><option value="push">Push</option>
+            <option value="pending">Pending</option>
+            <option value="win">Win</option>
+            <option value="loss">Loss</option>
+            <option value="push">Push</option>
           </select>
         </div>
         <div className="flex items-center gap-3">
@@ -371,6 +410,17 @@ export function BetTracker() {
       </div>
 
       <div className="pm-card overflow-x-auto mb-4">
+        <div className="flex items-center justify-between px-3 py-2.5 border-b border-pitch-600">
+          <span className="pm-label">Bet log · {bets.length} entries</span>
+          {bets.length > 0 && (
+            <button
+              onClick={clearAll}
+              className="text-[10px] text-pitch-500 hover:text-loss transition-colors"
+            >
+              Clear all
+            </button>
+          )}
+        </div>
         <table className="w-full text-sm min-w-[540px]">
           <thead>
             <tr className="border-b border-pitch-600">
@@ -396,7 +446,7 @@ export function BetTracker() {
                     {b.result === "pending" ? "—" : `${pl >= 0 ? "+" : ""}$${pl.toFixed(2)}`}
                   </td>
                   <td className="px-3 py-2.5">
-                    <span className={`pm-badge ${b.result === "win" ? "bg-win/10 text-win border border-win/20" : b.result === "loss" ? "bg-loss/10 text-loss border border-loss/20" : "bg-pitch-700 text-pitch-500 border border-pitch-600"}`}>
+                    <span className={`pm-badge ${b.result === "win" ? "bg-win/10 text-win border border-win/20" : b.result === "loss" ? "bg-loss/10 text-loss border border-loss/20" : b.result === "push" ? "bg-draw/10 text-draw border border-draw/20" : "bg-pitch-700 text-pitch-500 border border-pitch-600"}`}>
                       {b.result.toUpperCase()}
                     </span>
                   </td>
@@ -418,7 +468,12 @@ export function BetTracker() {
               <LineChart data={chartData}>
                 <XAxis dataKey="bet" tick={{ fill: "#546480", fontSize: 10 }} axisLine={false} tickLine={false} />
                 <YAxis tick={{ fill: "#546480", fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={v => `$${v}`} />
-                <Tooltip contentStyle={{ background: "#1a1e2a", border: "1px solid #2e3a50", borderRadius: 6, fontSize: 11 }} labelStyle={{ color: "#7d91ab" }} itemStyle={{ color: "#00d4aa" }} formatter={v => [`$${v}`, "P&L"]} />
+                <Tooltip
+                  contentStyle={{ background: "#1a1e2a", border: "1px solid #2e3a50", borderRadius: 6, fontSize: 11 }}
+                  labelStyle={{ color: "#7d91ab" }}
+                  itemStyle={{ color: "#00d4aa" }}
+                  formatter={v => [`$${v}`, "P&L"]}
+                />
                 <Line type="monotone" dataKey="pl" stroke="#00d4aa" strokeWidth={2} dot={{ fill: "#00d4aa", r: 3 }} />
               </LineChart>
             </ResponsiveContainer>
