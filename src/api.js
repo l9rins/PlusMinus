@@ -1,10 +1,10 @@
 // ─── PlusMinus API Layer ──────────────────────────────────────────
-// Data sources after BDL paywall migration:
-//   Standings  → ESPN free API  (no key, /api/espn proxy)
-//   Games      → ESPN free API  (no key, /api/espn proxy)
-//   Odds       → The Odds API   (ODDS_API_KEY in Vercel env)
-//   Players    → Static data.js (BDL season_averages is now paywalled)
-//   Search     → BDL /players   (name search still free on BDL)
+// Data sources:
+//   Standings  → ESPN free API via /api/espn  (no key)
+//   Games      → ESPN free API via /api/espn  (no key)
+//   Odds       → The Odds API via /api/odds   (ODDS_API_KEY)
+//   Players    → Static data.js               (BDL paywall bypass)
+//   Search     → BDL /players endpoint        (BDL_API_KEY, free tier)
 
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -26,7 +26,6 @@ class ApiError extends Error {
 }
 
 // ── Shared retry policy ───────────────────────────────────────────
-// Never retry on auth/rate-limit errors — stops request flooding
 const shouldRetry = (count, err) => {
     if ([401, 429, 503].includes(err?.status)) return false;
     return count < 2;
@@ -43,7 +42,7 @@ async function espnFetch(resource, params = {}, signal) {
     return res.json();
 }
 
-// ── BDL proxy fetcher (player name search only) ───────────────────
+// ── BDL proxy fetcher (player search only) ────────────────────────
 async function bdlFetch(path, signal) {
     const res = await fetch(`/api/bdl?path=${encodeURIComponent(path)}`, { signal });
     if (!res.ok) {
@@ -103,32 +102,60 @@ export function useServerConfig() {
 }
 
 // ── Standings (ESPN) ──────────────────────────────────────────────
-// ESPN shape: { children: [ { name: "Eastern Conference",
-//   standings: { entries: [ { team: { abbreviation }, stats: [...] } ] } } ] }
+// Real ESPN response shape (from site.web.api.espn.com/apis/v2/...):
+//   data.children[0]  = Eastern Conference  (id: "5")
+//   data.children[1]  = Western Conference  (id: "6")
+//   Each: { name, standings: { entries: [ { team: { abbreviation }, stats: [...] } ] } }
+//
+// ESPN abbreviation quirks confirmed from live data:
+//   SA  → SAS   (San Antonio Spurs)
+//   WSH → WAS   (Washington Wizards)
+//   NY  → NYK   (New York Knicks)
+//   GS  → GSW   (Golden State Warriors)  — scoreboard only
+//   NO  → NOP   (New Orleans Pelicans)   — scoreboard only
+
+const ESPN_ABBR_FIX = {
+    SA: "SAS",
+    WSH: "WAS",
+    NY: "NYK",
+    GS: "GSW",
+    NO: "NOP",
+    PHO: "PHX",
+};
+const fixAbbr = (a) => ESPN_ABBR_FIX[a] ?? a;
 
 function reshapeESPNStandings(data) {
     const reshapeConf = (conf) => {
-        const entries = conf?.standings?.entries ?? [];
+        if (!conf) return [];
+        const entries = conf.standings?.entries ?? [];
         return entries.map((e) => {
-            const abbr = e.team?.abbreviation ?? "???";
-            const getStat = (name) => e.stats?.find((s) => s.name === name)?.value ?? 0;
-            const getStatStr = (name) => e.stats?.find((s) => s.name === name)?.displayValue ?? "—";
+            const abbr = fixAbbr(e.team?.abbreviation ?? "???");
 
-            const w = getStat("wins");
-            const l = getStat("losses");
+            // Find stat by name field
+            const sv = (name) => e.stats?.find((s) => s.name === name)?.value ?? 0;
+            const sd = (name) => e.stats?.find((s) => s.name === name)?.displayValue ?? "—";
+            // Find stat by id field (records use id not name)
+            const sid = (id) => e.stats?.find((s) => s.id === id)?.displayValue ?? "—";
+
+            const w = sv("wins");
+            const l = sv("losses");
             const pct = w + l > 0 ? +(w / (w + l)).toFixed(3) : 0;
-            const gb = getStat("gamesBehind");
+            const gb = sv("gamesBehind");
+
+            // streak value: positive = win streak, negative = loss streak
+            const streakVal = sv("streak");
+            const streak = streakVal > 0 ? `W${streakVal}` : streakVal < 0 ? `L${Math.abs(streakVal)}` : "—";
 
             return {
                 team: abbr,
                 w,
                 l,
                 pct,
-                gb: gb === 0 ? 0 : +gb.toFixed(1),
-                last10: getStatStr("vsconf"),
-                home: getStatStr("Home"),
-                road: getStatStr("Road"),
-                streak: getStatStr("streak") || "—",
+                gb: gb === 0 ? 0 : +parseFloat(gb).toFixed(1),
+                last10: sid("901"),   // "Last Ten Games" stat uses id "901"
+                home: sid("33"),    // Home record uses id "33"
+                road: sid("34"),    // Road record uses id "34"
+                streak,
             };
         }).sort((a, b) => b.pct - a.pct);
     };
@@ -155,38 +182,35 @@ export function useStandings() {
     });
 }
 
-// ── Today's games (ESPN) ──────────────────────────────────────────
-// ESPN abbreviation corrections (ESPN uses non-standard codes for some teams)
-const ESPN_ABBR = {
-    GS: "GSW", NO: "NOP", NY: "NYK", SA: "SAS",
-    PHO: "PHX", WSH: "WAS",
-};
-const normAbbr = (a) => ESPN_ABBR[a] ?? a;
+// ── Today's games (ESPN scoreboard) ──────────────────────────────
+// ESPN scoreboard shape:
+//   data.events[ { id, competitions: [ { competitors: [...], status: {...} } ] } ]
+// competitors: [ { homeAway: "home"|"away", team: { abbreviation }, score } ]
+// status: { type: { state: "pre"|"in"|"post", completed, detail }, period }
 
 function reshapeESPNScoreboard(data) {
     return (data?.events ?? []).map((ev) => {
         const comp = ev.competitions?.[0];
         const statusType = comp?.status?.type;
-        const detail = statusType?.detail ?? "";
-        const state = statusType?.state ?? "pre"; // "pre" | "in" | "post"
+        const state = statusType?.state ?? "pre";
         const completed = statusType?.completed ?? false;
+        const detail = statusType?.detail ?? "";
 
         const status = completed ? "final" : state === "in" ? "live" : "scheduled";
 
         const home = comp?.competitors?.find((c) => c.homeAway === "home");
         const away = comp?.competitors?.find((c) => c.homeAway === "away");
 
-        const homeAbbr = normAbbr(home?.team?.abbreviation ?? "???");
-        const awayAbbr = normAbbr(away?.team?.abbreviation ?? "???");
+        const homeAbbr = fixAbbr(home?.team?.abbreviation ?? "???");
+        const awayAbbr = fixAbbr(away?.team?.abbreviation ?? "???");
 
-        const homeScore = (status !== "scheduled") ? parseInt(home?.score ?? 0) : null;
-        const awayScore = (status !== "scheduled") ? parseInt(away?.score ?? 0) : null;
+        const homeScore = status !== "scheduled" ? parseInt(home?.score ?? 0) : null;
+        const awayScore = status !== "scheduled" ? parseInt(away?.score ?? 0) : null;
         const period = status === "live" ? (comp?.status?.period ?? null) : null;
 
-        // Time display: "Final", "Q3 4:22", or "7:30 PM ET"
         const time = status === "final" ? "Final"
             : status === "live" ? detail
-                : detail;
+                : detail; // "7:30 PM EDT" for scheduled
 
         return {
             id: String(ev.id),
@@ -214,8 +238,8 @@ export function useTodayGames() {
             const data = await espnFetch("scoreboard", { date: today }, signal);
             return reshapeESPNScoreboard(data);
         },
-        staleTime: 1000 * 60,       // 1 min
-        refetchInterval: 1000 * 60,       // poll every 1 min
+        staleTime: 1000 * 60,
+        refetchInterval: 1000 * 60,
         placeholderData: GAMES_FALLBACK,
         retry: shouldRetry,
     });
@@ -256,11 +280,8 @@ export function mergeOddsIntoGames(games, odds) {
     });
 }
 
-// ── Players ───────────────────────────────────────────────────────
-// BDL season_averages endpoint is now behind a paywall.
-// Static data from data.js is used for the roster tab.
-// Player name search still works via BDL's free /players endpoint.
-
+// ── Players (static) ──────────────────────────────────────────────
+// BDL season_averages is paywalled. Static data.js is the source.
 export function usePlayers() {
     return useQuery({
         queryKey: ["players", "static"],
@@ -270,6 +291,7 @@ export function usePlayers() {
     });
 }
 
+// ── Player search (BDL free endpoint) ────────────────────────────
 export function usePlayerSearch(query) {
     const season = currentSeason();
     const trimmed = query?.trim() ?? "";
@@ -278,7 +300,6 @@ export function usePlayerSearch(query) {
     return useQuery({
         queryKey: ["playerSearch", trimmed],
         queryFn: async ({ signal }) => {
-            // BDL /players search — still free
             const searchData = await bdlFetch(
                 `/players?search=${encodeURIComponent(trimmed)}&per_page=25`,
                 signal
@@ -286,7 +307,7 @@ export function usePlayerSearch(query) {
             const players = searchData.data ?? [];
             if (!players.length) return [];
 
-            // Attempt season averages — gracefully degrade if paywalled
+            // Try to get averages — gracefully skip if paywalled
             let averages = [];
             try {
                 const ids = players.map((p) => p.id).join("&player_ids[]=");
