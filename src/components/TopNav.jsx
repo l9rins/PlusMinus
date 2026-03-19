@@ -4,7 +4,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import {
   LayoutDashboard, Users, BarChart3, Target,
   TrendingUp, Activity, ChevronDown, Search, Bell,
-  Settings, X, Menu, Zap, ChevronRight,
+  Settings, X, Menu, Zap, ChevronRight, Sun, Moon,
 } from "lucide-react";
 
 // ── Nav definition ────────────────────────────────────────────────
@@ -190,8 +190,24 @@ export default function TopNav({ activeTab, onTabChange }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [mobileOpen, setMobileOpen]   = useState(false);
   const [notifOpen, setNotifOpen]     = useState(false);
+  const [isLight, setIsLight]         = useState(false);
   const timeoutRef     = useRef(null);
   const searchInputRef = useRef(null);
+
+  useEffect(() => {
+    if (localStorage.getItem("pm-theme") === "light") {
+      document.documentElement.classList.add("light");
+      setIsLight(true);
+    }
+  }, []);
+
+  const toggleTheme = () => {
+    const next = !isLight;
+    setIsLight(next);
+    document.documentElement.classList.toggle("light", next);
+    if (next) localStorage.setItem("pm-theme", "light");
+    else localStorage.removeItem("pm-theme");
+  };
 
   useEffect(() => () => clearTimeout(timeoutRef.current), []);
 
@@ -419,6 +435,11 @@ export default function TopNav({ activeTab, onTabChange }) {
                   )}
                 </AnimatePresence>
               </div>
+
+              {/* Theme toggle */}
+              <button className="pm-nav-btn" title="Toggle theme" aria-label="Toggle theme" onClick={toggleTheme}>
+                {isLight ? <Moon size={13} strokeWidth={1.8} /> : <Sun size={13} strokeWidth={1.8} />}
+              </button>
 
               {/* Settings */}
               <button className="pm-nav-btn" title="Settings" aria-label="Settings"

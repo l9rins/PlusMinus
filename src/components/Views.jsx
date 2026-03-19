@@ -508,6 +508,20 @@ export function Betting() {
   const { data: oddsData, isFetching: oddsFetching, dataUpdatedAt: oddsUpdatedAt } = useOdds();
   const { data: standingsData, isFetching: standingsFetching } = useStandings();
 
+  const [bankroll, setBankrollState] = useState(() => Number(lsGet("bankroll")) || DEFAULT_BANKROLL);
+  useEffect(() => {
+    const handleStorage = (e) => {
+      if (e.detail?.key?.includes("bankroll")) setBankrollState(Number(lsGet("bankroll")) || DEFAULT_BANKROLL);
+    };
+    window.addEventListener("plusminus:storage", handleStorage);
+    return () => window.removeEventListener("plusminus:storage", handleStorage);
+  }, []);
+  const updateBankroll = (val) => {
+    if (val < 1) val = 1;
+    setBankrollState(val);
+    lsSet("bankroll", val);
+  };
+
   // Build edge cards from live multi-book odds
   const liveEdges = useMemo(() => {
     if (!oddsData || !standingsData || !rawGames) return null;
@@ -531,7 +545,7 @@ export function Betting() {
       const diff      = modelP !== null ? +(modelP - impliedP).toFixed(1) : null;
       const edge      = diff !== null ? (diff >= 10 ? "high" : diff >= 5 ? "mid" : "low") : "none";
       const kellyAmt  = diff !== null && diff >= 5
-        ? kellyBet(modelP / 100, -110, DEFAULT_BANKROLL) : null;
+        ? kellyBet(modelP / 100, -110, bankroll) : null;
 
       edges.push({
         matchup:    `${game.away} @ ${game.home}`,
@@ -712,11 +726,14 @@ export function Betting() {
               {isLive && g.kellyAmt > 0 && (
                 <div className="mb-3 px-2.5 py-2 rounded-md bg-pitch-750 border border-pitch-700">
                   <div className="flex items-center gap-1.5 text-[10px] text-pitch-400">
-                    <Shield size={10} className="text-accent" />
+                    <Shield size={10} className="text-accent flex-shrink-0" />
                     <span>½-Kelly: <span className="text-accent font-mono font-medium">
                       ${g.kellyAmt}
                     </span></span>
-                    <span className="text-pitch-600">on ${DEFAULT_BANKROLL}</span>
+                    <span className="text-pitch-600 flex items-center gap-1">
+                      on 
+                      <input type="number" value={bankroll} onChange={e => updateBankroll(Number(e.target.value))} className="bg-transparent w-12 text-pitch-300 border-b border-pitch-600 focus:outline-none focus:border-accent font-mono px-0.5 py-0 placeholder-pitch-600" aria-label="Bankroll amount" />
+                    </span>
                   </div>
                 </div>
               )}

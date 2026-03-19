@@ -1,10 +1,11 @@
 // ─── PlusMinus API Layer ──────────────────────────────────────────
 // Data sources:
-//   Standings  → ESPN free API via /api/espn  (no key)
-//   Games      → ESPN free API via /api/espn  (no key)
-//   Odds       → The Odds API via /api/odds   (ODDS_API_KEY)
-//   Players    → Static data.js               (BDL paywall bypass)
-//   Search     → BDL /players endpoint        (BDL_API_KEY, free tier)
+//   Standings      → ESPN free API via /api/espn  (no key)
+//   Games          → ESPN free API via /api/espn  (no key)
+//   Team schedule  → ESPN free API via /api/espn  (no key)
+//   Odds           → The Odds API via /api/odds   (ODDS_API_KEY)
+//   Players        → Static data.js               (BDL paywall bypass)
+//   Search         → BDL /players endpoint        (BDL_API_KEY, free tier)
 
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -102,26 +103,10 @@ export function useServerConfig() {
 }
 
 // ── Standings (ESPN) ──────────────────────────────────────────────
-// Real ESPN response shape (from site.web.api.espn.com/apis/v2/...):
-//   data.children[0]  = Eastern Conference  (id: "5")
-//   data.children[1]  = Western Conference  (id: "6")
-//   Each: { name, standings: { entries: [ { team: { abbreviation }, stats: [...] } ] } }
-//
-// ESPN abbreviation quirks confirmed from live data:
-//   SA  → SAS   (San Antonio Spurs)
-//   WSH → WAS   (Washington Wizards)
-//   NY  → NYK   (New York Knicks)
-//   GS  → GSW   (Golden State Warriors)  — scoreboard only
-//   NO  → NOP   (New Orleans Pelicans)   — scoreboard only
+// ESPN shape: data.children[0/1].standings.entries[{team.abbreviation, stats[]}]
+// Records use id fields: "33"=Home, "34"=Road, "901"=L10, name="streak"=streak
 
-const ESPN_ABBR_FIX = {
-    SA: "SAS",
-    WSH: "WAS",
-    NY: "NYK",
-    GS: "GSW",
-    NO: "NOP",
-    PHO: "PHX",
-};
+const ESPN_ABBR_FIX = { SA: "SAS", WSH: "WAS", NY: "NYK", GS: "GSW", NO: "NOP", PHO: "PHX" };
 const fixAbbr = (a) => ESPN_ABBR_FIX[a] ?? a;
 
 function reshapeESPNStandings(data) {
@@ -130,31 +115,22 @@ function reshapeESPNStandings(data) {
         const entries = conf.standings?.entries ?? [];
         return entries.map((e) => {
             const abbr = fixAbbr(e.team?.abbreviation ?? "???");
-
-            // Find stat by name field
             const sv = (name) => e.stats?.find((s) => s.name === name)?.value ?? 0;
             const sd = (name) => e.stats?.find((s) => s.name === name)?.displayValue ?? "—";
-            // Find stat by id field (records use id not name)
             const sid = (id) => e.stats?.find((s) => s.id === id)?.displayValue ?? "—";
-
             const w = sv("wins");
             const l = sv("losses");
             const pct = w + l > 0 ? +(w / (w + l)).toFixed(3) : 0;
             const gb = sv("gamesBehind");
-
-            // streak value: positive = win streak, negative = loss streak
-            const streakVal = sv("streak");
-            const streak = streakVal > 0 ? `W${streakVal}` : streakVal < 0 ? `L${Math.abs(streakVal)}` : "—";
-
+            const streakV = sv("streak");
+            const streak = streakV > 0 ? `W${streakV}` : streakV < 0 ? `L${Math.abs(streakV)}` : "—";
             return {
                 team: abbr,
-                w,
-                l,
-                pct,
+                w, l, pct,
                 gb: gb === 0 ? 0 : +parseFloat(gb).toFixed(1),
-                last10: sid("901"),   // "Last Ten Games" stat uses id "901"
-                home: sid("33"),    // Home record uses id "33"
-                road: sid("34"),    // Road record uses id "34"
+                last10: sid("901"),
+                home: sid("33"),
+                road: sid("34"),
                 streak,
             };
         }).sort((a, b) => b.pct - a.pct);
@@ -162,11 +138,7 @@ function reshapeESPNStandings(data) {
 
     const east = data?.children?.find((c) => c.name?.toLowerCase().includes("eastern"));
     const west = data?.children?.find((c) => c.name?.toLowerCase().includes("western"));
-
-    return {
-        east: reshapeConf(east),
-        west: reshapeConf(west),
-    };
+    return { east: reshapeConf(east), west: reshapeConf(west) };
 }
 
 export function useStandings() {
@@ -183,11 +155,6 @@ export function useStandings() {
 }
 
 // ── Today's games (ESPN scoreboard) ──────────────────────────────
-// ESPN scoreboard shape:
-//   data.events[ { id, competitions: [ { competitors: [...], status: {...} } ] } ]
-// competitors: [ { homeAway: "home"|"away", team: { abbreviation }, score } ]
-// status: { type: { state: "pre"|"in"|"post", completed, detail }, period }
-
 function reshapeESPNScoreboard(data) {
     return (data?.events ?? []).map((ev) => {
         const comp = ev.competitions?.[0];
@@ -195,43 +162,26 @@ function reshapeESPNScoreboard(data) {
         const state = statusType?.state ?? "pre";
         const completed = statusType?.completed ?? false;
         const detail = statusType?.detail ?? "";
-
         const status = completed ? "final" : state === "in" ? "live" : "scheduled";
-
         const home = comp?.competitors?.find((c) => c.homeAway === "home");
         const away = comp?.competitors?.find((c) => c.homeAway === "away");
-
         const homeAbbr = fixAbbr(home?.team?.abbreviation ?? "???");
         const awayAbbr = fixAbbr(away?.team?.abbreviation ?? "???");
-
         const homeScore = status !== "scheduled" ? parseInt(home?.score ?? 0) : null;
         const awayScore = status !== "scheduled" ? parseInt(away?.score ?? 0) : null;
         const period = status === "live" ? (comp?.status?.period ?? null) : null;
-
-        const time = status === "final" ? "Final"
-            : status === "live" ? detail
-                : detail; // "7:30 PM EDT" for scheduled
-
+        const time = status === "final" ? "Final" : detail;
         return {
-            id: String(ev.id),
-            away: awayAbbr,
-            home: homeAbbr,
-            awayP: 42,
-            homeP: 58,
-            time,
-            status,
-            awayScore,
-            homeScore,
-            period,
-            spread: "—",
-            total: "—",
+            id: String(ev.id), away: awayAbbr, home: homeAbbr,
+            awayP: 42, homeP: 58,
+            time, status, awayScore, homeScore, period,
+            spread: "—", total: "—",
         };
     });
 }
 
 export function useTodayGames() {
-    const today = todayStr().replace(/-/g, ""); // ESPN uses YYYYMMDD
-
+    const today = todayStr().replace(/-/g, "");
     return useQuery({
         queryKey: ["games", "espn", today],
         queryFn: async ({ signal }) => {
@@ -241,6 +191,68 @@ export function useTodayGames() {
         staleTime: 1000 * 60,
         refetchInterval: 1000 * 60,
         placeholderData: GAMES_FALLBACK,
+        retry: shouldRetry,
+    });
+}
+
+// ── Team Schedule (ESPN) ──────────────────────────────────────────
+// Returns up to 82 games for a team — past results + upcoming.
+// ESPN shape: { team: {...}, events: [ { id, date, home, away, result, score } ] }
+
+function reshapeTeamSchedule(data, teamAbbr) {
+    const events = data?.events ?? [];
+    return events.map((ev) => {
+        const comp = ev.competitions?.[0];
+        const homeTeam = comp?.competitors?.find((c) => c.homeAway === "home");
+        const awayTeam = comp?.competitors?.find((c) => c.homeAway === "away");
+        const isHome = fixAbbr(homeTeam?.team?.abbreviation ?? "") === teamAbbr;
+        const opponent = fixAbbr(isHome
+            ? awayTeam?.team?.abbreviation
+            : homeTeam?.team?.abbreviation) ?? "???";
+        const statusType = comp?.status?.type;
+        const completed = statusType?.completed ?? false;
+        const state = statusType?.state ?? "pre";
+        const status = completed ? "final" : state === "in" ? "live" : "scheduled";
+
+        let result = null, teamScore = null, oppScore = null;
+        if (completed) {
+            const teamComp = isHome ? homeTeam : awayTeam;
+            const oppComp = isHome ? awayTeam : homeTeam;
+            teamScore = parseInt(teamComp?.score ?? 0);
+            oppScore = parseInt(oppComp?.score ?? 0);
+            result = teamScore > oppScore ? "W" : "L";
+        }
+
+        // Date string — "Mar 19" format
+        const dateObj = ev.date ? new Date(ev.date) : null;
+        const dateStr = dateObj
+            ? dateObj.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "America/New_York" })
+            : "—";
+
+        return {
+            id: String(ev.id),
+            date: ev.date ?? "",
+            dateStr,
+            isHome,
+            opponent,
+            status,
+            result,
+            teamScore,
+            oppScore,
+            detail: statusType?.detail ?? "",
+        };
+    }).sort((a, b) => new Date(a.date) - new Date(b.date));
+}
+
+export function useTeamSchedule(teamAbbr) {
+    return useQuery({
+        queryKey: ["teamSchedule", teamAbbr],
+        queryFn: async ({ signal }) => {
+            const data = await espnFetch("team_schedule", { team: teamAbbr }, signal);
+            return reshapeTeamSchedule(data, teamAbbr);
+        },
+        staleTime: 1000 * 60 * 5,
+        enabled: !!teamAbbr,
         retry: shouldRetry,
     });
 }
@@ -281,7 +293,6 @@ export function mergeOddsIntoGames(games, odds) {
 }
 
 // ── Players (static) ──────────────────────────────────────────────
-// BDL season_averages is paywalled. Static data.js is the source.
 export function usePlayers() {
     return useQuery({
         queryKey: ["players", "static"],
@@ -307,7 +318,6 @@ export function usePlayerSearch(query) {
             const players = searchData.data ?? [];
             if (!players.length) return [];
 
-            // Try to get averages — gracefully skip if paywalled
             let averages = [];
             try {
                 const ids = players.map((p) => p.id).join("&player_ids[]=");
@@ -317,7 +327,7 @@ export function usePlayerSearch(query) {
                 );
                 averages = avgData.data ?? [];
             } catch {
-                // Season averages behind paywall — show players without stats
+                // Season averages paywalled — show players without stats
             }
 
             return players.map((p) => {

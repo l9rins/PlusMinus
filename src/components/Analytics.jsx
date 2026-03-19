@@ -6,7 +6,7 @@
 //   4. Shot Quality  — radar profile from roster data
 //   5. Playoff Sim   — Monte Carlo bracket simulation (10,000 runs)
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ResponsiveContainer, RadarChart, Radar, PolarGrid,
@@ -21,6 +21,7 @@ import { useStandings, usePlayers } from "../api";
 import { FreshnessTag, RowSkeleton, ErrorState } from "./ui";
 import { signed } from "../utils";
 import { TrendingUp, BarChart2, Zap, Award, Info, Star, Trophy } from "lucide-react";
+import PlayoffBracket from "./PlayoffBracket";
 
 const container = { hidden: {}, show: { transition: { staggerChildren: 0.04 } } };
 const item = { hidden: { opacity: 0, y: 8 }, show: { opacity: 1, y: 0, transition: { duration: 0.2 } } };
@@ -134,94 +135,8 @@ function computePowerIndex(fourFactors, eloData, shotQuality) {
   }).sort((a, b) => b.powerIndex - a.powerIndex);
 }
 
-// ─── Monte Carlo Playoff Sim ──────────────────────────────────
-const SIMS = 10_000;
-const HOME_BUMP = 35;
-
-function eloWinP(eloA, eloB, home = false) {
-  return 1 / (1 + Math.pow(10, -(eloA - eloB + (home ? HOME_BUMP : 0)) / 400));
-}
-
-function simSeries(eloA, eloB, rng) {
-  let wA = 0, wB = 0, g = 0;
-  const home = [true, true, false, false, true, false, true];
-  while (wA < 4 && wB < 4) { rng() < eloWinP(eloA, eloB, home[g++]) ? wA++ : wB++; }
-  return wA === 4;
-}
-
-function makeLCG(seed) {
-  let s = seed >>> 0;
-  return () => { s = (Math.imul(1664525, s) + 1013904223) >>> 0; return s / 4294967296; };
-}
-
-export function computePlayoffSim(standings, eloData) {
-  const buildSeeds = conf => conf.slice(0, 10).map((t, i) => {
-    const e = eloData.find(x => x.team === t.team);
-    return {
-      team: t.team, name: TEAM_NAMES[t.team] || t.team, color: TEAM_COLORS[t.team] || "#546480",
-      elo: e?.elo ?? (1500 + (t.pct - 0.5) * 400), seed: i + 1, pct: t.pct, w: t.w, l: t.l
-    };
-  });
-
-  const eastSeeds = buildSeeds(standings?.east || EAST_STANDINGS);
-  const westSeeds = buildSeeds(standings?.west || WEST_STANDINGS);
-  const all = [...eastSeeds, ...westSeeds];
-  const counts = {};
-  all.forEach(t => { counts[t.team] = { pi: 0, r1: 0, r2: 0, conf: 0, finals: 0, champ: 0 }; });
-
-  function simPlayIn(seeds, rng) {
-    const [s7, s8, s9, s10] = seeds.slice(6, 10);
-    [s7, s8, s9, s10].forEach(t => counts[t.team].pi++);
-    const seed7 = simSeries(s7.elo, s8.elo, rng) ? s7 : s8;
-    const loser78 = seed7 === s7 ? s8 : s7;
-    const w910 = simSeries(s9.elo, s10.elo, rng) ? s9 : s10;
-    const seed8 = simSeries(loser78.elo, w910.elo, rng) ? loser78 : w910;
-    return [seed7, seed8];
-  }
-
-  function simConf(seeds, rng) {
-    const direct = seeds.slice(0, 6);
-    const [pi7, pi8] = simPlayIn(seeds, rng);
-    const bracket = [...direct, pi7, pi8];
-    bracket.forEach(t => counts[t.team].r1++);
-    const r2 = [[0, 7], [3, 4], [2, 5], [1, 6]].map(([a, b]) =>
-      simSeries(bracket[a].elo, bracket[b].elo, rng) ? bracket[a] : bracket[b]
-    );
-    r2.forEach(t => counts[t.team].r2++);
-    const cf = [
-      simSeries(r2[0].elo, r2[1].elo, rng) ? r2[0] : r2[1],
-      simSeries(r2[2].elo, r2[3].elo, rng) ? r2[2] : r2[3],
-    ];
-    cf.forEach(t => counts[t.team].conf++);
-    const champ = simSeries(cf[0].elo, cf[1].elo, rng) ? cf[0] : cf[1];
-    counts[champ.team].finals++;
-    return champ;
-  }
-
-  for (let i = 0; i < SIMS; i++) {
-    const rng = makeLCG(i * 6364136223846793 + 1442695040888963407);
-    const eC = simConf(eastSeeds, rng);
-    const wC = simConf(westSeeds, rng);
-    const champ = simSeries(eC.elo, wC.elo, rng) ? eC : wC;
-    counts[champ.team].champ++;
-  }
-
-  const eastSet = new Set(eastSeeds.map(t => t.team));
-  return all.map(t => {
-    const c = counts[t.team];
-    return {
-      ...t,
-      playInPct: +(c.pi / SIMS * 100).toFixed(1),
-      r1Pct: +(c.r1 / SIMS * 100).toFixed(1),
-      r2Pct: +(c.r2 / SIMS * 100).toFixed(1),
-      confPct: +(c.conf / SIMS * 100).toFixed(1),
-      finalsPct: +(c.finals / SIMS * 100).toFixed(1),
-      champPct: +(c.champ / SIMS * 100).toFixed(1),
-      isPlayIn: t.seed >= 7,
-      conf: eastSet.has(t.team) ? "East" : "West",
-    };
-  }).sort((a, b) => b.champPct - a.champPct);
-}
+// ─── Monte Carlo Playoff Sim (Worker) ───────────────────────────
+// Simulation logic moved to src/workers/playoffWorker.js
 
 // ─── Playoff Sim View ─────────────────────────────────────────
 function PlayoffSimView({ data }) {
@@ -254,7 +169,7 @@ function PlayoffSimView({ data }) {
         <div>
           <div className="pm-label">Monte Carlo Playoff Simulation</div>
           <div className="text-[10px] text-pitch-500 mt-0.5">
-            {SIMS.toLocaleString()} simulations · Elo-based win probability · Play-in tournament included
+            10,000 simulations · Elo-based win probability · Play-in tournament included
           </div>
         </div>
         <div className="flex gap-1.5">
@@ -316,6 +231,11 @@ function PlayoffSimView({ data }) {
             </div>
           </div>
         ))}
+      </motion.div>
+
+      {/* Visual Bracket */}
+      <motion.div variants={item} className="mb-4">
+        <PlayoffBracket simData={data} />
       </motion.div>
 
       {/* Full table */}
@@ -794,10 +714,21 @@ export default function Analytics() {
       ? computePowerIndex(fourFactors, eloData, shotData) : [],
     [fourFactors, eloData, shotData]
   );
-  const playoffData = useMemo(() =>
-    standingsData && eloData.length ? computePlayoffSim(standingsData, eloData) : [],
-    [standingsData, eloData]
-  );
+  const [playoffData, setPlayoffData] = useState([]);
+  const [isSimulating, setIsSimulating] = useState(false);
+
+  useEffect(() => {
+    if (!standingsData || !eloData.length) return;
+    setIsSimulating(true);
+    const worker = new Worker(new URL("../workers/playoffWorker.js", import.meta.url), { type: "module" });
+    worker.onmessage = (e) => {
+      setPlayoffData(e.data);
+      setIsSimulating(false);
+      worker.terminate();
+    };
+    worker.postMessage({ standings: standingsData, eloData });
+    return () => worker.terminate();
+  }, [standingsData, eloData]);
 
   const needsStandings = ["factors", "elo", "power", "playoff"].includes(activeTab);
 
@@ -833,7 +764,7 @@ export default function Analytics() {
             {activeTab === "factors" && <FourFactorsView data={fourFactors} />}
             {activeTab === "elo" && <EloView data={eloData} />}
             {activeTab === "quality" && <ShotQualityView data={shotData} />}
-            {activeTab === "playoff" && <PlayoffSimView data={playoffData} />}
+            {activeTab === "playoff" && (isSimulating ? <div className="pm-card p-4 flex justify-center items-center"><div className="text-pitch-500 animate-pulse text-sm">Simulating 10,000 runs...</div></div> : <PlayoffSimView data={playoffData} />)}
           </motion.div>
         </AnimatePresence>
       )}

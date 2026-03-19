@@ -1,9 +1,9 @@
 // api/espn.js — Vercel Serverless Function
-// Proxy for ESPN's free NBA API endpoints.
-// No API key required.
+// Proxy for ESPN's free NBA API. No API key required.
 //
-// ?resource=standings  → current NBA standings
-// ?resource=scoreboard → today's games (?date=YYYYMMDD optional)
+// ?resource=standings                      → current NBA standings
+// ?resource=scoreboard                     → today's games (?date=YYYYMMDD)
+// ?resource=team_schedule&team=OKC         → full team schedule + results
 
 const STANDINGS_URL =
     "https://site.web.api.espn.com/apis/v2/sports/basketball/nba/standings" +
@@ -12,22 +12,40 @@ const STANDINGS_URL =
 const SCOREBOARD_BASE =
     "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard";
 
+// ESPN numeric team IDs (abbreviation → ESPN ID)
+const ESPN_TEAM_IDS = {
+    ATL: "1", BOS: "2", BKN: "17", CHA: "30", CHI: "4",
+    CLE: "5", DAL: "6", DEN: "7", DET: "8", GSW: "9",
+    HOU: "10", IND: "11", LAC: "12", LAL: "13", MEM: "29",
+    MIA: "14", MIL: "15", MIN: "16", NOP: "3", NYK: "18",
+    OKC: "25", ORL: "19", PHI: "20", PHX: "21", POR: "22",
+    SAC: "23", SAS: "24", TOR: "28", UTA: "26", WAS: "27",
+};
+
 export default async function handler(req, res) {
     if (req.method !== "GET") return res.status(405).json({ error: "Method not allowed" });
 
     const resource = req.query.resource;
-    if (!resource || !["standings", "scoreboard"].includes(resource)) {
+    if (!resource || !["standings", "scoreboard", "team_schedule"].includes(resource)) {
         return res.status(400).json({ error: `Unknown resource "${resource}"` });
     }
 
-    let url;
+    let url, ttl;
+
     if (resource === "standings") {
         url = STANDINGS_URL;
-    } else {
-        // scoreboard — optional ?date=YYYYMMDD
+        ttl = 600;
+    } else if (resource === "scoreboard") {
         url = req.query.date
             ? `${SCOREBOARD_BASE}?dates=${req.query.date}`
             : SCOREBOARD_BASE;
+        ttl = 60;
+    } else if (resource === "team_schedule") {
+        const abbr = (req.query.team || "").toUpperCase();
+        const espnId = ESPN_TEAM_IDS[abbr];
+        if (!espnId) return res.status(400).json({ error: `Unknown team: ${abbr}` });
+        url = `https://site.api.espn.com/apis/site/v2/sports/basketball/nba/teams/${espnId}/schedule`;
+        ttl = 300;
     }
 
     try {
@@ -40,21 +58,16 @@ export default async function handler(req, res) {
         });
 
         if (!upstream.ok) {
-            return res.status(upstream.status).json({
-                error: `ESPN upstream returned ${upstream.status}`,
-            });
+            return res.status(upstream.status).json({ error: `ESPN upstream ${upstream.status}` });
         }
 
         const data = await upstream.json();
-        const ttl = resource === "scoreboard" ? 60 : 600;
-
         res.setHeader("Cache-Control", `s-maxage=${ttl}, stale-while-revalidate=30`);
         res.setHeader("Content-Type", "application/json");
         return res.status(200).json(data);
+
     } catch (err) {
-        if (err.name === "TimeoutError") {
-            return res.status(504).json({ error: "ESPN upstream timed out" });
-        }
+        if (err.name === "TimeoutError") return res.status(504).json({ error: "ESPN timed out" });
         console.error("[api/espn]", err.message);
         return res.status(502).json({ error: "ESPN fetch failed", message: err.message });
     }

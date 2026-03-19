@@ -117,8 +117,8 @@ function SummaryTile({ label, value, sub, icon: Icon, trend, color, onClick, bad
     );
 }
 
-function KellyTile({ topEdge }) {
-    const kelly = kellyBet(topEdge.modelP / 100, -110, DEFAULT_BANKROLL);
+function KellyTile({ topEdge, bankroll }) {
+    const kelly = kellyBet(topEdge.modelP / 100, -110, bankroll);
     return (
         <motion.div variants={tile} className="pm-tile p-4">
             <div className="flex items-start justify-between mb-2.5">
@@ -162,7 +162,12 @@ export default function Dashboard({ onNavigate }) {
 
     const [betVersion, setBetVersion] = useState(0);
     const betStats = useMemo(() => readBetStats(), [betVersion]);
-    const handleStorage = useCallback((e) => { if (e.key?.includes(BET_STORAGE_KEY)) setBetVersion(v => v + 1); }, []);
+    const [bankroll, setBankroll] = useState(() => Number(lsGet("bankroll")) || DEFAULT_BANKROLL);
+    const handleStorage = useCallback((e) => { 
+        const key = e.detail?.key || e.key;
+        if (key?.includes(BET_STORAGE_KEY)) setBetVersion(v => v + 1); 
+        if (key?.includes("bankroll")) setBankroll(Number(lsGet("bankroll")) || DEFAULT_BANKROLL);
+    }, []);
     useEffect(() => { window.addEventListener("storage", handleStorage); return () => window.removeEventListener("storage", handleStorage); }, [handleStorage]);
 
     const topEdge = useMemo(() => {
@@ -217,7 +222,7 @@ export default function Dashboard({ onNavigate }) {
             </div>
 
             <div className="col-span-12 lg:col-span-4 space-y-3">
-                {oddsData && Object.keys(oddsData).length > 0 && topEdge.modelP > 0 && <KellyTile topEdge={topEdge} />}
+                {oddsData && Object.keys(oddsData).length > 0 && topEdge.modelP > 0 && <KellyTile topEdge={topEdge} bankroll={bankroll} />}
                 <motion.div variants={tile} className="pm-card p-4">
                     <div className="flex items-center justify-between mb-3">
                         <div className="pm-label">Standings</div>

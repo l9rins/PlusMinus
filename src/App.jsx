@@ -5,19 +5,22 @@ import {
 } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import TopNav from "./components/TopNav";
-const Dashboard  = lazy(() => import("./components/Dashboard"));
-const Players    = lazy(() => import("./components/Players"));
-const Analytics  = lazy(() => import("./components/Analytics"));
-const Scores     = lazy(() => import("./components/Views").then(m => ({ default: m.Scores })));
-const Standings  = lazy(() => import("./components/Views").then(m => ({ default: m.Standings })));
-const Betting    = lazy(() => import("./components/Views").then(m => ({ default: m.Betting })));
-const BetTracker = lazy(() => import("./components/Views").then(m => ({ default: m.BetTracker })));
 import { ToastContainer } from "./components/ui";
 import { TEAM_COLORS } from "./data";
 
+// ── Lazy route components ─────────────────────────────────────────
+const Dashboard = lazy(() => import("./components/Dashboard"));
+const Players = lazy(() => import("./components/Players"));
+const Analytics = lazy(() => import("./components/Analytics"));
+const TeamDetail = lazy(() => import("./components/TeamDetail"));
+const Scores = lazy(() => import("./components/Views").then(m => ({ default: m.Scores })));
+const Standings = lazy(() => import("./components/Views").then(m => ({ default: m.Standings })));
+const Betting = lazy(() => import("./components/Views").then(m => ({ default: m.Betting })));
+const BetTracker = lazy(() => import("./components/Views").then(m => ({ default: m.BetTracker })));
+
 // ── Dynamic team theming ──────────────────────────────────────────
-// Call useTeamTheme("OKC") from any view to shift the global accent
-// color to that team's brand hex — buttons, borders, glows all update.
+// Call useTeamTheme("OKC") from any view to shift the global --theme-accent
+// CSS variable to that team's brand color — buttons, borders, glows update.
 export function useTeamTheme(teamAbbr) {
   useEffect(() => {
     const color = (teamAbbr && TEAM_COLORS[teamAbbr]) ? TEAM_COLORS[teamAbbr] : null;
@@ -37,13 +40,13 @@ export function useTeamTheme(teamAbbr) {
 
 // ── Route metadata ────────────────────────────────────────────────
 const ROUTE_META = {
-  "/":          { title: "Dashboard",   tab: "dashboard" },
-  "/scores":    { title: "Scores",      tab: "scores"    },
-  "/standings": { title: "Standings",   tab: "standings" },
-  "/players":   { title: "Players",     tab: "players"   },
-  "/betting":   { title: "Betting",     tab: "betting"   },
-  "/tracker":   { title: "Bet Tracker", tab: "tracker"   },
-  "/analytics": { title: "Analytics",   tab: "analytics" },
+  "/": { title: "Dashboard", tab: "dashboard" },
+  "/scores": { title: "Scores", tab: "scores" },
+  "/standings": { title: "Standings", tab: "standings" },
+  "/players": { title: "Players", tab: "players" },
+  "/betting": { title: "Betting", tab: "betting" },
+  "/tracker": { title: "Bet Tracker", tab: "tracker" },
+  "/analytics": { title: "Analytics", tab: "analytics" },
 };
 
 const SHORTCUT_ROUTES = {
@@ -97,13 +100,20 @@ function AppInner() {
   const location = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Document title
+  // Document title — handles /team/:abbr dynamically
   useEffect(() => {
     const meta = ROUTE_META[location.pathname];
-    document.title = meta ? `${meta.title} · PlusMinus` : "PlusMinus";
+    if (meta) {
+      document.title = `${meta.title} · PlusMinus`;
+    } else if (location.pathname.startsWith("/team/")) {
+      const abbr = location.pathname.split("/team/")[1]?.toUpperCase();
+      document.title = abbr ? `${abbr} · PlusMinus` : "PlusMinus";
+    } else {
+      document.title = "PlusMinus";
+    }
   }, [location.pathname]);
 
-  // Global keyboard shortcuts (when no input focused)
+  // Global keyboard shortcuts (when no input is focused)
   useEffect(() => {
     const handler = (e) => {
       const tag = e.target.tagName.toLowerCase();
@@ -143,14 +153,15 @@ function AppInner() {
             <ErrorBoundary key={location.pathname}>
               <Suspense fallback={<PageSkeleton />}>
                 <Routes>
-                  <Route path="/"          element={<Dashboard onNavigate={handleTabChange} />} />
-                  <Route path="/scores"    element={<Scores />} />
+                  <Route path="/" element={<Dashboard onNavigate={handleTabChange} />} />
+                  <Route path="/scores" element={<Scores />} />
                   <Route path="/standings" element={<Standings />} />
-                  <Route path="/players"   element={<Players initialQuery={searchQuery} />} />
-                  <Route path="/betting"   element={<Betting />} />
-                  <Route path="/tracker"   element={<BetTracker />} />
+                  <Route path="/players" element={<Players initialQuery={searchQuery} />} />
+                  <Route path="/betting" element={<Betting />} />
+                  <Route path="/tracker" element={<BetTracker />} />
                   <Route path="/analytics" element={<Analytics />} />
-                  <Route path="*"          element={<Navigate to="/" replace />} />
+                  <Route path="/team/:abbr" element={<TeamDetail />} />
+                  <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
               </Suspense>
             </ErrorBoundary>
