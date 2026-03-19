@@ -5,10 +5,14 @@ import {
 } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import TopNav from "./components/TopNav";
-import Dashboard from "./components/Dashboard";
-import Players from "./components/Players";
-import Analytics from "./components/Analytics";
-import { Scores, Standings, Betting, BetTracker } from "./components/Views";
+import { lazy } from "react";
+const Dashboard  = lazy(() => import("./components/Dashboard"));
+const Players    = lazy(() => import("./components/Players"));
+const Analytics  = lazy(() => import("./components/Analytics"));
+const Scores     = lazy(() => import("./components/Views").then(m => ({ default: m.Scores })));
+const Standings  = lazy(() => import("./components/Views").then(m => ({ default: m.Standings })));
+const Betting    = lazy(() => import("./components/Views").then(m => ({ default: m.Betting })));
+const BetTracker = lazy(() => import("./components/Views").then(m => ({ default: m.BetTracker })));
 import { ToastContainer } from "./components/ui";
 import { TEAM_COLORS } from "./data";
 
