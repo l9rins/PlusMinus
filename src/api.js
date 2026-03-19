@@ -318,22 +318,9 @@ export function usePlayerSearch(query) {
             const players = searchData.data ?? [];
             if (!players.length) return [];
 
-            let averages = [];
-            try {
-                const ids = players.map((p) => p.id).join("&player_ids[]=");
-                const avgData = await bdlFetch(
-                    `/season_averages?season=${season}&player_ids[]=${ids}`,
-                    signal
-                );
-                averages = avgData.data ?? [];
-            } catch {
-                // Season averages paywalled — show players without stats
-            }
-
             return players.map((p) => {
-                const avg = averages.find((a) => a.player.id === p.id);
                 const name = `${p.first_name} ${p.last_name}`.trim();
-                const base = {
+                return {
                     id: p.id, name,
                     pos: p.position || "—",
                     team: p.team?.abbreviation || "—",
@@ -341,14 +328,6 @@ export function usePlayerSearch(query) {
                     per: null, bpm: null, vorp: null,
                     ortg: null, drtg: null, form: null,
                     pts: 0, ast: 0, reb: 0, ts: null,
-                };
-                if (!avg) return base;
-                return {
-                    ...base,
-                    pts: +parseFloat(avg.pts ?? 0).toFixed(1),
-                    ast: +parseFloat(avg.ast ?? 0).toFixed(1),
-                    reb: +parseFloat(avg.reb ?? 0).toFixed(1),
-                    ts: avg.fg_pct ? +parseFloat(avg.fg_pct * 100).toFixed(1) : null,
                 };
             });
         },

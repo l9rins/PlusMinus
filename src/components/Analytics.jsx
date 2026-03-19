@@ -23,6 +23,10 @@ import { signed } from "../utils";
 import { TrendingUp, BarChart2, Zap, Award, Info, Star, Trophy } from "lucide-react";
 import PlayoffBracket from "./PlayoffBracket";
 
+// Constants mirrored from playoffWorker.js for display purposes
+const SIMS = 10_000;
+const HOME_BUMP = 35;
+
 const container = { hidden: {}, show: { transition: { staggerChildren: 0.04 } } };
 const item = { hidden: { opacity: 0, y: 8 }, show: { opacity: 1, y: 0, transition: { duration: 0.2 } } };
 

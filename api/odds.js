@@ -149,12 +149,22 @@ export default async function handler(req, res) {
         consAwayP,
 
         // Line shopping data — full breakdown per book
-        books: homeLines.map((hl, i) => ({
-          book: hl.book,
-          homeOdds: hl.odds,
-          awayOdds: awayLines[i]?.odds ?? null,
-          homeP: +(toImplied(hl.odds) / (toImplied(hl.odds) + toImplied(awayLines[i]?.odds ?? hl.odds)) * 100).toFixed(1),
-        })).sort((a, b) => toDecimal(b.homeOdds) - toDecimal(a.homeOdds)),
+        books: (() => {
+          const awayByBook = Object.fromEntries(awayLines.map(al => [al.book, al]));
+          return homeLines
+            .map(hl => {
+              const al = awayByBook[hl.book];
+              if (!al) return null;
+              return {
+                book: hl.book,
+                homeOdds: hl.odds,
+                awayOdds: al.odds,
+                homeP: +(toImplied(hl.odds) / (toImplied(hl.odds) + toImplied(al.odds)) * 100).toFixed(1),
+              };
+            })
+            .filter(Boolean)
+            .sort((a, b) => toDecimal(b.homeOdds) - toDecimal(a.homeOdds));
+        })(),
 
         // Arbitrage
         isArb,

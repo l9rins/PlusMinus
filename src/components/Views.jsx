@@ -459,7 +459,7 @@ export function Standings() {
                       </td>
                       <td className="px-3 py-2.5 font-mono text-pitch-200 font-medium">{t.w}</td>
                       <td className="px-3 py-2.5 font-mono text-pitch-400">{t.l}</td>
-                      <td className="px-3 py-2.5 font-mono text-pitch-300">{formatPct(t.pct)}</td>
+                      <td className="px-3 py-2.5 font-mono text-pitch-300">{(t.pct || 0).toFixed(3).replace(/^0/, '')}</td>
                       <td className="px-3 py-2.5 font-mono text-pitch-500 text-[11px]">
                         {t.gb === 0 ? "—" : t.gb}
                       </td>

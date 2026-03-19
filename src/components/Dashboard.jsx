@@ -168,7 +168,14 @@ export default function Dashboard({ onNavigate }) {
         if (key?.includes(BET_STORAGE_KEY)) setBetVersion(v => v + 1); 
         if (key?.includes("bankroll")) setBankroll(Number(lsGet("bankroll")) || DEFAULT_BANKROLL);
     }, []);
-    useEffect(() => { window.addEventListener("storage", handleStorage); return () => window.removeEventListener("storage", handleStorage); }, [handleStorage]);
+    useEffect(() => { 
+        window.addEventListener("plusminus:storage", handleStorage); 
+        window.addEventListener("storage", handleStorage);
+        return () => {
+            window.removeEventListener("plusminus:storage", handleStorage);
+            window.removeEventListener("storage", handleStorage);
+        }
+    }, [handleStorage]);
 
     const topEdge = useMemo(() => {
         if (oddsData && Object.keys(oddsData).length > 0) {

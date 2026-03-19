@@ -70,12 +70,6 @@ export const breakEven = (american) => oddsToImplied(american);
  */
 export const calcROI = (totalPL, totalStaked) => {
   if (!totalStaked || totalStaked === 0) return 0;
-  // Legacy path: if second arg looks like a win-rate (0–1) and first like a rate too
-  if (totalStaked > 0 && totalStaked <= 1 && totalPL >= 0 && totalPL <= 1) {
-    const dec = oddsToDecimal(DEFAULT_JUICE);
-    return +((totalPL * (dec - 1) - (1 - totalPL)) * 100).toFixed(2);
-  }
-  // Standard path: totalPL / totalStaked as percentage
   return +((totalPL / totalStaked) * 100).toFixed(2);
 };
 
@@ -229,7 +223,11 @@ export const lsGet = (key) => {
 
 export const lsSet = (key, value) => {
   try {
-    localStorage.setItem(LS_PREFIX + key, JSON.stringify(value));
+    const fullKey = LS_PREFIX + key;
+    localStorage.setItem(fullKey, JSON.stringify(value));
+    window.dispatchEvent(
+      new CustomEvent("plusminus:storage", { detail: { key: fullKey } })
+    );
     return true;
   } catch { return false; }
 };
