@@ -778,7 +778,11 @@ const TABS = [
 
 // ─── Main Analytics Component ─────────────────────────────────
 export default function Analytics() {
-  const [activeTab, setActiveTab] = useState("power");
+  const [activeTab, setActiveTab] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    const tab = params.get("tab");
+    return ["power","factors","elo","quality","playoff"].includes(tab) ? tab : "power";
+  });
   const { data: standingsData, isLoading, isError, isFetching, refetch, dataUpdatedAt } = useStandings();
   const { data: playersData } = usePlayers();
 

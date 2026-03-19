@@ -45,6 +45,7 @@ const NAV_ITEMS = [
       { label: "Four Factors",   path: "/analytics", desc: "Dean Oliver efficiency model" },
       { label: "Elo Ratings",    path: "/analytics", desc: "Power rankings & trajectory" },
       { label: "Shot Quality",   path: "/analytics", desc: "Radar profiles & comparison" },
+      { label: "Playoff Sim",    path: "/analytics?tab=playoff", desc: "Monte Carlo bracket odds" },
     ],
   },
 ];
