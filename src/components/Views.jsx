@@ -38,6 +38,10 @@ export function Scores() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {Array.from({ length: 9 }).map((_, i) => <TileSkeleton key={i} lines={4} />)}
         </div>
+      ) : (games || []).length === 0 ? (
+        <div className="pm-card p-12 text-center text-pitch-500 text-sm">
+          No games scheduled today.
+        </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {(games || []).map(g => {
@@ -185,14 +189,22 @@ export function Standings() {
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: i * 0.02 }}
                     className={`border-b border-pitch-700 hover:bg-pitch-700 transition-colors cursor-pointer
-                      ${i === 5 ? "border-t-2 border-t-accent/40" : ""}`}
+                      ${i === 5 ? "border-t-2 border-t-accent/40" : ""}
+                      ${i >= 6 && i <= 9 ? "opacity-80" : ""}`}
                   >
                     <td className="px-3 py-2.5 font-mono text-[11px] text-pitch-500">{i + 1}</td>
                     <td className="px-3 py-2.5">
-                      <span className={`font-display text-base tracking-wider
-                        ${i === 0 ? "text-accent" : "text-pitch-200"}`}>
-                        {t.team}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className={`font-display text-base tracking-wider
+                          ${i === 0 ? "text-accent" : i < 6 ? "text-pitch-200" : "text-pitch-400"}`}>
+                          {t.team}
+                        </span>
+                        {i >= 6 && i <= 9 && (
+                          <span className="text-[9px] text-draw border border-draw/30 bg-draw/10 px-1 py-0.5 rounded">
+                            play-in
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-3 py-2.5 font-mono text-pitch-200">{t.w}</td>
                     <td className="px-3 py-2.5 font-mono text-pitch-400">{t.l}</td>
@@ -213,8 +225,9 @@ export function Standings() {
               </tbody>
             </table>
           </div>
-          <div className="mt-2 text-[10px] text-pitch-600">
-            Line above rank 7 = playoff / play-in cutoff
+          <div className="mt-2 flex gap-4 text-[10px] text-pitch-600 px-1">
+            <span>Line above rank 7 = direct playoff (top 6)</span>
+            <span>Ranks 7–10 = play-in tournament</span>
           </div>
         </>
       )}
@@ -228,6 +241,10 @@ export function Betting() {
   const { data: oddsData, isFetching: oddsFetching, dataUpdatedAt: oddsUpdatedAt } = useOdds();
   const { data: standingsData, isFetching: standingsFetching } = useStandings();
 
+  // Build live edge cards from odds + standings data.
+  // modelP = favourite's win% from standings (proxy, not a full model).
+  // impliedP = vig-removed market implied probability from The Odds API.
+  // Minimum 10-game threshold: don't show edge for teams with thin sample.
   const liveEdges = useMemo(() => {
     if (!oddsData || !standingsData || !rawGames) return null;
 
@@ -435,7 +452,8 @@ export function Betting() {
 
 // ── BET TRACKER ───────────────────────────────────────────────
 // Bets persist in localStorage. Key imported from utils.js.
-// If missing (raw === null = first visit), we seed with demo bets.
+// raw === null means first visit → show demo bets.
+// raw === "[]" means user cleared all bets → respect empty array.
 
 const DEMO_BETS = [
   { id: 1, game: "OKC @ BKN", type: "Spread", pick: "OKC -16", odds: -110, stake: 50, result: "win" },
@@ -447,9 +465,9 @@ const DEMO_BETS = [
 function loadBets() {
   try {
     const raw = localStorage.getItem(BET_STORAGE_KEY);
-    if (raw === null) return DEMO_BETS;
+    if (raw === null) return DEMO_BETS;          // first visit — show demo
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : DEMO_BETS;
+    return Array.isArray(parsed) ? parsed : DEMO_BETS;  // respect empty array
   } catch {
     return DEMO_BETS;
   }
@@ -465,9 +483,7 @@ function saveBets(bets) {
   }
 }
 
-// CSV export utility.
-// Triggers a browser download of all bets as a .csv file.
-// Uses a hidden <a> tag + object URL — no server required.
+// CSV export — uses timestamp check to avoid 1/1/1970 dates on demo bets
 function exportBetsCSV(bets) {
   const headers = "Date,Game,Type,Pick,Odds,Stake,Result,P&L\n";
   const rows = bets.map(b => {
@@ -475,7 +491,6 @@ function exportBetsCSV(bets) {
     const plStr = b.result === "pending" ? "" : pl.toFixed(2);
     // Only treat id as a timestamp if it's a real Date.now() value (13 digits)
     const date = b.id > 1000000000000 ? new Date(b.id).toLocaleDateString("en-US") : "";
-    // Wrap fields in quotes to handle commas inside game/pick strings
     return `"${date}","${b.game}","${b.type}","${b.pick}",${b.odds},${b.stake},${b.result},${plStr}`;
   }).join("\n");
 
@@ -539,8 +554,6 @@ export function BetTracker() {
     });
   }, [bets]);
 
-  // Bet type breakdown — win rate + P&L per bet type.
-  // Only includes decisive (non-pending) bets. Skips types with no history.
   const typeBreakdown = useMemo(() => {
     const types = {};
     bets.forEach(b => {
@@ -737,27 +750,15 @@ export function BetTracker() {
         </div>
       )}
 
-      {/* Bet type breakdown — win rate by bet type.
-          Only renders when there are at least 2 settled bets across at least 2 types. */}
+      {/* Win rate by bet type */}
       {typeBreakdown.length >= 2 && (
         <div className="pm-card p-4">
           <div className="pm-label mb-3">Win rate by bet type</div>
           <div style={{ height: 160 }}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={typeBreakdown} barCategoryGap="28%">
-                <XAxis
-                  dataKey="type"
-                  tick={{ fill: "#546480", fontSize: 10 }}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <YAxis
-                  domain={[0, 100]}
-                  tick={{ fill: "#546480", fontSize: 10 }}
-                  axisLine={false}
-                  tickLine={false}
-                  tickFormatter={v => `${v}%`}
-                />
+                <XAxis dataKey="type" tick={{ fill: "#546480", fontSize: 10 }} axisLine={false} tickLine={false} />
+                <YAxis domain={[0, 100]} tick={{ fill: "#546480", fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={v => `${v}%`} />
                 <Tooltip
                   contentStyle={{ background: "#1a1e2a", border: "1px solid #2e3a50", borderRadius: 6, fontSize: 11 }}
                   labelStyle={{ color: "#7d91ab" }}

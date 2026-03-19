@@ -1,24 +1,28 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, SlidersHorizontal, ChevronDown, X, Loader } from "lucide-react";
+import { Search, SlidersHorizontal, ChevronDown, X, Loader, GitCompare } from "lucide-react";
 import { TEAM_COLORS } from "../data";
 import { usePlayers, usePlayerSearch } from "../api";
 import { signed } from "../utils";
 import { TileSkeleton, ErrorState } from "./ui";
 
 // ── AttrBar ───────────────────────────────────────────────────
-function AttrBar({ label, value, max = 100, min = 0, invert = false, isSigned = false }) {
-    let pct;
-    if (isSigned) {
-        const range = max - min;
-        const raw = invert ? max - value : value;
-        pct = range > 0 ? Math.min(100, Math.max(0, ((raw - min) / range) * 100)) : 0;
-    } else {
-        const raw = invert ? Math.max(0, max - value) : value;
-        pct = Math.min(100, Math.max(0, (raw / max) * 100));
-    }
+// compareValue: optional second player value to show alongside
+function AttrBar({ label, value, max = 100, min = 0, invert = false, isSigned = false, compareValue, compareColor }) {
+    const calcPct = (v) => {
+        if (isSigned) {
+            const range = max - min;
+            const raw = invert ? max - v : v;
+            return range > 0 ? Math.min(100, Math.max(0, ((raw - min) / range) * 100)) : 0;
+        }
+        const raw = invert ? Math.max(0, max - v) : v;
+        return Math.min(100, Math.max(0, (raw / max) * 100));
+    };
 
-    const color =
+    const pct = calcPct(value);
+    const cmpPct = compareValue !== undefined ? calcPct(compareValue) : null;
+
+    const barColor =
         pct >= 80 ? "bg-tier-elite" :
             pct >= 65 ? "bg-tier-good" :
                 pct >= 50 ? "bg-tier-avg" :
@@ -27,15 +31,29 @@ function AttrBar({ label, value, max = 100, min = 0, invert = false, isSigned = 
     return (
         <div className="flex items-center gap-2 mb-1.5">
             <span className="text-[10px] text-pitch-400 w-14 flex-shrink-0">{label}</span>
-            <div className="flex-1 pm-stat-bar">
+            <div className="flex-1 pm-stat-bar relative">
                 <motion.div
-                    className={`pm-stat-bar-fill ${color}`}
+                    className={`pm-stat-bar-fill ${barColor}`}
                     initial={{ width: 0 }}
                     animate={{ width: `${pct}%` }}
                     transition={{ duration: 0.6, ease: "easeOut", delay: 0.1 }}
                 />
+                {cmpPct !== null && (
+                    <motion.div
+                        className="pm-stat-bar-fill absolute top-0 left-0 opacity-40"
+                        style={{ background: compareColor || "#f59e0b" }}
+                        initial={{ width: 0 }}
+                        animate={{ width: `${cmpPct}%` }}
+                        transition={{ duration: 0.6, ease: "easeOut", delay: 0.15 }}
+                    />
+                )}
             </div>
             <span className="font-mono text-[11px] text-pitch-200 w-8 text-right">{value}</span>
+            {compareValue !== undefined && (
+                <span className="font-mono text-[11px] w-8 text-right" style={{ color: compareColor || "#f59e0b" }}>
+                    {compareValue}
+                </span>
+            )}
         </div>
     );
 }
@@ -56,24 +74,19 @@ function Form({ results }) {
 }
 
 // ── PlayerCard ────────────────────────────────────────────────
-// Handles both static (full advanced metrics) and dynamic search
-// results (basic stats only — BDL free tier limitation).
-// Advanced section is hidden when player.per === null, which signals
-// a search result rather than a static roster player.
-function PlayerCard({ player }) {
+function PlayerCard({ player, onCompare, comparePlayer, isComparing }) {
     const [expanded, setExpanded] = useState(false);
     const color = TEAM_COLORS[player.team] || "#546480";
+    const cmpColor = comparePlayer ? (TEAM_COLORS[comparePlayer.team] || "#f59e0b") : null;
     const initials = player.name.split(" ").map(w => w[0]).join("").slice(0, 2);
 
-    // A player from dynamic search has null advanced metrics
     const hasAdvanced = player.per !== null;
-    // A player with no season data at all shouldn't show stats
     const hasStats = player.pts > 0 || player.ast > 0 || player.reb > 0;
 
     return (
         <motion.div
             layout
-            className={`pm-tile transition-all ${expanded ? "pm-accent-border" : ""}`}
+            className={`pm-tile transition-all ${expanded ? "pm-accent-border" : ""} ${isComparing ? "ring-1 ring-draw/40" : ""}`}
             onClick={() => setExpanded(!expanded)}
         >
             <div className="p-3 flex items-center gap-3">
@@ -103,6 +116,20 @@ function PlayerCard({ player }) {
                 {!hasStats && (
                     <span className="text-[10px] text-pitch-600 flex-shrink-0">No stats this season</span>
                 )}
+                {/* Compare button — only for static roster players with advanced metrics */}
+                {hasAdvanced && onCompare && (
+                    <button
+                        onClick={e => { e.stopPropagation(); onCompare(player); }}
+                        title={isComparing ? "Remove from comparison" : "Compare this player"}
+                        className={`flex-shrink-0 p-1.5 rounded-md border transition-all
+                            ${isComparing
+                                ? "bg-draw/10 border-draw/30 text-draw"
+                                : "bg-pitch-700 border-pitch-600 text-pitch-400 hover:text-pitch-200 hover:border-pitch-500"
+                            }`}
+                    >
+                        <GitCompare size={11} strokeWidth={1.8} />
+                    </button>
+                )}
                 <ChevronDown size={14} strokeWidth={1.8} className={`text-pitch-500 transition-transform duration-200 flex-shrink-0 ${expanded ? "rotate-180" : ""}`} />
             </div>
 
@@ -118,16 +145,26 @@ function PlayerCard({ player }) {
                     >
                         <div className="px-3 pb-4 border-t border-pitch-600 pt-4">
                             {hasAdvanced ? (
-                                // Full expanded view for static roster players
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                                     <div>
-                                        <div className="pm-label mb-3">Advanced metrics</div>
-                                        <AttrBar label="PER" value={player.per} max={35} />
-                                        <AttrBar label="TS%" value={player.ts} max={75} />
-                                        <AttrBar label="BPM" value={player.bpm} min={-5} max={12} isSigned />
-                                        <AttrBar label="VORP" value={player.vorp} min={-2} max={9} isSigned />
-                                        <AttrBar label="O-RTG" value={player.ortg} max={135} />
-                                        <AttrBar label="D-RTG" value={player.drtg} max={120} invert />
+                                        <div className="pm-label mb-1 flex items-center gap-2">
+                                            Advanced metrics
+                                            {comparePlayer && (
+                                                <span className="text-[9px] text-pitch-500">
+                                                    <span style={{ color }}>{player.name.split(" ")[1]}</span>
+                                                    {" vs "}
+                                                    <span style={{ color: cmpColor }}>{comparePlayer.name.split(" ")[1]}</span>
+                                                </span>
+                                            )}
+                                        </div>
+                                        <div className="mt-2">
+                                            <AttrBar label="PER" value={player.per} max={35} compareValue={comparePlayer?.per} compareColor={cmpColor} />
+                                            <AttrBar label="TS%" value={player.ts} max={75} compareValue={comparePlayer?.ts} compareColor={cmpColor} />
+                                            <AttrBar label="BPM" value={player.bpm} min={-5} max={12} isSigned compareValue={comparePlayer?.bpm} compareColor={cmpColor} />
+                                            <AttrBar label="VORP" value={player.vorp} min={-2} max={9} isSigned compareValue={comparePlayer?.vorp} compareColor={cmpColor} />
+                                            <AttrBar label="O-RTG" value={player.ortg} max={135} compareValue={comparePlayer?.ortg} compareColor={cmpColor} />
+                                            <AttrBar label="D-RTG" value={player.drtg} max={120} invert compareValue={comparePlayer?.drtg} compareColor={cmpColor} />
+                                        </div>
                                     </div>
                                     <div>
                                         <div className="pm-label mb-3">Season averages</div>
@@ -155,7 +192,6 @@ function PlayerCard({ player }) {
                                     </div>
                                 </div>
                             ) : (
-                                // Simplified view for dynamic search results
                                 <div>
                                     <div className="pm-label mb-3">Season averages</div>
                                     {hasStats ? (
@@ -182,7 +218,6 @@ function PlayerCard({ player }) {
                                     ) : (
                                         <div className="text-[11px] text-pitch-500">No stats available for this season.</div>
                                     )}
-                                    {/* Honest disclosure for search results */}
                                     <div className="mt-3 pt-3 border-t border-pitch-700">
                                         <div className="text-[10px] text-pitch-600">
                                             Advanced metrics (PER, BPM, VORP) not available for searched players via BallDontLie free tier.
@@ -199,9 +234,6 @@ function PlayerCard({ player }) {
 }
 
 // ── useDebounce ───────────────────────────────────────────────
-// Delays updating the value until the user stops typing.
-// 350ms is the sweet spot — fast enough to feel responsive,
-// slow enough to avoid hammering the API on every keystroke.
 function useDebounce(value, delay = 350) {
     const [debounced, setDebounced] = useState(value);
     useEffect(() => {
@@ -217,17 +249,19 @@ export default function Players({ initialQuery = "" }) {
     const [pos, setPos] = useState("");
     const [sortKey, setSort] = useState("pts");
 
+    // Sync query if parent updates initialQuery (e.g. TopNav search → Players tab)
     useEffect(() => { setQuery(initialQuery); }, [initialQuery]);
 
-    // Debounce the query before firing the API search.
-    // The raw query updates the input immediately; the debounced
-    // value only changes after the user pauses typing.
+    // Compare mode — track one player to compare against
+    const [comparePlayer, setComparePlayer] = useState(null);
+
+    const handleCompare = (player) => {
+        setComparePlayer(prev => prev?.id === player.id ? null : player);
+    };
+
     const debouncedQuery = useDebounce(query, 350);
 
-    // Static roster — always loaded, shown when search is empty
     const { data: staticPlayers, isLoading: staticLoading, isError: staticError, refetch } = usePlayers();
-
-    // Dynamic search — only fires when debouncedQuery.trim().length >= 2
     const {
         data: searchResults,
         isLoading: searchLoading,
@@ -235,18 +269,16 @@ export default function Players({ initialQuery = "" }) {
         isError: searchError,
     } = usePlayerSearch(debouncedQuery);
 
-    // Determine which mode we're in:
-    // - search mode: user has typed 2+ chars
-    // - browse mode: show static roster with client-side filters
     const isSearchMode = debouncedQuery.trim().length >= 2;
     const isTyping = query.trim().length >= 2 && query !== debouncedQuery;
 
-    // In browse mode, apply client-side position filter + sort to static roster
-    const browsePlayers = (staticPlayers || [])
-        .filter(p => !pos || p.pos === pos)
-        .sort((a, b) => b[sortKey] - a[sortKey]);
+    const browsePlayers = useMemo(() =>
+        (staticPlayers || [])
+            .filter(p => !pos || p.pos === pos)
+            .sort((a, b) => b[sortKey] - a[sortKey]),
+        [staticPlayers, pos, sortKey]
+    );
 
-    // In search mode, show results sorted by pts (dynamic results have no advanced metrics to sort by)
     const displayPlayers = isSearchMode
         ? (searchResults || []).sort((a, b) => b.pts - a.pts)
         : browsePlayers;
@@ -257,15 +289,39 @@ export default function Players({ initialQuery = "" }) {
 
     return (
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
+            {/* Compare banner */}
+            <AnimatePresence>
+                {comparePlayer && (
+                    <motion.div
+                        initial={{ opacity: 0, y: -8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -8 }}
+                        className="mb-3 px-3 py-2 rounded-md border border-draw/30 bg-draw/5 flex items-center gap-2"
+                    >
+                        <div
+                            className="w-5 h-5 rounded flex items-center justify-center text-[9px] font-semibold flex-shrink-0"
+                            style={{ background: (TEAM_COLORS[comparePlayer.team] || "#f59e0b") + "28", color: TEAM_COLORS[comparePlayer.team] || "#f59e0b" }}
+                        >
+                            {comparePlayer.name.split(" ").map(w => w[0]).join("").slice(0, 2)}
+                        </div>
+                        <span className="text-[11px] text-pitch-300 flex-1">
+                            Comparing against <span className="text-draw font-medium">{comparePlayer.name}</span> — expand any player to see side-by-side bars
+                        </span>
+                        <button
+                            onClick={() => setComparePlayer(null)}
+                            className="text-pitch-500 hover:text-pitch-300 transition-colors"
+                        >
+                            <X size={12} />
+                        </button>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
             <div className="flex flex-wrap items-center gap-2 mb-4">
                 {/* Search input */}
                 <div className="relative flex-1 min-w-[180px]">
                     {isFetching ? (
-                        <Loader
-                            size={13}
-                            strokeWidth={1.8}
-                            className="absolute left-2.5 top-1/2 -translate-y-1/2 text-accent animate-spin"
-                        />
+                        <Loader size={13} strokeWidth={1.8} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-accent animate-spin" />
                     ) : (
                         <Search size={13} strokeWidth={1.8} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-pitch-500" />
                     )}
@@ -276,16 +332,12 @@ export default function Players({ initialQuery = "" }) {
                         className="w-full bg-pitch-800 border border-pitch-600 rounded-md pl-8 pr-3 py-1.5 text-sm text-pitch-200 placeholder:text-pitch-500 focus:outline-none focus:border-accent/50 transition-colors"
                     />
                     {query && (
-                        <button
-                            onClick={() => { setQuery(""); }}
-                            className="absolute right-2.5 top-1/2 -translate-y-1/2"
-                        >
+                        <button onClick={() => setQuery("")} className="absolute right-2.5 top-1/2 -translate-y-1/2">
                             <X size={11} className="text-pitch-500 hover:text-pitch-300" />
                         </button>
                     )}
                 </div>
 
-                {/* Position filter — hidden in search mode (search covers all positions) */}
                 {!isSearchMode && (
                     <div className="flex gap-1">
                         {["", "PG", "SG", "SF", "PF", "C"].map(p => (
@@ -301,7 +353,6 @@ export default function Players({ initialQuery = "" }) {
                     </div>
                 )}
 
-                {/* Sort — hidden in search mode (dynamic results have no advanced metrics) */}
                 {!isSearchMode && (
                     <div className="flex items-center gap-1 ml-auto">
                         <SlidersHorizontal size={12} className="text-pitch-500" />
@@ -317,7 +368,6 @@ export default function Players({ initialQuery = "" }) {
                     </div>
                 )}
 
-                {/* Search mode label */}
                 {isSearchMode && (
                     <div className="ml-auto text-[10px] text-pitch-500">
                         {isFetching ? "Searching…" : `${displayPlayers.length} result${displayPlayers.length !== 1 ? "s" : ""}`}
@@ -325,7 +375,6 @@ export default function Players({ initialQuery = "" }) {
                 )}
             </div>
 
-            {/* Hint when user has typed 1 char but not yet triggered search */}
             {query.trim().length === 1 && (
                 <div className="text-center py-4 text-pitch-600 text-[11px]">
                     Type one more character to search all NBA players…
@@ -344,7 +393,15 @@ export default function Players({ initialQuery = "" }) {
             ) : (
                 <div className="space-y-2">
                     <AnimatePresence>
-                        {displayPlayers.map(p => <PlayerCard key={p.id} player={p} />)}
+                        {displayPlayers.map(p => (
+                            <PlayerCard
+                                key={p.id}
+                                player={p}
+                                onCompare={!isSearchMode ? handleCompare : null}
+                                comparePlayer={comparePlayer}
+                                isComparing={comparePlayer?.id === p.id}
+                            />
+                        ))}
                     </AnimatePresence>
                     {displayPlayers.length === 0 && !isFetching && (
                         <div className="text-center py-12 text-pitch-500 text-sm">

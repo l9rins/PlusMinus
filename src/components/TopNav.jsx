@@ -24,8 +24,8 @@ const NAV_ITEMS = [
   {
     label: "Players", icon: Users, id: "players",
     sub: [
-      { label: "Player Explorer", id: "players" },
-      { label: "Advanced Stats", id: "players" },
+      { label: "Browse Roster", id: "players" },
+      { label: "Compare Players", id: "players" },
     ],
   },
   {
@@ -40,6 +40,7 @@ const NAV_ITEMS = [
     sub: [
       { label: "Four Factors", id: "analytics" },
       { label: "Elo Ratings", id: "analytics" },
+      { label: "Shot Quality", id: "analytics" },
     ],
   },
 ];
@@ -50,7 +51,7 @@ export default function TopNav({ activeTab, onTabChange }) {
   const [searchQuery, setSearchQuery] = useState("");
   const timeoutRef = useRef(null);
 
-  // Clean up pending timeout on unmount to prevent state updates on unmounted component
+  // Clean up pending timeout on unmount
   useEffect(() => {
     return () => clearTimeout(timeoutRef.current);
   }, []);
@@ -160,7 +161,7 @@ export default function TopNav({ activeTab, onTabChange }) {
 
           {/* Right actions */}
           <div className="flex items-center gap-1 ml-auto flex-shrink-0">
-            <button onClick={toggleSearch} className="pm-nav-btn" title="Search">
+            <button onClick={toggleSearch} className="pm-nav-btn" title="Search players">
               {searchOpen
                 ? <X size={13} strokeWidth={1.8} />
                 : <Search size={13} strokeWidth={1.8} />
@@ -207,7 +208,7 @@ export default function TopNav({ activeTab, onTabChange }) {
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
                   onKeyDown={handleSearchKey}
-                  placeholder="Search players, teams… press Enter to go to Players"
+                  placeholder="Search any NBA player… press Enter to search"
                   className="w-full bg-pitch-700 border border-pitch-500 rounded-md
                              px-3 py-2 text-sm text-pitch-100 placeholder:text-pitch-400
                              focus:outline-none focus:border-accent/50 transition-colors"
