@@ -127,45 +127,6 @@ export function ErrorState({ message, onRetry, type = "generic" }) {
     );
 }
 
-// ── API key missing state ─────────────────────────────────────────
-export function NoApiKey({ service = "BallDontLie", envVar = "VITE_BDLAPI_KEY", url = "https://www.balldontlie.io" }) {
-    return (
-        <motion.div
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="pm-card p-6 text-center"
-        >
-            <div className="w-10 h-10 rounded-full bg-draw/10 border border-draw/20 flex items-center justify-center mx-auto mb-3">
-                <Key size={16} className="text-draw/70" strokeWidth={1.5} />
-            </div>
-            <div className="text-[10px] tracking-[1.6px] uppercase text-pitch-500 mb-1.5">
-                API key required
-            </div>
-            <div className="text-sm text-pitch-300 mb-4 leading-relaxed">
-                Connect your {service} API key to load live data.
-            </div>
-            <div className="pm-inset px-3 py-2.5 text-[11px] font-mono text-pitch-300 text-left space-y-0.5">
-                <div className="text-pitch-500"># .env (project root)</div>
-                <div>
-                    <span className="text-accent">{envVar}</span>
-                    <span className="text-pitch-400">=your_key_here</span>
-                </div>
-            </div>
-            <div className="text-[10px] text-pitch-500 mt-3">
-                Get a free key at{" "}
-                <a
-                    href={url}
-                    className="text-accent hover:text-accent-hover underline underline-offset-2"
-                    target="_blank"
-                    rel="noreferrer"
-                >
-                    {url.replace("https://", "")}
-                </a>
-            </div>
-        </motion.div>
-    );
-}
-
 // ── Data freshness indicator ──────────────────────────────────────
 export function FreshnessTag({ isFetching, dataUpdatedAt }) {
     const [, forceUpdate] = useState(0);

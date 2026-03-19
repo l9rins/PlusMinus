@@ -1,11 +1,10 @@
-import { useState, useEffect, useCallback, Suspense, Component } from "react";
+import { useState, useEffect, useCallback, Suspense, Component, lazy } from "react";
 import {
   BrowserRouter, Routes, Route, Navigate,
   useNavigate, useLocation,
 } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import TopNav from "./components/TopNav";
-import { lazy } from "react";
 const Dashboard  = lazy(() => import("./components/Dashboard"));
 const Players    = lazy(() => import("./components/Players"));
 const Analytics  = lazy(() => import("./components/Analytics"));

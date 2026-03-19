@@ -46,14 +46,6 @@ function toDecimal(american) {
   return 1 - 100 / american;
 }
 
-// Detect arbitrage: sum of best-price implied probs < 1
-function detectArbitrage(bestHomeP, bestAwayP) {
-  // bestHomeP and bestAwayP are already vig-removed per-book
-  // For arb, we need the raw best price at each book
-  // arb exists when 1/homeDecimal + 1/awayDecimal < 1
-  return false; // placeholder — real arb computed below per event
-}
-
 export default async function handler(req, res) {
   const origin = req.headers.origin || "";
   const isAllowedOrigin =

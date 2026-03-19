@@ -2,6 +2,14 @@
 // Pure functions — no side effects, no imports.
 // Import only what you need; tree-shaking removes the rest.
 
+// ── Constants ─────────────────────────────────────────────────────
+export const BET_STORAGE_KEY = "bets_v2";   // bump to invalidate old bet format
+export const DEFAULT_BANKROLL = 1000;         // default bankroll for Kelly sizing ($)
+export const BREAK_EVEN_PCT = 52.38;        // break-even win rate at -110 juice
+export const DEFAULT_JUICE = -110;         // standard American moneyline
+export const KELLY_FRACTION = 0.5;          // ½-Kelly (applied inside kellyBet)
+export const MAX_KELLY_PCT = 0.25;         // max 25% of bankroll on any single bet
+
 // ── Number formatters ─────────────────────────────────────────────
 
 /** "+5.2" or "-3.1" — always shows sign */
@@ -232,11 +240,3 @@ export const lsRemove = (key) => {
     return true;
   } catch { return false; }
 };
-
-// ── Constants ─────────────────────────────────────────────────────
-export const BET_STORAGE_KEY = "bets_v2";   // bump to invalidate old bet format
-export const DEFAULT_BANKROLL = 1000;         // default bankroll for Kelly sizing ($)
-export const BREAK_EVEN_PCT = 52.38;        // break-even win rate at -110 juice
-export const DEFAULT_JUICE = -110;         // standard American moneyline
-export const KELLY_FRACTION = 0.5;          // ½-Kelly (applied inside kellyBet)
-export const MAX_KELLY_PCT = 0.25;         // max 25% of bankroll on any single bet
