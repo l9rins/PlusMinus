@@ -17,7 +17,7 @@ import {
 import {
   EAST_STANDINGS, WEST_STANDINGS, PLAYERS, TEAM_NAMES, TEAM_COLORS,
 } from "../data";
-import { useStandings } from "../api";
+import { useStandings, usePlayers } from "../api";
 import { FreshnessTag, RowSkeleton, ErrorState } from "./ui";
 
 const container = { hidden: {}, show: { transition: { staggerChildren: 0.04 } } };
@@ -145,10 +145,10 @@ function computeElo(standings) {
 // Radar chart showing offensive profile for top teams.
 // Dimensions: Scoring, Playmaking, Rebounding, Efficiency, Defense
 
-function computeShotQuality() {
+function computeShotQuality(players = PLAYERS) {
   // Group players by team, compute team-level offensive profile
   const teamMap = {};
-  PLAYERS.forEach(p => {
+  players.forEach(p => {
     if (!teamMap[p.team]) teamMap[p.team] = [];
     teamMap[p.team].push(p);
   });
@@ -688,6 +688,7 @@ function ShotQualityView({ data }) {
 export default function Analytics() {
   const [activeTab, setActiveTab] = useState("factors");
   const { data: standingsData, isLoading, isError, isFetching, refetch, dataUpdatedAt } = useStandings();
+  const { data: playersData } = usePlayers();
 
   const fourFactors = useMemo(
     () => standingsData ? computeFourFactors(standingsData) : [],
@@ -699,7 +700,10 @@ export default function Analytics() {
     [standingsData]
   );
 
-  const shotData = useMemo(() => computeShotQuality(), []);
+  const shotData = useMemo(
+    () => computeShotQuality(playersData),
+    [playersData]
+  );
 
   return (
     <motion.div
