@@ -26,7 +26,7 @@ import {
 import { oddsToImplied } from "./utils";
 
 const API_KEY = import.meta.env.VITE_BDLAPI_KEY;
-const BASE = "https://api.balldontlie.io/v1";
+const BASE = "https://api.balldontlie.io/nba/v1";
 
 // ── Shared fetch wrapper ──────────────────────────────────────
 async function bdlFetch(path) {
