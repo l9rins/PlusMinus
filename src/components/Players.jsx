@@ -6,10 +6,10 @@ import { usePlayers } from "../api";
 import { signed } from "../utils";
 import { TileSkeleton, ErrorState } from "./ui";
 
-function AttrBar({ label, value, max = 100, min = 0, invert = false, signed = false }) {
+function AttrBar({ label, value, max = 100, min = 0, invert = false, isSigned = false }) {
     // Compute a 0–100 percentage for the bar width.
     //
-    // signed = true  → metric spans min..max (e.g. BPM: -5 to 12, VORP: -2 to 9).
+    // isSigned = true → metric spans min..max (e.g. BPM: -5 to 12, VORP: -2 to 9).
     //                   Shift value into a 0–100 scale so 0 is a neutral midpoint,
     //                   not the bar's left edge. This prevents BPM +4.9 from looking
     //                   "poor" at 40% — it actually becomes ~58%, squarely "average-plus".
@@ -19,7 +19,7 @@ function AttrBar({ label, value, max = 100, min = 0, invert = false, signed = fa
     //
     // default        → simple 0-to-max linear scale.
     let pct;
-    if (signed) {
+    if (isSigned) {
         const range = max - min;
         const raw = invert ? max - value : value;
         pct = range > 0 ? Math.min(100, Math.max(0, ((raw - min) / range) * 100)) : 0;
@@ -114,8 +114,8 @@ function PlayerCard({ player }) {
                                     <div className="pm-label mb-3">Advanced metrics</div>
                                     <AttrBar label="PER" value={player.per} max={35} />
                                     <AttrBar label="TS%" value={player.ts} max={75} />
-                                    <AttrBar label="BPM" value={player.bpm} min={-5} max={12} signed />
-                                    <AttrBar label="VORP" value={player.vorp} min={-2} max={9} signed />
+                                    <AttrBar label="BPM" value={player.bpm} min={-5} max={12} isSigned />
+                                    <AttrBar label="VORP" value={player.vorp} min={-2} max={9} isSigned />
                                     <AttrBar label="O-RTG" value={player.ortg} max={135} />
                                     {/* invert=true: lower D-RTG = better defense, so bar should fill more for lower values */}
                                     <AttrBar label="D-RTG" value={player.drtg} max={120} invert />

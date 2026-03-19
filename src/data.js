@@ -30,7 +30,11 @@ export const TEAM_NAMES = {
 // Full shape required by Players.jsx expanded card:
 // pts/ast/reb per game · per: PER · ts: TS% · bpm: BPM
 // vorp: VORP · ortg/drtg: per-100-poss ratings · form: last 5 W/L
+//
+// One representative player per team ensures all 30 NBA teams
+// appear in the Shot Quality radar view and Players page.
 export const PLAYERS = [
+  // ── Original 15 ────────────────────────────────────────────
   { id: 1,  name: "Shai Gilgeous-Alexander", pos: "PG", team: "OKC", age: 27, pts: 32.4, ast: 6.1,  reb: 5.3,  per: 28.6, ts: 62.8, bpm: 9.2,  vorp: 7.1, ortg: 123, drtg: 110, form: ["W","W","W","L","W"] },
   { id: 2,  name: "Victor Wembanyama",        pos: "C",  team: "SAS", age: 21, pts: 27.1, ast: 4.8,  reb: 11.4, per: 26.2, ts: 59.4, bpm: 8.1,  vorp: 6.3, ortg: 118, drtg: 106, form: ["W","W","L","W","W"] },
   { id: 3,  name: "Nikola Jokic",             pos: "C",  team: "DEN", age: 31, pts: 28.3, ast: 9.7,  reb: 13.1, per: 31.4, ts: 67.2, bpm: 11.4, vorp: 8.8, ortg: 126, drtg: 112, form: ["W","L","W","W","W"] },
@@ -46,6 +50,22 @@ export const PLAYERS = [
   { id: 13, name: "Scottie Barnes",           pos: "SF", team: "TOR", age: 24, pts: 22.1, ast: 5.9,  reb: 8.4,  per: 19.7, ts: 58.3, bpm: 4.1,  vorp: 3.3, ortg: 114, drtg: 112, form: ["W","L","W","W","W"] },
   { id: 14, name: "Alperen Sengun",           pos: "C",  team: "HOU", age: 23, pts: 21.3, ast: 4.6,  reb: 9.7,  per: 22.3, ts: 59.8, bpm: 5.6,  vorp: 4.4, ortg: 116, drtg: 111, form: ["W","L","W","W","L"] },
   { id: 15, name: "Paolo Banchero",           pos: "PF", team: "ORL", age: 23, pts: 25.4, ast: 5.1,  reb: 7.8,  per: 21.9, ts: 57.1, bpm: 4.8,  vorp: 3.8, ortg: 115, drtg: 113, form: ["W","W","L","W","W"] },
+  // ── Added for full 30-team coverage ────────────────────────
+  { id: 16, name: "Donovan Mitchell",         pos: "SG", team: "CLE", age: 29, pts: 24.2, ast: 4.6,  reb: 4.8,  per: 20.8, ts: 57.5, bpm: 4.3,  vorp: 3.4, ortg: 116, drtg: 111, form: ["W","W","L","W","W"] },
+  { id: 17, name: "Stephen Curry",            pos: "PG", team: "GSW", age: 37, pts: 22.8, ast: 6.3,  reb: 4.5,  per: 20.4, ts: 61.2, bpm: 4.1,  vorp: 3.2, ortg: 117, drtg: 115, form: ["L","L","W","L","W"] },
+  { id: 18, name: "Devin Booker",             pos: "SG", team: "PHX", age: 29, pts: 25.7, ast: 5.8,  reb: 4.3,  per: 21.3, ts: 58.9, bpm: 3.8,  vorp: 3.0, ortg: 115, drtg: 114, form: ["W","L","L","W","L"] },
+  { id: 19, name: "James Harden",             pos: "PG", team: "LAC", age: 36, pts: 19.8, ast: 8.4,  reb: 5.7,  per: 19.1, ts: 59.3, bpm: 3.4,  vorp: 2.7, ortg: 114, drtg: 115, form: ["L","W","L","L","W"] },
+  { id: 20, name: "Bam Adebayo",              pos: "C",  team: "MIA", age: 28, pts: 19.4, ast: 4.1,  reb: 10.2, per: 20.6, ts: 56.8, bpm: 3.6,  vorp: 2.9, ortg: 113, drtg: 109, form: ["L","L","W","L","L"] },
+  { id: 21, name: "Tyrese Maxey",             pos: "PG", team: "PHI", age: 25, pts: 25.9, ast: 5.6,  reb: 3.8,  per: 21.4, ts: 58.1, bpm: 3.9,  vorp: 3.1, ortg: 115, drtg: 114, form: ["W","L","W","L","L"] },
+  { id: 22, name: "LaMelo Ball",              pos: "PG", team: "CHA", age: 24, pts: 22.4, ast: 7.2,  reb: 5.3,  per: 19.3, ts: 55.4, bpm: 2.8,  vorp: 2.2, ortg: 112, drtg: 114, form: ["L","L","W","W","L"] },
+  { id: 23, name: "Zach LaVine",              pos: "SG", team: "CHI", age: 31, pts: 21.6, ast: 4.3,  reb: 4.8,  per: 17.8, ts: 57.6, bpm: 1.4,  vorp: 1.1, ortg: 112, drtg: 116, form: ["W","W","L","L","L"] },
+  { id: 24, name: "Anfernee Simons",          pos: "SG", team: "POR", age: 26, pts: 23.1, ast: 5.2,  reb: 3.1,  per: 18.6, ts: 57.3, bpm: 1.8,  vorp: 1.4, ortg: 113, drtg: 116, form: ["W","W","W","L","W"] },
+  { id: 25, name: "Ja Morant",                pos: "PG", team: "MEM", age: 26, pts: 22.3, ast: 7.6,  reb: 4.9,  per: 19.8, ts: 54.6, bpm: 2.4,  vorp: 1.9, ortg: 111, drtg: 115, form: ["L","L","L","W","L"] },
+  { id: 26, name: "Zion Williamson",          pos: "PF", team: "NOP", age: 25, pts: 21.8, ast: 4.2,  reb: 6.4,  per: 20.1, ts: 61.4, bpm: 3.2,  vorp: 2.5, ortg: 115, drtg: 116, form: ["L","L","W","L","L"] },
+  { id: 27, name: "Lauri Markkanen",          pos: "PF", team: "UTA", age: 29, pts: 20.9, ast: 2.1,  reb: 7.1,  per: 18.4, ts: 58.7, bpm: 1.6,  vorp: 1.3, ortg: 112, drtg: 115, form: ["L","L","L","W","L"] },
+  { id: 28, name: "De'Aaron Fox",             pos: "PG", team: "SAC", age: 28, pts: 24.8, ast: 6.1,  reb: 4.2,  per: 19.6, ts: 56.2, bpm: 2.1,  vorp: 1.7, ortg: 113, drtg: 117, form: ["L","L","L","L","W"] },
+  { id: 29, name: "Cam Thomas",               pos: "SG", team: "BKN", age: 24, pts: 24.4, ast: 3.8,  reb: 3.4,  per: 17.2, ts: 54.8, bpm: 0.6,  vorp: 0.5, ortg: 110, drtg: 117, form: ["L","L","L","W","L"] },
+  { id: 30, name: "Jordan Poole",             pos: "SG", team: "WAS", age: 27, pts: 20.1, ast: 4.9,  reb: 3.6,  per: 15.4, ts: 53.6, bpm: -0.8, vorp: -0.3, ortg: 109, drtg: 118, form: ["L","L","W","L","L"] },
 ];
 
 // ─── TODAY'S GAMES ────────────────────────────────────────────

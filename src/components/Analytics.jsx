@@ -18,7 +18,7 @@ import {
   EAST_STANDINGS, WEST_STANDINGS, PLAYERS, TEAM_NAMES, TEAM_COLORS,
 } from "../data";
 import { useStandings } from "../api";
-import { FreshnessTag } from "./ui";
+import { FreshnessTag, RowSkeleton, ErrorState } from "./ui";
 
 const container = { hidden: {}, show: { transition: { staggerChildren: 0.04 } } };
 const item = {
@@ -675,10 +675,10 @@ function ShotQualityView({ data }) {
 
       <motion.div variants={item} className="mt-3 pm-card p-4 text-[11px] text-pitch-400 leading-relaxed">
         <span className="text-pitch-200 font-medium">Shot quality methodology: </span>
-        Profiles are built from the tracked players on each roster. Scoring scales to 32 PPG,
-        Playmaking to 11 APG, Rebounding to 13 RPG, Efficiency uses TS% above 50%, and
-        Offense/Defense use per-100-possession ratings. Click two different teams to overlay
-        their profiles for comparison. The dashed polygon shows the comparison team.
+        Profiles are built from one representative player per team across all 30 NBA rosters.
+        Scoring scales to 32 PPG, Playmaking to 11 APG, Rebounding to 13 RPG, Efficiency uses
+        TS% above 50%, and Offense/Defense use per-100-possession ratings. Click two different
+        teams to overlay their profiles for comparison. The dashed polygon shows the comparison team.
       </motion.div>
     </motion.div>
   );
@@ -687,16 +687,16 @@ function ShotQualityView({ data }) {
 // ─── MAIN ANALYTICS COMPONENT ─────────────────────────────────
 export default function Analytics() {
   const [activeTab, setActiveTab] = useState("factors");
-  const standings = useStandings();
+  const { data: standingsData, isLoading, isError, isFetching, refetch, dataUpdatedAt } = useStandings();
 
   const fourFactors = useMemo(
-    () => computeFourFactors(standings.data),
-    [standings.data]
+    () => standingsData ? computeFourFactors(standingsData) : [],
+    [standingsData]
   );
 
   const eloData = useMemo(
-    () => computeElo(standings.data),
-    [standings.data]
+    () => standingsData ? computeElo(standingsData) : [],
+    [standingsData]
   );
 
   const shotData = useMemo(() => computeShotQuality(), []);
@@ -725,14 +725,25 @@ export default function Analytics() {
           ))}
         </div>
         <FreshnessTag
-          isFetching={standings.isFetching}
-          dataUpdatedAt={standings.dataUpdatedAt}
+          isFetching={isFetching}
+          dataUpdatedAt={dataUpdatedAt}
         />
       </div>
 
-      {activeTab === "factors" && <FourFactorsView data={fourFactors} />}
-      {activeTab === "elo" && <EloView data={eloData} />}
-      {activeTab === "quality" && <ShotQualityView data={shotData} />}
+      {/* Loading / Error / Content */}
+      {isError && (activeTab === "factors" || activeTab === "elo") ? (
+        <ErrorState message="Couldn't load standings for analytics." onRetry={refetch} />
+      ) : isLoading && (activeTab === "factors" || activeTab === "elo") ? (
+        <div className="pm-card p-4">
+          <RowSkeleton rows={15} />
+        </div>
+      ) : (
+        <>
+          {activeTab === "factors" && <FourFactorsView data={fourFactors} />}
+          {activeTab === "elo" && <EloView data={eloData} />}
+          {activeTab === "quality" && <ShotQualityView data={shotData} />}
+        </>
+      )}
     </motion.div>
   );
 }
