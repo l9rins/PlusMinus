@@ -71,8 +71,9 @@ export default function TopNav({ activeTab, onTabChange }) {
       setSearchQuery("");
     }
     if (e.key === "Enter" && searchQuery.trim()) {
-      onTabChange("players");
+      onTabChange("players", searchQuery.trim());
       setSearchOpen(false);
+      setSearchQuery("");
     }
   };
 

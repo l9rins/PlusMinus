@@ -311,6 +311,11 @@ function loadBets() {
 function saveBets(bets) {
   try {
     localStorage.setItem(BET_STORAGE_KEY, JSON.stringify(bets));
+    // Notify same-tab listeners — the native "storage" event only fires
+    // for OTHER tabs, so we dispatch a synthetic one for Dashboard's listener.
+    window.dispatchEvent(
+      new StorageEvent("storage", { key: BET_STORAGE_KEY })
+    );
   } catch {
     // localStorage may be unavailable in some browser contexts — fail silently
     console.warn("[PlusMinus] Could not persist bets to localStorage.");
@@ -321,6 +326,7 @@ export function BetTracker() {
   const [bets, setBets] = useState(loadBets);
   const [form, setForm] = useState({ game: "", type: "Moneyline", pick: "", odds: "", stake: "", result: "pending" });
   const [formError, setFormError] = useState("");
+  const [editingId, setEditingId] = useState(null);
 
   // Persist to localStorage whenever bets change
   useEffect(() => {
@@ -341,6 +347,11 @@ export function BetTracker() {
     if (window.confirm("Clear all bets? This cannot be undone.")) {
       setBets([]);
     }
+  };
+
+  const updateResult = (id, newResult) => {
+    setBets(prev => prev.map(b => b.id === id ? { ...b, result: newResult } : b));
+    setEditingId(null);
   };
 
   const stats = useMemo(() => {
@@ -364,6 +375,13 @@ export function BetTracker() {
   const inputCls = `bg-pitch-700 border border-pitch-600 rounded-md px-2.5 py-1.5
     text-sm text-pitch-200 placeholder:text-pitch-500 w-full
     focus:outline-none focus:border-accent/50 transition-colors`;
+
+  const RESULT_OPTIONS = [
+    { value: "win", label: "WIN", cls: "bg-win/10 text-win border-win/20" },
+    { value: "loss", label: "LOSS", cls: "bg-loss/10 text-loss border-loss/20" },
+    { value: "push", label: "PUSH", cls: "bg-draw/10 text-draw border-draw/20" },
+    { value: "pending", label: "PENDING", cls: "bg-pitch-700 text-pitch-500 border-pitch-600" },
+  ];
 
   return (
     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
@@ -432,6 +450,7 @@ export function BetTracker() {
             )}
             {bets.map(b => {
               const pl = calcPL(b.stake, b.odds, b.result);
+              const isEditing = editingId === b.id;
               return (
                 <tr key={b.id} className="border-b border-pitch-700 hover:bg-pitch-750 transition-colors">
                   <td className="px-3 py-2.5 font-medium text-pitch-100">{b.game}</td>
@@ -442,10 +461,41 @@ export function BetTracker() {
                   <td className={`px-3 py-2.5 font-mono font-medium ${b.result === "pending" ? "text-pitch-500" : pl > 0 ? "text-win" : pl < 0 ? "text-loss" : "text-pitch-400"}`}>
                     {b.result === "pending" ? "—" : `${pl >= 0 ? "+" : ""}$${pl.toFixed(2)}`}
                   </td>
-                  <td className="px-3 py-2.5">
-                    <span className={`pm-badge ${b.result === "win" ? "bg-win/10 text-win border border-win/20" : b.result === "loss" ? "bg-loss/10 text-loss border border-loss/20" : b.result === "push" ? "bg-draw/10 text-draw border border-draw/20" : "bg-pitch-700 text-pitch-500 border border-pitch-600"}`}>
-                      {b.result.toUpperCase()}
-                    </span>
+                  <td className="px-3 py-2.5 relative">
+                    {isEditing ? (
+                      <div className="flex gap-1 flex-wrap">
+                        {RESULT_OPTIONS.map(opt => (
+                          <button
+                            key={opt.value}
+                            onClick={() => updateResult(b.id, opt.value)}
+                            className={`pm-badge border cursor-pointer transition-all hover:scale-105
+                              ${b.result === opt.value ? "ring-1 ring-accent/50" : ""}
+                              ${opt.cls}`}
+                          >
+                            {opt.label}
+                          </button>
+                        ))}
+                        <button
+                          onClick={() => setEditingId(null)}
+                          className="text-pitch-600 hover:text-pitch-300 text-[10px] ml-1 transition-colors"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setEditingId(b.id)}
+                        title="Click to change result"
+                        className={`pm-badge border cursor-pointer hover:brightness-125 transition-all ${
+                          b.result === "win" ? "bg-win/10 text-win border-win/20"
+                          : b.result === "loss" ? "bg-loss/10 text-loss border-loss/20"
+                          : b.result === "push" ? "bg-draw/10 text-draw border-draw/20"
+                          : "bg-pitch-700 text-pitch-500 border-pitch-600"
+                        }`}
+                      >
+                        {b.result.toUpperCase()}
+                      </button>
+                    )}
                   </td>
                   <td className="px-3 py-2.5">
                     <button onClick={() => setBets(prev => prev.filter(x => x.id !== b.id))} className="text-pitch-600 hover:text-loss text-base leading-none transition-colors">×</button>

@@ -1,10 +1,10 @@
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { motion } from "framer-motion";
 import { TrendingUp, TrendingDown, Target, BarChart2, Zap, ChevronRight } from "lucide-react";
 import { TEAM_NAMES, ODDS_GAMES } from "../data";
 import { useStandings, useTodayGames } from "../api";
 import { calcPL, BET_STORAGE_KEY } from "../utils";
-import { TileSkeleton, RowSkeleton, ErrorState, FreshnessTag } from "./ui";
+import { TileSkeleton, RowSkeleton, ErrorState, FreshnessTag, NoApiKey } from "./ui";
 
 const container = {
     hidden: {},
@@ -139,6 +139,8 @@ function SummaryTile({ label, value, sub, icon: Icon, trend }) {
 }
 
 // ── Main Dashboard ────────────────────────────────────────────
+const HAS_API_KEY = !!import.meta.env.VITE_BDLAPI_KEY;
+
 export default function Dashboard({ onNavigate }) {
     const games = useTodayGames();
     const standings = useStandings();
@@ -157,7 +159,7 @@ export default function Dashboard({ onNavigate }) {
     // and on mount. Uses a version counter to trigger re-computation.
     const [betVersion, setBetVersion] = useState(0);
 
-    const readBetStats = useCallback(() => {
+    function readBetStats() {
         try {
             const raw = localStorage.getItem(BET_STORAGE_KEY);
             if (!raw) return { total: 0, wins: 0, losses: 0, pending: 0, pl: 0 };
@@ -171,10 +173,10 @@ export default function Dashboard({ onNavigate }) {
         } catch {
             return { total: 0, wins: 0, losses: 0, pending: 0, pl: 0 };
         }
-    }, []);
+    }
 
-    // Re-read on mount and when navigating back to Dashboard
-    const betStats = useMemo(() => readBetStats(), [betVersion, readBetStats]);
+    // Re-read on mount, when betVersion changes (via storage events from same/other tabs)
+    const betStats = useMemo(() => readBetStats(), [betVersion]);
 
     // Listen for storage changes (cross-tab or same-tab via BetTracker)
     useEffect(() => {
@@ -251,7 +253,9 @@ export default function Dashboard({ onNavigate }) {
                     </button>
                 </div>
 
-                {games.isError ? (
+                {!HAS_API_KEY ? (
+                    <NoApiKey />
+                ) : games.isError ? (
                     <ErrorState
                         message="Couldn't load today's games."
                         onRetry={() => games.refetch()}
@@ -280,7 +284,9 @@ export default function Dashboard({ onNavigate }) {
                         </button>
                     </div>
 
-                    {standings.isError ? (
+                    {!HAS_API_KEY ? (
+                        <NoApiKey />
+                    ) : standings.isError ? (
                         <ErrorState message="Couldn't load standings." onRetry={() => standings.refetch()} />
                     ) : standings.isLoading ? (
                         <RowSkeleton rows={6} />

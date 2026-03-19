@@ -6,12 +6,28 @@ import { usePlayers } from "../api";
 import { signed } from "../utils";
 import { TileSkeleton, ErrorState } from "./ui";
 
-function AttrBar({ label, value, max = 100, invert = false }) {
-    // FIXED: the original code set effectiveMax = (max - 100) when invert=true,
-    // which for D-RTG (max=120) gave effectiveMax=20 and broke every bar.
-    // The correct approach: invert just flips the raw value; effectiveMax is always max.
-    const raw = invert ? Math.max(0, max - value) : value;
-    const pct = Math.min(100, (raw / max) * 100);
+function AttrBar({ label, value, max = 100, min = 0, invert = false, signed = false }) {
+    // Compute a 0–100 percentage for the bar width.
+    //
+    // signed = true  → metric spans min..max (e.g. BPM: -5 to 12, VORP: -2 to 9).
+    //                   Shift value into a 0–100 scale so 0 is a neutral midpoint,
+    //                   not the bar's left edge. This prevents BPM +4.9 from looking
+    //                   "poor" at 40% — it actually becomes ~58%, squarely "average-plus".
+    //
+    // invert = true  → lower is better (e.g. D-RTG 105 is better than 115).
+    //                   Flip the value within the range before scaling.
+    //
+    // default        → simple 0-to-max linear scale.
+    let pct;
+    if (signed) {
+        const range = max - min;
+        const raw = invert ? max - value : value;
+        pct = range > 0 ? Math.min(100, Math.max(0, ((raw - min) / range) * 100)) : 0;
+    } else {
+        const raw = invert ? Math.max(0, max - value) : value;
+        pct = Math.min(100, Math.max(0, (raw / max) * 100));
+    }
+
     const color =
         pct >= 80 ? "bg-tier-elite" :
             pct >= 65 ? "bg-tier-good" :
@@ -98,8 +114,8 @@ function PlayerCard({ player }) {
                                     <div className="pm-label mb-3">Advanced metrics</div>
                                     <AttrBar label="PER" value={player.per} max={35} />
                                     <AttrBar label="TS%" value={player.ts} max={75} />
-                                    <AttrBar label="BPM" value={player.bpm} max={12} />
-                                    <AttrBar label="VORP" value={player.vorp} max={9} />
+                                    <AttrBar label="BPM" value={player.bpm} min={-5} max={12} signed />
+                                    <AttrBar label="VORP" value={player.vorp} min={-2} max={9} signed />
                                     <AttrBar label="O-RTG" value={player.ortg} max={135} />
                                     {/* invert=true: lower D-RTG = better defense, so bar should fill more for lower values */}
                                     <AttrBar label="D-RTG" value={player.drtg} max={120} invert />
@@ -133,8 +149,8 @@ function PlayerCard({ player }) {
     );
 }
 
-export default function Players() {
-    const [query, setQuery] = useState("");
+export default function Players({ initialQuery = "" }) {
+    const [query, setQuery] = useState(initialQuery);
     const [pos, setPos] = useState("");
     const [sortKey, setSort] = useState("pts");
 
