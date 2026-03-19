@@ -17,6 +17,8 @@ Built with React + Vite. Styled with Tailwind CSS. Charts from Recharts. Data fr
 | **Betting** | Edge finder (model vs. implied probability), full bet tracker with inline result editing, P&L chart |
 | **Analytics** | Four Factors efficiency table, Elo power rankings with trajectory chart, Shot Quality radar profiles |
 
+*Note on Betting edges: The edge finder is completely live when `VITE_ODDS_API_KEY` is set. It compares real market implied probabilities against a proxy model (season win%, requiring a 10-game minimum threshold to prevent early-season noise). If the API key is missing, it gracefully falls back to static sample data.*
+
 ## Data sources
 
 | Source | What | Tier | Refresh |

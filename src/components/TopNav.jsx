@@ -40,7 +40,6 @@ const NAV_ITEMS = [
     sub: [
       { label: "Four Factors", id: "analytics" },
       { label: "Elo Ratings", id: "analytics" },
-      { label: "Lineup Tool", id: "analytics" },
     ],
   },
 ];
