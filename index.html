@@ -1,40 +1,87 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
+
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 
+  <!-- ── Primary meta ─────────────────────────────────────── -->
   <title>PlusMinus — NBA Analytics</title>
-  <meta name="description" content="NBA analytics platform for data scientists, fans, and bettors. Live scores, standings, player stats, betting edges, and win probability models." />
+  <meta name="description"
+    content="NBA analytics platform for data scientists, bettors, and fans. Live scores, standings, player advanced metrics, betting edge finder, Elo ratings, and win probability models." />
+  <meta name="keywords" content="NBA analytics, basketball stats, betting odds, PER, BPM, Elo ratings, Four Factors" />
+  <meta name="author" content="PlusMinus" />
+  <meta name="robots" content="index, follow" />
 
-  <!-- Favicon -->
-  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-
-  <!-- Open Graph -->
-  <meta property="og:title"       content="PlusMinus — NBA Analytics" />
-  <meta property="og:description" content="Live scores, standings, advanced player stats, betting edge finder, and win probability models." />
-  <meta property="og:type"        content="website" />
-  <meta property="og:image"       content="/og-image.png" />
-
-  <!-- Twitter Card -->
-  <meta name="twitter:card"        content="summary_large_image" />
-  <meta name="twitter:title"       content="PlusMinus — NBA Analytics" />
-  <meta name="twitter:description" content="Live scores, standings, player stats, and betting analytics." />
-  <meta name="twitter:image"       content="/og-image.png" />
-
-  <!-- Theme color -->
+  <!-- ── Theme / PWA ───────────────────────────────────────── -->
+  <meta name="theme-color" content="#0d1117" media="(prefers-color-scheme: dark)" />
   <meta name="theme-color" content="#0d1117" />
+  <meta name="color-scheme" content="dark" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="PlusMinus" />
 
+  <!-- ── Favicon / icons ──────────────────────────────────── -->
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="apple-touch-icon" href="/favicon.svg" />
+
+  <!-- ── Open Graph ───────────────────────────────────────── -->
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="PlusMinus" />
+  <meta property="og:title" content="PlusMinus — NBA Analytics" />
+  <meta property="og:description"
+    content="Live scores, standings, advanced player stats, betting edge finder, Elo power rankings, and Four Factors analytics." />
+  <meta property="og:image" content="/og-image.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="PlusMinus NBA Analytics dashboard" />
+
+  <!-- ── Twitter Card ─────────────────────────────────────── -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="PlusMinus — NBA Analytics" />
+  <meta name="twitter:description" content="Live scores, player stats, Elo ratings, and betting analytics." />
+  <meta name="twitter:image" content="/og-image.png" />
+
+  <!-- ── Resource hints ───────────────────────────────────── -->
   <!-- Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <!-- API domains — DNS prefetch keeps first request snappy -->
+  <link rel="dns-prefetch" href="https://api.balldontlie.io" />
+  <link rel="dns-prefetch" href="https://api.the-odds-api.com" />
+
+  <!-- ── Fonts ────────────────────────────────────────────── -->
+  <!-- Bebas Neue: display headings / team abbr / numbers     -->
+  <!-- DM Sans: UI body text                                  -->
+  <!-- DM Mono: stats, odds, tabular figures                  -->
   <link
-    href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&family=DM+Mono:wght@400;500&display=swap"
-    rel="stylesheet"
-  />
+    href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=DM+Mono:wght@400;500&display=swap"
+    rel="stylesheet" />
 </head>
+
 <body>
+  <noscript>
+    <div style="
+      font-family: system-ui, sans-serif;
+      background: #0d1117;
+      color: #c8d5e8;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 2rem;
+    ">
+      <div>
+        <h1 style="font-size: 1.5rem; margin-bottom: 0.5rem;">PlusMinus requires JavaScript</h1>
+        <p style="color: #7d91ab; font-size: 0.9rem;">Please enable JavaScript in your browser to use this app.</p>
+      </div>
+    </div>
+  </noscript>
+
   <div id="root"></div>
   <script type="module" src="/src/main.jsx"></script>
 </body>
+
 </html>

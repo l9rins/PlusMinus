@@ -5,9 +5,14 @@ import App from "./App.jsx";
 import "./index.css";
 import { queryClientConfig } from "./api.js";
 
+// ── Query client ──────────────────────────────────────────────
 const queryClient = new QueryClient(queryClientConfig);
 
-ReactDOM.createRoot(document.getElementById("root")).render(
+// ── Mount ─────────────────────────────────────────────────────
+const rootEl = document.getElementById("root");
+if (!rootEl) throw new Error("[PlusMinus] #root element not found. Check index.html.");
+
+ReactDOM.createRoot(rootEl).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
       <App />

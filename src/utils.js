@@ -1,342 +1,234 @@
-// ─── PlusMinus Utilities ──────────────────────────────────────────
-// Pure functions with no React dependencies.
-// Imported by components, api.js, and any other module that needs them.
+// ─── PlusMinus Utilities ──────────────────────────────────────
+// Pure functions — no side effects, no imports.
+// Import only what you need; tree-shaking removes the rest.
+
+// ── Number formatters ─────────────────────────────────────────
+
+/** "+5.2" or "-3.1" — always shows sign */
+export const signed = (n) => (n >= 0 ? `+${n}` : `${n}`);
+
+/** "$1,234.50" */
+export const formatCurrency = (n) =>
+  new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2 }).format(n ?? 0);
+
+/** "54.3%" */
+export const formatPct = (n, decimals = 1) => `${Number(n ?? 0).toFixed(decimals)}%`;
+
+/** "1,234" or "1.2K" or "1.2M" */
+export const compactNumber = (n) => {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
+  return String(Math.round(n ?? 0));
+};
+
+/** "-110" → "1.91" (decimal odds) */
+export const oddsToDecimal = (american) => {
+  if (american > 0) return +(1 + american / 100).toFixed(3);
+  return +(1 - 100 / american).toFixed(3);
+};
+
+/** "-110" → 0.5238 (raw implied probability, includes vig) */
+export const oddsToImplied = (american) => {
+  if (american > 0) return 100 / (american + 100);
+  return Math.abs(american) / (Math.abs(american) + 100);
+};
+
+/** implied probability → American odds string ("-110", "+120") */
+export const impliedToOdds = (p) => {
+  if (p <= 0 || p >= 1) return "—";
+  if (p >= 0.5) return `-${Math.round(p / (1 - p) * 100)}`;
+  return `+${Math.round((1 - p) / p * 100)}`;
+};
+
+/** Break-even win rate for a given American line: "-110" → 0.5238 */
+export const breakEven = (american) => oddsToImplied(american);
+
+/** ROI % given payout odds and win rate: kellyBet uses this internally */
+export const calcROI = (winRate, american) => {
+  const dec = oddsToDecimal(american);
+  return winRate * (dec - 1) - (1 - winRate);
+};
 
 /**
- * Calculate profit/loss for a settled bet (American odds).
- *
- * @param {number} stake  - Amount wagered ($)
- * @param {number} odds   - American odds (e.g. -110, +150)
- * @param {string} result - "win" | "loss" | "push" | "pending"
- * @returns {number} Net P&L in dollars (0 for pending/push)
- *
- * @example
- *   calcPL(100, -110, "win")  → 90.91
- *   calcPL(50,  +150, "win")  → 75.00
- *   calcPL(50,  -110, "loss") → -50.00
- *   calcPL(50,  -110, "push") → 0
+ * Kelly Criterion bet size as fraction of bankroll.
+ * @param {number} winProb  — model probability 0-1
+ * @param {number} american — American odds (e.g. -110)
+ * @returns {number}        — kelly fraction 0-1 (cap at 0.25 for sanity)
  */
-export function calcPL(stake, odds, result) {
-  if (!result || result === "pending" || result === "push") return 0;
-  if (result === "loss") return -Math.abs(parseFloat(stake));
-  const s = parseFloat(stake);
-  const o = parseFloat(odds);
-  if (isNaN(s) || isNaN(o)) return 0;
-  if (o > 0) return +(s * o / 100).toFixed(2);
-  return +(s * 100 / Math.abs(o)).toFixed(2);
-}
+export const kellyBet = (winProb, american) => {
+  const dec = oddsToDecimal(american);
+  const b = dec - 1; // net odds
+  const q = 1 - winProb;
+  const k = (b * winProb - q) / b;
+  return Math.max(0, Math.min(0.25, k));
+};
 
 /**
- * Convert American moneyline odds to implied win probability (0–1).
- * Used to normalize market odds, then strip vig via normalization.
- *
- * @param {number} odds - American odds
- * @returns {number} Implied probability as a decimal (0–1)
- *
- * @example
- *   oddsToImplied(-110) → 0.5238
- *   oddsToImplied(+150) → 0.4000
+ * Calculate P&L for a single bet.
+ * @param {"win"|"loss"|"push"|"pending"} result
+ * @param {number} stake   — dollar amount
+ * @param {number} american — odds
  */
-export function oddsToImplied(odds) {
-  const o = parseFloat(odds);
-  if (isNaN(o)) return 0.5;
-  if (o > 0) return 100 / (o + 100);
-  return Math.abs(o) / (Math.abs(o) + 100);
-}
+export const calcPL = (result, stake, american) => {
+  const s = Number(stake) || 0;
+  if (!s || result === "pending") return 0;
+  if (result === "push") return 0;
+  if (result === "loss") return -s;
+  // Win
+  const dec = oddsToDecimal(Number(american) || -110);
+  return +(s * (dec - 1)).toFixed(2);
+};
 
-/**
- * Format a number with an explicit sign (+/-).
- *
- * @param {number} n
- * @param {number} [decimals=1]
- * @returns {string} e.g. "+9.2", "-3.1", "+0.0"
- */
-export function signed(n, decimals = 1) {
-  const val = parseFloat(n);
-  if (isNaN(val)) return "—";
-  return (val >= 0 ? "+" : "") + val.toFixed(decimals);
-}
+// ── Date helpers ──────────────────────────────────────────────
 
-/**
- * Clamp a value between min and max.
- *
- * @param {number} value
- * @param {number} min
- * @param {number} max
- * @returns {number}
- */
-export function clamp(value, min, max) {
-  return Math.min(Math.max(value, min), max);
-}
+/** "2025-11-14" — always in local timezone */
+export const todayStr = () => {
+  const d = new Date();
+  return [
+    d.getFullYear(),
+    String(d.getMonth() + 1).padStart(2, "0"),
+    String(d.getDate()).padStart(2, "0"),
+  ].join("-");
+};
 
-/**
- * Linear interpolation between two values.
- *
- * @param {number} a - Start value
- * @param {number} b - End value
- * @param {number} t - Progress (0–1)
- * @returns {number}
- */
-export function lerp(a, b, t) {
-  return a + (b - a) * clamp(t, 0, 1);
-}
+/** "Nov 14" */
+export const formatShortDate = (dateStr) => {
+  const d = new Date(dateStr + "T00:00:00"); // avoid UTC offset shift
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+};
 
-/**
- * Format currency with sign and dollar symbol.
- *
- * @param {number} n - Dollar amount
- * @param {boolean} [showSign=true] - Prepend + for positive
- * @returns {string} e.g. "+$142.50", "-$32.00", "$0.00"
- */
-export function formatCurrency(n, showSign = true) {
-  const val = parseFloat(n);
-  if (isNaN(val)) return "$0.00";
-  const abs = `$${Math.abs(val).toFixed(2)}`;
-  if (!showSign) return abs;
-  return (val >= 0 ? "+" : "-") + abs;
-}
-
-/**
- * Format a win percentage as a 3-decimal string (e.g. ".785").
- *
- * @param {number} pct - Win percentage (0–1)
- * @returns {string}
- */
-export function formatPct(pct) {
-  if (typeof pct !== "number" || isNaN(pct)) return ".000";
-  return pct.toFixed(3);
-}
-
-/**
- * Format American odds for display.
- *
- * @param {number} odds - American odds
- * @returns {string} e.g. "-110", "+150"
- */
-export function formatOdds(odds) {
-  const o = parseFloat(odds);
-  if (isNaN(o)) return "—";
-  return o > 0 ? `+${o}` : `${o}`;
-}
-
-/**
- * Convert implied probability to American moneyline.
- * Inverse of oddsToImplied.
- *
- * @param {number} prob - Implied probability (0–1)
- * @returns {number} American odds
- */
-export function impliedToOdds(prob) {
-  const p = clamp(prob, 0.01, 0.99);
-  if (p >= 0.5) {
-    return Math.round(-(p / (1 - p)) * 100);
-  }
-  return Math.round(((1 - p) / p) * 100);
-}
-
-/**
- * Format a number compactly (1200 → "1.2K").
- *
- * @param {number} n
- * @returns {string}
- */
-export function compactNumber(n) {
-  if (Math.abs(n) >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (Math.abs(n) >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
-  return String(n);
-}
-
-/**
- * Calculate ROI as a percentage.
- *
- * @param {number} pl         - Net profit/loss
- * @param {number} totalStake - Total amount wagered
- * @returns {number} ROI percentage (or 0 if no stake)
- */
-export function calcROI(pl, totalStake) {
-  if (!totalStake || totalStake <= 0) return 0;
-  return +((pl / totalStake) * 100).toFixed(2);
-}
-
-/**
- * Calculate Kelly Criterion bet size.
- * Tells you what fraction of bankroll to wager.
- *
- * @param {number} prob     - Your estimated win probability (0–1)
- * @param {number} odds     - American odds
- * @param {number} bankroll - Total bankroll ($)
- * @returns {number} Recommended bet size in dollars
- */
-export function kellyBet(prob, odds, bankroll) {
-  const o = parseFloat(odds);
-  const b = o > 0 ? o / 100 : 100 / Math.abs(o);
-  const q = 1 - prob;
-  const kelly = (b * prob - q) / b;
-  if (kelly <= 0) return 0;
-  const halfKelly = kelly * 0.5; // half-Kelly for safety
-  return +(clamp(halfKelly, 0, 0.25) * bankroll).toFixed(2);
-}
-
-/**
- * Compute break-even win percentage for a given odds line.
- *
- * @param {number} odds - American odds
- * @returns {number} Required win rate to break even (0–1)
- */
-export function breakEven(odds) {
-  return oddsToImplied(odds);
-}
-
-/**
- * Debounce a function.
- * Note: for React hooks, use the useDebounce hook in Players.jsx instead.
- *
- * @param {Function} fn
- * @param {number} delay - milliseconds
- * @returns {Function}
- */
-export function debounce(fn, delay) {
-  let timer;
-  return (...args) => {
-    clearTimeout(timer);
-    timer = setTimeout(() => fn(...args), delay);
-  };
-}
-
-/**
- * Deep clone a plain object/array (no functions, no class instances).
- *
- * @param {*} value
- * @returns {*}
- */
-export function deepClone(value) {
-  return JSON.parse(JSON.stringify(value));
-}
-
-/**
- * Group an array of objects by a key.
- *
- * @param {Array} arr
- * @param {string} key
- * @returns {Record<string, Array>}
- */
-export function groupBy(arr, key) {
-  return arr.reduce((acc, item) => {
-    const k = item[key] ?? "unknown";
-    if (!acc[k]) acc[k] = [];
-    acc[k].push(item);
-    return acc;
-  }, {});
-}
-
-/**
- * Get the current date string in "YYYY-MM-DD" format (UTC).
- *
- * @returns {string}
- */
-export function todayStr() {
-  return new Date().toISOString().split("T")[0];
-}
-
-/**
- * Format a date as "Mon Mar 19" style.
- *
- * @param {Date|number|string} date
- * @returns {string}
- */
-export function formatShortDate(date) {
-  return new Date(date).toLocaleDateString("en-US", {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-  });
-}
-
-/**
- * Format a time as "7:30 PM ET" from a UTC ISO string.
- *
- * @param {string} isoString
- * @returns {string}
- */
-export function formatGameTime(isoString) {
+/** "7:30 PM" from an ISO string */
+export const formatGameTime = (isoStr) => {
   try {
-    return new Date(isoString).toLocaleTimeString("en-US", {
+    return new Date(isoStr).toLocaleTimeString("en-US", {
       hour: "numeric",
       minute: "2-digit",
       timeZone: "America/New_York",
     }) + " ET";
   } catch {
-    return isoString;
+    return isoStr;
   }
-}
+};
+
+// ── Analytics helpers ─────────────────────────────────────────
 
 /**
- * Return a tier label + class for a net rating value.
- *
- * @param {number} netRtg
- * @returns {{ label: string, cls: string }}
+ * Net rating → tier label.
+ * @param {number} netRtg — O-RTG minus D-RTG
  */
-export function netRatingTier(netRtg) {
-  if (netRtg >= 8) return { label: "Elite", cls: "text-tier-elite" };
-  if (netRtg >= 3) return { label: "Solid", cls: "text-tier-good" };
-  if (netRtg >= 0) return { label: "Average", cls: "text-tier-avg" };
-  if (netRtg >= -3) return { label: "Below Avg", cls: "text-tier-poor" };
-  return { label: "Poor", cls: "text-tier-bad" };
-}
+export const netRatingTier = (netRtg) => {
+  if (netRtg >= 8) return "Elite";
+  if (netRtg >= 4) return "Good";
+  if (netRtg >= 0) return "Average";
+  if (netRtg >= -4) return "Below avg";
+  return "Poor";
+};
 
 /**
- * Safe localStorage read — returns null on any failure.
- *
- * @param {string} key
- * @returns {*} Parsed value or null
+ * Net rating → Tailwind text-color class.
  */
-export function lsGet(key) {
+export const netRatingColor = (netRtg) => {
+  if (netRtg >= 8) return "text-tier-elite";
+  if (netRtg >= 4) return "text-tier-good";
+  if (netRtg >= 0) return "text-tier-avg";
+  if (netRtg >= -4) return "text-tier-poor";
+  return "text-tier-bad";
+};
+
+/**
+ * Edge classification from model vs implied probability.
+ * @param {number} modelP   — 0-100
+ * @param {number} impliedP — 0-100 (vig-removed)
+ */
+export const edgeLabel = (modelP, impliedP) => {
+  const diff = modelP - impliedP;
+  if (diff >= 8) return "high";
+  if (diff >= 4) return "mid";
+  return "none";
+};
+
+// ── Functional helpers ────────────────────────────────────────
+
+/**
+ * Group an array by a key function.
+ * @example groupBy([{t:"A"},{t:"B"},{t:"A"}], x => x.t) → { A:[...], B:[...] }
+ */
+export const groupBy = (arr, keyFn) =>
+  arr.reduce((acc, item) => {
+    const key = keyFn(item);
+    (acc[key] = acc[key] || []).push(item);
+    return acc;
+  }, {});
+
+/** Deep clone via structuredClone (or JSON fallback for old browsers) */
+export const deepClone = (obj) => {
+  if (typeof structuredClone === "function") return structuredClone(obj);
+  return JSON.parse(JSON.stringify(obj));
+};
+
+/**
+ * Returns a debounced version of fn that fires after `wait` ms of inactivity.
+ * @param {Function} fn
+ * @param {number}   wait — ms
+ */
+export const debounce = (fn, wait = 300) => {
+  let timer;
+  return (...args) => {
+    clearTimeout(timer);
+    timer = setTimeout(() => fn(...args), wait);
+  };
+};
+
+/** Clamp a value between min and max */
+export const clamp = (val, min, max) => Math.min(max, Math.max(min, val));
+
+/** Linear interpolate from a to b by t (0-1) */
+export const lerp = (a, b, t) => a + (b - a) * clamp(t, 0, 1);
+
+/** Sum an array of numbers */
+export const sum = (arr) => arr.reduce((s, n) => s + (n ?? 0), 0);
+
+/** Average of an array of numbers */
+export const avg = (arr) => arr.length ? sum(arr) / arr.length : 0;
+
+// ── Local storage helpers ─────────────────────────────────────
+// All throw-safe; return null on any error.
+
+const LS_PREFIX = "plusminus:";
+
+/** Get a JSON-parsed value from localStorage */
+export const lsGet = (key) => {
   try {
-    const raw = localStorage.getItem(key);
-    if (raw === null) return null;
-    return JSON.parse(raw);
+    const raw = localStorage.getItem(LS_PREFIX + key);
+    return raw !== null ? JSON.parse(raw) : null;
   } catch {
     return null;
   }
-}
+};
 
-/**
- * Safe localStorage write.
- *
- * @param {string} key
- * @param {*} value - Will be JSON-serialized
- * @param {boolean} [dispatchEvent=true] - Dispatch storage event for cross-component sync
- * @returns {boolean} Success
- */
-export function lsSet(key, value, dispatchEvent = true) {
+/** Set a JSON-stringified value in localStorage */
+export const lsSet = (key, value) => {
   try {
-    localStorage.setItem(key, JSON.stringify(value));
-    if (dispatchEvent) {
-      window.dispatchEvent(new StorageEvent("storage", { key }));
-    }
+    localStorage.setItem(LS_PREFIX + key, JSON.stringify(value));
     return true;
   } catch {
-    console.warn(`[PlusMinus] localStorage write failed for key "${key}"`);
     return false;
   }
-}
+};
 
-/**
- * Safe localStorage remove.
- *
- * @param {string} key
- */
-export function lsRemove(key) {
-  try { localStorage.removeItem(key); } catch { /* silently fail */ }
-}
+/** Remove a key from localStorage */
+export const lsRemove = (key) => {
+  try {
+    localStorage.removeItem(LS_PREFIX + key);
+    return true;
+  } catch {
+    return false;
+  }
+};
 
-// ── Constants ────────────────────────────────────────────────────
-
-/** LocalStorage key for persisted bets. Single source of truth. */
-export const BET_STORAGE_KEY = "plusminus_bets_v2";
-
-/** LocalStorage key for user preferences. */
-export const PREFS_STORAGE_KEY = "plusminus_prefs";
-
-/** Default bankroll for Kelly Criterion calculations. */
-export const DEFAULT_BANKROLL = 1000;
+// ── Constants ─────────────────────────────────────────────────
+export const BET_STORAGE_KEY = "bets_v2";          // versioned key — change to invalidate old format
+export const BREAK_EVEN_PCT = 52.38;              // break-even win rate at -110 juice
+export const DEFAULT_JUICE = -110;               // standard American moneyline
+export const KELLY_FRACTION = 0.25;               // quarter-Kelly is industry standard for safety
+export const MAX_KELLY_STAKE = 0.10;               // never more than 10% of bankroll on one bet
