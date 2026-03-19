@@ -228,10 +228,6 @@ export function Betting() {
   const { data: oddsData, isFetching: oddsFetching, dataUpdatedAt: oddsUpdatedAt } = useOdds();
   const { data: standingsData, isFetching: standingsFetching } = useStandings();
 
-  // Build live edge cards from odds + standings data.
-  // modelP = favourite's win% from standings (proxy, not a full model).
-  // impliedP = vig-removed market implied probability from The Odds API.
-  // Minimum 10-game threshold: don't show edge for teams with thin sample.
   const liveEdges = useMemo(() => {
     if (!oddsData || !standingsData || !rawGames) return null;
 
@@ -280,9 +276,6 @@ export function Betting() {
   const edgeCards = liveEdges && liveEdges.length > 0 ? liveEdges : null;
   const isLive = !!edgeCards;
 
-  // ADDED: detect when we're showing demo data because the key is missing
-  // so we can show an honest offline banner instead of silently displaying
-  // static odds as if they were live.
   const hasOddsKey = !!import.meta.env.VITE_ODDS_API_KEY;
   const showOfflineBanner = !hasOddsKey || (!isLive && !oddsFetching);
 
@@ -298,8 +291,6 @@ export function Betting() {
         />
       </div>
 
-      {/* ADDED: Offline banner — shown when key is missing or odds haven't loaded.
-          Prevents users from treating static demo data as live market odds. */}
       {showOfflineBanner && (
         <motion.div
           variants={item}
@@ -444,7 +435,7 @@ export function Betting() {
 
 // ── BET TRACKER ───────────────────────────────────────────────
 // Bets persist in localStorage. Key imported from utils.js.
-// If missing, we seed with demo bets.
+// If missing (raw === null = first visit), we seed with demo bets.
 
 const DEMO_BETS = [
   { id: 1, game: "OKC @ BKN", type: "Spread", pick: "OKC -16", odds: -110, stake: 50, result: "win" },
@@ -456,10 +447,9 @@ const DEMO_BETS = [
 function loadBets() {
   try {
     const raw = localStorage.getItem(BET_STORAGE_KEY);
-    if (!raw) return DEMO_BETS;
+    if (raw === null) return DEMO_BETS;          // first visit — show demo
     const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-    return DEMO_BETS;
+    return Array.isArray(parsed) ? parsed : DEMO_BETS;  // respect empty array
   } catch {
     return DEMO_BETS;
   }
@@ -475,7 +465,7 @@ function saveBets(bets) {
   }
 }
 
-// ADDED: CSV export utility.
+// CSV export utility.
 // Triggers a browser download of all bets as a .csv file.
 // Uses a hidden <a> tag + object URL — no server required.
 function exportBetsCSV(bets) {
@@ -483,7 +473,8 @@ function exportBetsCSV(bets) {
   const rows = bets.map(b => {
     const pl = calcPL(b.stake, b.odds, b.result);
     const plStr = b.result === "pending" ? "" : pl.toFixed(2);
-    const date = b.id ? new Date(b.id).toLocaleDateString("en-US") : "";
+    // Only treat id as a timestamp if it's a real Date.now() value (13 digits)
+    const date = b.id > 1000000000000 ? new Date(b.id).toLocaleDateString("en-US") : "";
     // Wrap fields in quotes to handle commas inside game/pick strings
     return `"${date}","${b.game}","${b.type}","${b.pick}",${b.odds},${b.stake},${b.result},${plStr}`;
   }).join("\n");
@@ -548,7 +539,7 @@ export function BetTracker() {
     });
   }, [bets]);
 
-  // ADDED: Bet type breakdown — win rate + P&L per bet type.
+  // Bet type breakdown — win rate + P&L per bet type.
   // Only includes decisive (non-pending) bets. Skips types with no history.
   const typeBreakdown = useMemo(() => {
     const types = {};
@@ -630,7 +621,6 @@ export function BetTracker() {
       <div className="pm-card overflow-x-auto mb-4">
         <div className="flex items-center justify-between px-3 py-2.5 border-b border-pitch-600">
           <span className="pm-label">Bet log · {bets.length} entries</span>
-          {/* ADDED: CSV export button next to Clear all */}
           <div className="flex items-center gap-3">
             {bets.length > 0 && (
               <button
@@ -673,7 +663,7 @@ export function BetTracker() {
                   <td className="px-3 py-2.5 font-mono text-pitch-300">{b.odds}</td>
                   <td className="px-3 py-2.5 font-mono text-pitch-300">${b.stake}</td>
                   <td className={`px-3 py-2.5 font-mono font-medium ${b.result === "pending" ? "text-pitch-500"
-                      : pl > 0 ? "text-win" : pl < 0 ? "text-loss" : "text-pitch-400"
+                    : pl > 0 ? "text-win" : pl < 0 ? "text-loss" : "text-pitch-400"
                     }`}>
                     {b.result === "pending" ? "—" : `${pl >= 0 ? "+" : ""}$${pl.toFixed(2)}`}
                   </td>
@@ -703,9 +693,9 @@ export function BetTracker() {
                         onClick={() => setEditingId(b.id)}
                         title="Click to change result"
                         className={`pm-badge border cursor-pointer hover:brightness-125 transition-all ${b.result === "win" ? "bg-win/10  text-win  border-win/20"
-                            : b.result === "loss" ? "bg-loss/10 text-loss border-loss/20"
-                              : b.result === "push" ? "bg-draw/10 text-draw border-draw/20"
-                                : "bg-pitch-700 text-pitch-500 border-pitch-600"
+                          : b.result === "loss" ? "bg-loss/10 text-loss border-loss/20"
+                            : b.result === "push" ? "bg-draw/10 text-draw border-draw/20"
+                              : "bg-pitch-700 text-pitch-500 border-pitch-600"
                           }`}
                       >
                         {b.result.toUpperCase()}
@@ -747,9 +737,8 @@ export function BetTracker() {
         </div>
       )}
 
-      {/* ADDED: Bet type breakdown — win rate by bet type.
-          Only renders when there are at least 2 settled bets across at least 2 types.
-          Tells bettors where their actual edge is. */}
+      {/* Bet type breakdown — win rate by bet type.
+          Only renders when there are at least 2 settled bets across at least 2 types. */}
       {typeBreakdown.length >= 2 && (
         <div className="pm-card p-4">
           <div className="pm-label mb-3">Win rate by bet type</div>

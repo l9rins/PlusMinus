@@ -509,6 +509,14 @@ function ShotQualityView({ data }) {
   const [selected, setSelected] = useState(0);
   const [compareIdx, setCompareIdx] = useState(null);
 
+  if (!data || data.length === 0 || !data[selected]) {
+    return (
+      <div className="pm-card p-12 text-center text-pitch-400">
+        Shot quality data heavily reliant on player stats is currently unavailable.
+      </div>
+    );
+  }
+
   const primary = data[selected];
   const comparison = compareIdx !== null ? data[compareIdx] : null;
 
@@ -701,7 +709,7 @@ export default function Analytics() {
   );
 
   const shotData = useMemo(
-    () => computeShotQuality(playersData),
+    () => computeShotQuality(playersData ?? PLAYERS),
     [playersData]
   );
 

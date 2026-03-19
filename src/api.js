@@ -352,7 +352,7 @@ export function usePlayerSearch(query) {
                     name: fullName,
                     pos,
                     team,
-                    age: p.height_feet ? null : null, // BDL free tier doesn't return age
+                    age: null, // BDL free tier doesn't return age
                     // Advanced metrics not available in free tier for arbitrary players
                     // — null signals PlayerCard to hide the advanced section
                     per: null,

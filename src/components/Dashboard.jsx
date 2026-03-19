@@ -141,6 +141,22 @@ function SummaryTile({ label, value, sub, icon: Icon, trend }) {
 // ── Main Dashboard ────────────────────────────────────────────
 const HAS_API_KEY = !!import.meta.env.VITE_BDLAPI_KEY;
 
+function readBetStats() {
+    try {
+        const raw = localStorage.getItem(BET_STORAGE_KEY);
+        if (!raw) return { total: 0, wins: 0, losses: 0, pending: 0, pl: 0 };
+        const bets = JSON.parse(raw);
+        if (!Array.isArray(bets)) return { total: 0, wins: 0, losses: 0, pending: 0, pl: 0 };
+        const wins = bets.filter(b => b.result === "win").length;
+        const losses = bets.filter(b => b.result === "loss").length;
+        const pending = bets.filter(b => b.result === "pending").length;
+        const pl = bets.reduce((s, b) => s + calcPL(b.stake, b.odds, b.result), 0);
+        return { total: bets.length, wins, losses, pending, pl };
+    } catch {
+        return { total: 0, wins: 0, losses: 0, pending: 0, pl: 0 };
+    }
+}
+
 export default function Dashboard({ onNavigate }) {
     const games = useTodayGames();
     const standings = useStandings();
@@ -161,22 +177,6 @@ export default function Dashboard({ onNavigate }) {
     // and on mount. Uses a version counter to trigger re-computation.
     const [betVersion, setBetVersion] = useState(0);
 
-    function readBetStats() {
-        try {
-            const raw = localStorage.getItem(BET_STORAGE_KEY);
-            if (!raw) return { total: 0, wins: 0, losses: 0, pending: 0, pl: 0 };
-            const bets = JSON.parse(raw);
-            if (!Array.isArray(bets)) return { total: 0, wins: 0, losses: 0, pending: 0, pl: 0 };
-            const wins = bets.filter(b => b.result === "win").length;
-            const losses = bets.filter(b => b.result === "loss").length;
-            const pending = bets.filter(b => b.result === "pending").length;
-            const pl = bets.reduce((s, b) => s + calcPL(b.stake, b.odds, b.result), 0);
-            return { total: bets.length, wins, losses, pending, pl };
-        } catch {
-            return { total: 0, wins: 0, losses: 0, pending: 0, pl: 0 };
-        }
-    }
-
     // Re-read on mount, when betVersion changes (via storage events from same/other tabs)
     const betStats = useMemo(() => readBetStats(), [betVersion]);
 
@@ -193,14 +193,42 @@ export default function Dashboard({ onNavigate }) {
         ? `${betStats.wins} wins · ${betStats.losses} losses · ${betStats.pending} open`
         : "No bets logged yet";
 
-    // Compute edge/prob tiles from ODDS_GAMES instead of hardcoding
-    const topEdge = useMemo(() =>
-        ODDS_GAMES.reduce((best, g) =>
+    // Compute edge/prob tiles — live from oddsData when available, fallback to ODDS_GAMES
+    const topEdge = useMemo(() => {
+        if (oddsData && Object.keys(oddsData).length > 0) {
+            const cards = Object.entries(oddsData).map(([key, o]) => {
+                const [away, home] = key.split("@");
+                return {
+                    matchup: `${away} @ ${home}`,
+                    fav: o.homeP >= o.awayP ? home : away,
+                    modelP: Math.max(o.homeP, o.awayP),
+                    impliedP: Math.min(o.homeP, o.awayP),
+                };
+            });
+            return cards.reduce((best, g) =>
+                (g.modelP - g.impliedP) > (best.modelP - best.impliedP) ? g : best
+            );
+        }
+        return ODDS_GAMES.reduce((best, g) =>
             (g.modelP - g.impliedP) > (best.modelP - best.impliedP) ? g : best
-        ), []);
-    const bestProb = useMemo(() =>
-        ODDS_GAMES.reduce((best, g) => g.modelP > best.modelP ? g : best
-        ), []);
+        );
+    }, [oddsData]);
+
+    const bestProb = useMemo(() => {
+        if (oddsData && Object.keys(oddsData).length > 0) {
+            const cards = Object.entries(oddsData).map(([key, o]) => {
+                const [away, home] = key.split("@");
+                return {
+                    matchup: `${away} @ ${home}`,
+                    fav: o.homeP >= o.awayP ? home : away,
+                    modelP: Math.max(o.homeP, o.awayP),
+                    impliedP: Math.min(o.homeP, o.awayP),
+                };
+            });
+            return cards.reduce((best, g) => g.modelP > best.modelP ? g : best);
+        }
+        return ODDS_GAMES.reduce((best, g) => g.modelP > best.modelP ? g : best);
+    }, [oddsData]);
 
     return (
         <motion.div

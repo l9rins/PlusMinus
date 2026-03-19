@@ -217,6 +217,11 @@ export default function Players({ initialQuery = "" }) {
     const [pos, setPos] = useState("");
     const [sortKey, setSort] = useState("pts");
 
+    // Sync query if parent updates initialQuery (e.g. TopNav search → Players tab)
+    useEffect(() => {
+        setQuery(initialQuery);
+    }, [initialQuery]);
+
     // Debounce the query before firing the API search.
     // The raw query updates the input immediately; the debounced
     // value only changes after the user pauses typing.
