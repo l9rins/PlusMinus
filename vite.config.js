@@ -1,15 +1,21 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
-import path from "path";
 
 export default defineConfig({
-    plugins: [react()],
+  plugins: [react()],
 
-    // "/" for Netlify, Vercel, or any root domain deploy.
-    // Change to "/plusminus/" only if deploying to GitHub Pages subdirectory.
-    base: "/",
+  // ── Vitest config ──────────────────────────────────────────────
+  test: {
+    environment: "jsdom",   // localStorage, DOM APIs
+    globals: true,          // describe/it/expect without imports
+    setupFiles: [],
+  },
 
-    resolve: {
-        alias: { "@": path.resolve(__dirname, "./src") },
-    },
+  // ── Dev server ─────────────────────────────────────────────────
+  // When running `vercel dev`, the serverless functions in /api are
+  // served alongside Vite. For plain `vite`, proxy /api to a local
+  // dev server if you want to test without Vercel CLI.
+  server: {
+    port: 3000,
+  },
 });
