@@ -237,18 +237,15 @@ export function mergeOddsIntoGames(games, odds) {
     });
 }
 
-// ─── PLAYERS ─────────────────────────────────────────────────
-// BallDontLie /season_averages returns per-game stats.
-// Advanced stats (PER, BPM, VORP) are NOT in BallDontLie free tier —
-// those stay as static data from data.js.
+// ─── PLAYERS (static roster) ──────────────────────────────────
+// Fetches season averages for the hardcoded 30-player roster.
+// Used as the default Players tab view and as fallback when search
+// returns no results or the API key is missing.
 //
 // ⚠️  HONEST NOTE ON IDs:
 // BallDontLie uses its own sequential player IDs — NOT NBA.com IDs.
-// Previous versions of this file used NBA.com IDs (7-digit numbers),
-// which silently returned empty arrays and fell back to static data.
 // The IDs below are actual BDL IDs, verified via:
 //   GET /v1/players?search={first_name}+{last_name}
-// If a player's ID changes or a new player is added, verify there.
 
 const PLAYER_IDS = {
     "Shai Gilgeous-Alexander": 666,
@@ -280,8 +277,7 @@ function reshapePlayers(averages, staticPlayers) {
             pts: parseFloat(live.pts) || sp.pts,
             ast: parseFloat(live.ast) || sp.ast,
             reb: parseFloat(live.reb) || sp.reb,
-            // BDL free tier doesn't have TS% — we use fg_pct as a rough proxy
-            // and keep the static value if fg_pct is unavailable
+            // BDL free tier doesn't have TS% — use fg_pct as rough proxy
             ts: live.fg_pct ? parseFloat((live.fg_pct * 100).toFixed(1)) : sp.ts,
             // per, bpm, vorp, ortg, drtg stay from static — not in BDL free tier
         };
@@ -302,6 +298,89 @@ export function usePlayers() {
         },
         staleTime: 1000 * 60 * 60,
         placeholderData: PLAYERS_FALLBACK,
+    });
+}
+
+// ─── PLAYER SEARCH ────────────────────────────────────────────
+// Dynamic search against the full BallDontLie player database (~450+ active players).
+//
+// Flow:
+//   1. Search /players?search={query} → get matching players + their BDL IDs
+//   2. Fetch /season_averages for those IDs → get live pts/ast/reb
+//   3. Return merged shape — advanced metrics (per/bpm/vorp/ortg/drtg) are
+//      NOT available in BDL free tier, so those fields are null for search results.
+//      PlayerCard conditionally renders the advanced section only when data exists.
+//
+// Design decisions:
+//   - Minimum 2 characters before firing to avoid noise
+//   - Disabled when query is empty (falls back to static roster in Players.jsx)
+//   - staleTime 5 minutes — search results don't change mid-session
+//   - No refetchInterval — search is on-demand, not polling
+
+export function usePlayerSearch(query) {
+    const season = currentSeason();
+    const trimmed = query.trim();
+    const enabled = !!API_KEY && trimmed.length >= 2;
+
+    return useQuery({
+        queryKey: ["playerSearch", trimmed, season],
+        queryFn: async () => {
+            // Step 1: search for players by name
+            const searchData = await bdlFetch(
+                `/players?search=${encodeURIComponent(trimmed)}&per_page=25`
+            );
+            const players = searchData.data;
+            if (!players || players.length === 0) return [];
+
+            // Step 2: fetch season averages for found player IDs
+            const ids = players.map(p => p.id).join("&player_ids[]=");
+            const avgData = await bdlFetch(
+                `/season_averages?season=${season}&player_ids[]=${ids}`
+            );
+            const averages = avgData.data || [];
+
+            // Step 3: merge — player info + live averages
+            return players.map(p => {
+                const avg = averages.find(a => a.player.id === p.id);
+                const fullName = `${p.first_name} ${p.last_name}`;
+                const team = p.team?.abbreviation || "—";
+                const pos = p.position || "—";
+
+                // Base shape — always available from /players
+                const base = {
+                    id: p.id,
+                    name: fullName,
+                    pos,
+                    team,
+                    age: p.height_feet ? null : null, // BDL free tier doesn't return age
+                    // Advanced metrics not available in free tier for arbitrary players
+                    // — null signals PlayerCard to hide the advanced section
+                    per: null,
+                    bpm: null,
+                    vorp: null,
+                    ortg: null,
+                    drtg: null,
+                    form: null,
+                    // Defaults shown when no averages found
+                    pts: 0,
+                    ast: 0,
+                    reb: 0,
+                    ts: null,
+                };
+
+                if (!avg) return base;
+
+                return {
+                    ...base,
+                    pts: parseFloat(avg.pts) || 0,
+                    ast: parseFloat(avg.ast) || 0,
+                    reb: parseFloat(avg.reb) || 0,
+                    ts: avg.fg_pct ? parseFloat((avg.fg_pct * 100).toFixed(1)) : null,
+                };
+            }).filter(p => p.pts > 0 || p.ast > 0 || p.reb > 0); // filter out DNP/inactive
+        },
+        staleTime: 1000 * 60 * 5,
+        enabled,
     });
 }
 

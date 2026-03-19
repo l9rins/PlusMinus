@@ -1,23 +1,13 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, SlidersHorizontal, ChevronDown, X } from "lucide-react";
+import { Search, SlidersHorizontal, ChevronDown, X, Loader } from "lucide-react";
 import { TEAM_COLORS } from "../data";
-import { usePlayers } from "../api";
+import { usePlayers, usePlayerSearch } from "../api";
 import { signed } from "../utils";
 import { TileSkeleton, ErrorState } from "./ui";
 
+// ── AttrBar ───────────────────────────────────────────────────
 function AttrBar({ label, value, max = 100, min = 0, invert = false, isSigned = false }) {
-    // Compute a 0–100 percentage for the bar width.
-    //
-    // isSigned = true → metric spans min..max (e.g. BPM: -5 to 12, VORP: -2 to 9).
-    //                   Shift value into a 0–100 scale so 0 is a neutral midpoint,
-    //                   not the bar's left edge. This prevents BPM +4.9 from looking
-    //                   "poor" at 40% — it actually becomes ~58%, squarely "average-plus".
-    //
-    // invert = true  → lower is better (e.g. D-RTG 105 is better than 115).
-    //                   Flip the value within the range before scaling.
-    //
-    // default        → simple 0-to-max linear scale.
     let pct;
     if (isSigned) {
         const range = max - min;
@@ -65,10 +55,20 @@ function Form({ results }) {
     );
 }
 
+// ── PlayerCard ────────────────────────────────────────────────
+// Handles both static (full advanced metrics) and dynamic search
+// results (basic stats only — BDL free tier limitation).
+// Advanced section is hidden when player.per === null, which signals
+// a search result rather than a static roster player.
 function PlayerCard({ player }) {
     const [expanded, setExpanded] = useState(false);
     const color = TEAM_COLORS[player.team] || "#546480";
     const initials = player.name.split(" ").map(w => w[0]).join("").slice(0, 2);
+
+    // A player from dynamic search has null advanced metrics
+    const hasAdvanced = player.per !== null;
+    // A player with no season data at all shouldn't show stats
+    const hasStats = player.pts > 0 || player.ast > 0 || player.reb > 0;
 
     return (
         <motion.div
@@ -85,16 +85,24 @@ function PlayerCard({ player }) {
                 </div>
                 <div className="flex-1 min-w-0">
                     <div className="text-sm font-medium text-pitch-100 truncate">{player.name}</div>
-                    <div className="text-[10px] text-pitch-400 mt-0.5">{player.pos} · {player.team} · Age {player.age}</div>
+                    <div className="text-[10px] text-pitch-400 mt-0.5">
+                        {player.pos} · {player.team}
+                        {player.age ? ` · Age ${player.age}` : ""}
+                    </div>
                 </div>
-                <div className="flex gap-4 flex-shrink-0">
-                    {[{ lbl: "PTS", val: player.pts }, { lbl: "AST", val: player.ast }, { lbl: "REB", val: player.reb }].map(s => (
-                        <div key={s.lbl} className="text-center">
-                            <div className="font-mono font-medium text-sm text-pitch-100">{s.val}</div>
-                            <div className="text-[9px] text-pitch-500 uppercase tracking-wider">{s.lbl}</div>
-                        </div>
-                    ))}
-                </div>
+                {hasStats && (
+                    <div className="flex gap-4 flex-shrink-0">
+                        {[{ lbl: "PTS", val: player.pts }, { lbl: "AST", val: player.ast }, { lbl: "REB", val: player.reb }].map(s => (
+                            <div key={s.lbl} className="text-center">
+                                <div className="font-mono font-medium text-sm text-pitch-100">{s.val}</div>
+                                <div className="text-[9px] text-pitch-500 uppercase tracking-wider">{s.lbl}</div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+                {!hasStats && (
+                    <span className="text-[10px] text-pitch-600 flex-shrink-0">No stats this season</span>
+                )}
                 <ChevronDown size={14} strokeWidth={1.8} className={`text-pitch-500 transition-transform duration-200 flex-shrink-0 ${expanded ? "rotate-180" : ""}`} />
             </div>
 
@@ -109,38 +117,79 @@ function PlayerCard({ player }) {
                         onClick={e => e.stopPropagation()}
                     >
                         <div className="px-3 pb-4 border-t border-pitch-600 pt-4">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                                <div>
-                                    <div className="pm-label mb-3">Advanced metrics</div>
-                                    <AttrBar label="PER" value={player.per} max={35} />
-                                    <AttrBar label="TS%" value={player.ts} max={75} />
-                                    <AttrBar label="BPM" value={player.bpm} min={-5} max={12} isSigned />
-                                    <AttrBar label="VORP" value={player.vorp} min={-2} max={9} isSigned />
-                                    <AttrBar label="O-RTG" value={player.ortg} max={135} />
-                                    {/* invert=true: lower D-RTG = better defense, so bar should fill more for lower values */}
-                                    <AttrBar label="D-RTG" value={player.drtg} max={120} invert />
+                            {hasAdvanced ? (
+                                // Full expanded view for static roster players
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                                    <div>
+                                        <div className="pm-label mb-3">Advanced metrics</div>
+                                        <AttrBar label="PER" value={player.per} max={35} />
+                                        <AttrBar label="TS%" value={player.ts} max={75} />
+                                        <AttrBar label="BPM" value={player.bpm} min={-5} max={12} isSigned />
+                                        <AttrBar label="VORP" value={player.vorp} min={-2} max={9} isSigned />
+                                        <AttrBar label="O-RTG" value={player.ortg} max={135} />
+                                        <AttrBar label="D-RTG" value={player.drtg} max={120} invert />
+                                    </div>
+                                    <div>
+                                        <div className="pm-label mb-3">Season averages</div>
+                                        <div className="grid grid-cols-3 gap-2 mb-4">
+                                            {[
+                                                { lbl: "PTS", val: player.pts },
+                                                { lbl: "AST", val: player.ast },
+                                                { lbl: "REB", val: player.reb },
+                                                { lbl: "PER", val: player.per },
+                                                { lbl: "TS%", val: player.ts + "%" },
+                                                { lbl: "BPM", val: signed(player.bpm) },
+                                            ].map(s => (
+                                                <div key={s.lbl} className="bg-pitch-700 rounded-md p-2 text-center">
+                                                    <div className="font-mono font-medium text-pitch-50 text-base">{s.val}</div>
+                                                    <div className="text-[9px] text-pitch-500 uppercase tracking-wider mt-0.5">{s.lbl}</div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                        {player.form && (
+                                            <>
+                                                <div className="pm-label mb-2">Last 5 games</div>
+                                                <Form results={player.form} />
+                                            </>
+                                        )}
+                                    </div>
                                 </div>
+                            ) : (
+                                // Simplified view for dynamic search results
                                 <div>
                                     <div className="pm-label mb-3">Season averages</div>
-                                    <div className="grid grid-cols-3 gap-2 mb-4">
-                                        {[
-                                            { lbl: "PTS", val: player.pts },
-                                            { lbl: "AST", val: player.ast },
-                                            { lbl: "REB", val: player.reb },
-                                            { lbl: "PER", val: player.per },
-                                            { lbl: "TS%", val: player.ts + "%" },
-                                            { lbl: "BPM", val: signed(player.bpm) },
-                                        ].map(s => (
-                                            <div key={s.lbl} className="bg-pitch-700 rounded-md p-2 text-center">
-                                                <div className="font-mono font-medium text-pitch-50 text-base">{s.val}</div>
-                                                <div className="text-[9px] text-pitch-500 uppercase tracking-wider mt-0.5">{s.lbl}</div>
+                                    {hasStats ? (
+                                        <>
+                                            <div className="grid grid-cols-3 gap-2 mb-3">
+                                                {[
+                                                    { lbl: "PTS", val: player.pts },
+                                                    { lbl: "AST", val: player.ast },
+                                                    { lbl: "REB", val: player.reb },
+                                                ].map(s => (
+                                                    <div key={s.lbl} className="bg-pitch-700 rounded-md p-2 text-center">
+                                                        <div className="font-mono font-medium text-pitch-50 text-base">{s.val}</div>
+                                                        <div className="text-[9px] text-pitch-500 uppercase tracking-wider mt-0.5">{s.lbl}</div>
+                                                    </div>
+                                                ))}
                                             </div>
-                                        ))}
+                                            {player.ts !== null && (
+                                                <div className="flex items-center gap-2 text-[11px] text-pitch-400">
+                                                    <span className="text-pitch-500">FG%</span>
+                                                    <span className="font-mono text-pitch-200">{player.ts}%</span>
+                                                </div>
+                                            )}
+                                        </>
+                                    ) : (
+                                        <div className="text-[11px] text-pitch-500">No stats available for this season.</div>
+                                    )}
+                                    {/* Honest disclosure for search results */}
+                                    <div className="mt-3 pt-3 border-t border-pitch-700">
+                                        <div className="text-[10px] text-pitch-600">
+                                            Advanced metrics (PER, BPM, VORP) not available for searched players via BallDontLie free tier.
+                                        </div>
                                     </div>
-                                    <div className="pm-label mb-2">Last 5 games</div>
-                                    <Form results={player.form} />
                                 </div>
-                            </div>
+                            )}
                         </div>
                     </motion.div>
                 )}
@@ -149,62 +198,143 @@ function PlayerCard({ player }) {
     );
 }
 
+// ── useDebounce ───────────────────────────────────────────────
+// Delays updating the value until the user stops typing.
+// 350ms is the sweet spot — fast enough to feel responsive,
+// slow enough to avoid hammering the API on every keystroke.
+function useDebounce(value, delay = 350) {
+    const [debounced, setDebounced] = useState(value);
+    useEffect(() => {
+        const timer = setTimeout(() => setDebounced(value), delay);
+        return () => clearTimeout(timer);
+    }, [value, delay]);
+    return debounced;
+}
+
+// ── Players ───────────────────────────────────────────────────
 export default function Players({ initialQuery = "" }) {
     const [query, setQuery] = useState(initialQuery);
     const [pos, setPos] = useState("");
     const [sortKey, setSort] = useState("pts");
 
-    const { data: players, isLoading, isError, refetch } = usePlayers();
+    // Debounce the query before firing the API search.
+    // The raw query updates the input immediately; the debounced
+    // value only changes after the user pauses typing.
+    const debouncedQuery = useDebounce(query, 350);
 
-    const filtered = (players || [])
-        .filter(p =>
-            (!query || p.name.toLowerCase().includes(query.toLowerCase())) &&
-            (!pos || p.pos === pos)
-        )
+    // Static roster — always loaded, shown when search is empty
+    const { data: staticPlayers, isLoading: staticLoading, isError: staticError, refetch } = usePlayers();
+
+    // Dynamic search — only fires when debouncedQuery.trim().length >= 2
+    const {
+        data: searchResults,
+        isLoading: searchLoading,
+        isFetching: searchFetching,
+        isError: searchError,
+    } = usePlayerSearch(debouncedQuery);
+
+    // Determine which mode we're in:
+    // - search mode: user has typed 2+ chars
+    // - browse mode: show static roster with client-side filters
+    const isSearchMode = debouncedQuery.trim().length >= 2;
+    const isTyping = query.trim().length >= 2 && query !== debouncedQuery;
+
+    // In browse mode, apply client-side position filter + sort to static roster
+    const browsePlayers = (staticPlayers || [])
+        .filter(p => !pos || p.pos === pos)
         .sort((a, b) => b[sortKey] - a[sortKey]);
+
+    // In search mode, show results sorted by pts (dynamic results have no advanced metrics to sort by)
+    const displayPlayers = isSearchMode
+        ? (searchResults || []).sort((a, b) => b.pts - a.pts)
+        : browsePlayers;
+
+    const isLoading = isSearchMode ? (searchLoading && !searchResults) : staticLoading;
+    const isError = isSearchMode ? searchError : staticError;
+    const isFetching = isSearchMode && (searchLoading || searchFetching || isTyping);
 
     return (
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
             <div className="flex flex-wrap items-center gap-2 mb-4">
+                {/* Search input */}
                 <div className="relative flex-1 min-w-[180px]">
-                    <Search size={13} strokeWidth={1.8} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-pitch-500" />
+                    {isFetching ? (
+                        <Loader
+                            size={13}
+                            strokeWidth={1.8}
+                            className="absolute left-2.5 top-1/2 -translate-y-1/2 text-accent animate-spin"
+                        />
+                    ) : (
+                        <Search size={13} strokeWidth={1.8} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-pitch-500" />
+                    )}
                     <input
                         value={query}
                         onChange={e => setQuery(e.target.value)}
-                        placeholder="Search player..."
+                        placeholder={isSearchMode ? "Searching all NBA players…" : "Search player…"}
                         className="w-full bg-pitch-800 border border-pitch-600 rounded-md pl-8 pr-3 py-1.5 text-sm text-pitch-200 placeholder:text-pitch-500 focus:outline-none focus:border-accent/50 transition-colors"
                     />
                     {query && (
-                        <button onClick={() => setQuery("")} className="absolute right-2.5 top-1/2 -translate-y-1/2">
+                        <button
+                            onClick={() => { setQuery(""); }}
+                            className="absolute right-2.5 top-1/2 -translate-y-1/2"
+                        >
                             <X size={11} className="text-pitch-500 hover:text-pitch-300" />
                         </button>
                     )}
                 </div>
-                <div className="flex gap-1">
-                    {["", "PG", "SG", "SF", "PF", "C"].map(p => (
-                        <button key={p} onClick={() => setPos(p)}
-                            className={`px-2.5 py-1.5 rounded text-[11px] font-medium transition-all
-                ${pos === p ? "bg-accent/15 text-accent border border-accent/30" : "bg-pitch-800 text-pitch-400 border border-pitch-600 hover:border-pitch-500 hover:text-pitch-300"}`}>
-                            {p || "All"}
-                        </button>
-                    ))}
-                </div>
-                <div className="flex items-center gap-1 ml-auto">
-                    <SlidersHorizontal size={12} className="text-pitch-500" />
-                    <select value={sortKey} onChange={e => setSort(e.target.value)}
-                        className="bg-pitch-800 border border-pitch-600 rounded-md px-2 py-1.5 text-[11px] text-pitch-300 focus:outline-none focus:border-accent/50">
-                        <option value="pts">Sort: Points</option>
-                        <option value="ast">Sort: Assists</option>
-                        <option value="reb">Sort: Rebounds</option>
-                        <option value="per">Sort: PER</option>
-                        <option value="bpm">Sort: BPM</option>
-                        <option value="ts">Sort: TS%</option>
-                    </select>
-                </div>
+
+                {/* Position filter — hidden in search mode (search covers all positions) */}
+                {!isSearchMode && (
+                    <div className="flex gap-1">
+                        {["", "PG", "SG", "SF", "PF", "C"].map(p => (
+                            <button key={p} onClick={() => setPos(p)}
+                                className={`px-2.5 py-1.5 rounded text-[11px] font-medium transition-all
+                                    ${pos === p
+                                        ? "bg-accent/15 text-accent border border-accent/30"
+                                        : "bg-pitch-800 text-pitch-400 border border-pitch-600 hover:border-pitch-500 hover:text-pitch-300"
+                                    }`}>
+                                {p || "All"}
+                            </button>
+                        ))}
+                    </div>
+                )}
+
+                {/* Sort — hidden in search mode (dynamic results have no advanced metrics) */}
+                {!isSearchMode && (
+                    <div className="flex items-center gap-1 ml-auto">
+                        <SlidersHorizontal size={12} className="text-pitch-500" />
+                        <select value={sortKey} onChange={e => setSort(e.target.value)}
+                            className="bg-pitch-800 border border-pitch-600 rounded-md px-2 py-1.5 text-[11px] text-pitch-300 focus:outline-none focus:border-accent/50">
+                            <option value="pts">Sort: Points</option>
+                            <option value="ast">Sort: Assists</option>
+                            <option value="reb">Sort: Rebounds</option>
+                            <option value="per">Sort: PER</option>
+                            <option value="bpm">Sort: BPM</option>
+                            <option value="ts">Sort: TS%</option>
+                        </select>
+                    </div>
+                )}
+
+                {/* Search mode label */}
+                {isSearchMode && (
+                    <div className="ml-auto text-[10px] text-pitch-500">
+                        {isFetching ? "Searching…" : `${displayPlayers.length} result${displayPlayers.length !== 1 ? "s" : ""}`}
+                    </div>
+                )}
             </div>
 
+            {/* Hint when user has typed 1 char but not yet triggered search */}
+            {query.trim().length === 1 && (
+                <div className="text-center py-4 text-pitch-600 text-[11px]">
+                    Type one more character to search all NBA players…
+                </div>
+            )}
+
             {isError ? (
-                <ErrorState message="Couldn't load player stats." onRetry={refetch} />
+                <ErrorState
+                    message={isSearchMode ? "Couldn't search players." : "Couldn't load player stats."}
+                    onRetry={refetch}
+                />
             ) : isLoading ? (
                 <div className="space-y-2">
                     {Array.from({ length: 8 }).map((_, i) => <TileSkeleton key={i} lines={2} />)}
@@ -212,10 +342,15 @@ export default function Players({ initialQuery = "" }) {
             ) : (
                 <div className="space-y-2">
                     <AnimatePresence>
-                        {filtered.map(p => <PlayerCard key={p.id} player={p} />)}
+                        {displayPlayers.map(p => <PlayerCard key={p.id} player={p} />)}
                     </AnimatePresence>
-                    {filtered.length === 0 && (
-                        <div className="text-center py-12 text-pitch-500 text-sm">No players match your filters.</div>
+                    {displayPlayers.length === 0 && !isFetching && (
+                        <div className="text-center py-12 text-pitch-500 text-sm">
+                            {isSearchMode
+                                ? `No active players found for "${debouncedQuery}".`
+                                : "No players match your filters."
+                            }
+                        </div>
                     )}
                 </div>
             )}
