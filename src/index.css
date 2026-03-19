@@ -2,33 +2,49 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ─── Google Fonts ───────────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@300;400;500&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&display=swap');
+
 @layer base {
-    * {
+
+    *,
+    *::before,
+    *::after {
         box-sizing: border-box;
     }
 
     html {
-        background-color: #0f1114;
+        background-color: #0a0b0d;
         color: #d4e0ec;
         font-family: "DM Sans", sans-serif;
         -webkit-font-smoothing: antialiased;
         -moz-osx-font-smoothing: grayscale;
+        font-feature-settings: "kern" 1, "liga" 1, "calt" 1;
+        scroll-behavior: smooth;
     }
 
     body {
         margin: 0;
         min-height: 100vh;
         overflow-x: hidden;
+        /* Subtle noise texture over the background for depth */
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.025'/%3E%3C/svg%3E");
     }
 
-    /* Scrollbar — thin, matches dark palette */
+    /* Selection styling */
+    ::selection {
+        background: rgba(0, 212, 170, 0.25);
+        color: #eef4fb;
+    }
+
+    /* Custom scrollbars — thin, refined */
     ::-webkit-scrollbar {
         width: 4px;
         height: 4px;
     }
 
     ::-webkit-scrollbar-track {
-        background: #0f1114;
+        background: transparent;
     }
 
     ::-webkit-scrollbar-thumb {
@@ -39,13 +55,44 @@
     ::-webkit-scrollbar-thumb:hover {
         background: #3d4f6a;
     }
+
+    ::-webkit-scrollbar-corner {
+        background: transparent;
+    }
+
+    /* Focus ring — accessible, on-brand */
+    :focus-visible {
+        outline: 2px solid rgba(0, 212, 170, 0.6);
+        outline-offset: 2px;
+        border-radius: 4px;
+    }
+
+    /* Remove default number input spinners */
+    input[type="number"]::-webkit-inner-spin-button,
+    input[type="number"]::-webkit-outer-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+    }
+
+    input[type="number"] {
+        -moz-appearance: textfield;
+    }
+
+    /* Tables: prevent layout shifts */
+    table {
+        border-collapse: collapse;
+    }
+
+    /* Smooth color transitions globally */
+    a,
+    button {
+        transition: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+    }
 }
 
 @layer utilities {
 
-    /* scrollbar-none: used on TopNav horizontal nav overflow container.
-     Tailwind's base stylesheet does not include this — we define it here
-     rather than requiring a plugin. */
+    /* ── Scrollbar helpers ──────────────────────────────────────── */
     .scrollbar-none {
         scrollbar-width: none;
     }
@@ -53,71 +100,442 @@
     .scrollbar-none::-webkit-scrollbar {
         display: none;
     }
+
+    /* ── Text utilities ─────────────────────────────────────────── */
+    .text-gradient {
+        background: linear-gradient(135deg, #00d4aa 0%, #4ade80 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+
+    .text-gradient-warm {
+        background: linear-gradient(135deg, #f97316 0%, #facc15 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+
+    /* ── Glass surfaces ─────────────────────────────────────────── */
+    .glass {
+        background: rgba(26, 30, 42, 0.8);
+        backdrop-filter: blur(12px) saturate(1.2);
+        -webkit-backdrop-filter: blur(12px) saturate(1.2);
+    }
+
+    .glass-strong {
+        background: rgba(20, 23, 32, 0.92);
+        backdrop-filter: blur(20px) saturate(1.4);
+        -webkit-backdrop-filter: blur(20px) saturate(1.4);
+    }
+
+    /* ── Glow utilities ─────────────────────────────────────────── */
+    .glow-accent {
+        box-shadow: 0 0 20px rgba(0, 212, 170, 0.25), 0 0 60px rgba(0, 212, 170, 0.08);
+    }
+
+    .glow-win {
+        box-shadow: 0 0 16px rgba(34, 197, 94, 0.2);
+    }
+
+    .glow-loss {
+        box-shadow: 0 0 16px rgba(239, 68, 68, 0.2);
+    }
+
+    /* ── Tabular numbers ────────────────────────────────────────── */
+    .tabular {
+        font-variant-numeric: tabular-nums;
+    }
+
+    /* ── Truncation helpers ─────────────────────────────────────── */
+    .line-clamp-1 {
+        display: -webkit-box;
+        -webkit-line-clamp: 1;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+
+    .line-clamp-2 {
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+
+    /* ── Interaction helpers ────────────────────────────────────── */
+    .interactive {
+        cursor: pointer;
+        user-select: none;
+    }
+
+    .no-select {
+        user-select: none;
+    }
+
+    /* ── Safe grid ──────────────────────────────────────────────── */
+    .grid-auto-fill-sm {
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    }
+
+    .grid-auto-fill-md {
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    }
 }
 
 @layer components {
 
-    /* FM26-style tile — the fundamental building block.
-     NOTE: overflow-hidden is intentionally NOT set here.
-     It belongs on the inner animated div in expandable cards (Players.jsx)
-     so that pm-accent-border's glow box-shadow is not clipped. */
+    /* ══════════════════════════════════════════════════════════════
+     CORE SURFACE PRIMITIVES
+     ══════════════════════════════════════════════════════════════ */
+
+    /* pm-tile — the fundamental data card */
     .pm-tile {
-        @apply bg-pitch-800 border border-pitch-600 rounded-lg transition-all duration-200 cursor-pointer hover:border-pitch-500 hover:bg-pitch-750;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+        @apply bg-pitch-800 border border-pitch-600 rounded-lg transition-all duration-200 cursor-pointer;
+        box-shadow:
+            0 1px 3px rgba(0, 0, 0, 0.4),
+            0 1px 1px rgba(0, 0, 0, 0.3),
+            inset 0 1px 0 rgba(255, 255, 255, 0.03);
+        will-change: transform, box-shadow;
     }
 
     .pm-tile:hover {
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+        @apply border-pitch-500 bg-pitch-750;
+        box-shadow:
+            0 4px 12px rgba(0, 0, 0, 0.5),
+            0 2px 4px rgba(0, 0, 0, 0.3),
+            inset 0 1px 0 rgba(255, 255, 255, 0.04);
+        transform: translateY(-1px);
     }
 
-    /* FM26-style card — elevated surface for larger containers */
+    .pm-tile:active {
+        transform: translateY(0);
+    }
+
+    /* pm-card — elevated container for sections */
     .pm-card {
         @apply bg-pitch-800 border border-pitch-600 rounded-xl;
-        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+        box-shadow:
+            0 4px 16px rgba(0, 0, 0, 0.5),
+            0 1px 3px rgba(0, 0, 0, 0.3),
+            inset 0 1px 0 rgba(255, 255, 255, 0.03);
     }
 
-    /* Accent glow border — for selected/active tiles.
-     Requires pm-tile to NOT have overflow-hidden so the glow is visible. */
+    /* pm-card-elevated — for modals / popovers */
+    .pm-card-elevated {
+        @apply bg-pitch-750 border border-pitch-500 rounded-xl;
+        box-shadow:
+            0 8px 32px rgba(0, 0, 0, 0.6),
+            0 2px 8px rgba(0, 0, 0, 0.4),
+            inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    }
+
+    /* pm-accent-border — selected/active highlight ring */
     .pm-accent-border {
-        @apply border border-accent/30 rounded-lg;
-        box-shadow: 0 0 12px rgba(0, 212, 170, 0.12);
+        @apply border border-accent/40 rounded-lg;
+        box-shadow:
+            0 0 0 1px rgba(0, 212, 170, 0.15),
+            0 0 16px rgba(0, 212, 170, 0.12),
+            0 4px 12px rgba(0, 0, 0, 0.4);
     }
 
-    /* Section label — FM26's small-caps category header */
+    .pm-accent-border:hover {
+        @apply border-accent/60;
+        box-shadow:
+            0 0 0 1px rgba(0, 212, 170, 0.25),
+            0 0 24px rgba(0, 212, 170, 0.18),
+            0 6px 16px rgba(0, 0, 0, 0.5);
+    }
+
+    /* pm-inset — sunken input/code surfaces */
+    .pm-inset {
+        @apply bg-pitch-900 border border-pitch-700 rounded-md;
+        box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.4);
+    }
+
+    /* ══════════════════════════════════════════════════════════════
+     TYPOGRAPHY
+     ══════════════════════════════════════════════════════════════ */
+
+    /* pm-label — section header, uppercase, tracked */
     .pm-label {
-        @apply text-[10px] font-medium tracking-[1.6px] uppercase text-pitch-400;
+        @apply text-[10px] font-semibold tracking-[1.8px] uppercase text-pitch-400;
+        font-feature-settings: "ss01";
     }
 
-    /* Stat bar — FM26-style attribute bar */
-    .pm-stat-bar {
-        @apply h-[3px] rounded-full bg-pitch-600 overflow-hidden;
+    /* pm-number — all numeric/stat values */
+    .pm-number {
+        @apply font-mono font-medium tabular-nums;
+        font-variant-numeric: tabular-nums lining-nums;
     }
 
-    .pm-stat-bar-fill {
-        @apply h-full rounded-full transition-all duration-700 ease-out;
+    /* pm-display — Bebas Neue team codes / hero values */
+    .pm-display {
+        font-family: "Bebas Neue", sans-serif;
+        letter-spacing: 0.1em;
+        line-height: 1;
     }
 
-    /* Badge — small label pill */
+    /* ══════════════════════════════════════════════════════════════
+     INTERACTIVE ELEMENTS
+     ══════════════════════════════════════════════════════════════ */
+
+    /* pm-badge — status pill / tag */
     .pm-badge {
-        @apply text-[10px] font-medium tracking-wide px-2 py-0.5 rounded;
+        @apply text-[10px] font-semibold tracking-wide px-2 py-0.5 rounded;
+        font-variant-numeric: tabular-nums;
     }
 
-    /* Navigation button */
+    /* pm-btn — primary action button */
+    .pm-btn {
+        @apply flex items-center gap-1.5 px-4 py-2 rounded-md text-sm font-medium bg-accent/15 text-accent border border-accent/30 hover:bg-accent/25 hover:border-accent/50 active:bg-accent/20 active:scale-[0.98] transition-all duration-150;
+    }
+
+    /* pm-btn-ghost — secondary action */
+    .pm-btn-ghost {
+        @apply flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium text-pitch-400 border border-pitch-600 hover:text-pitch-200 hover:border-pitch-500 hover:bg-pitch-700 active:scale-[0.98] transition-all duration-150;
+    }
+
+    /* pm-btn-danger — destructive action */
+    .pm-btn-danger {
+        @apply flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium text-loss/80 border border-loss/20 hover:text-loss hover:border-loss/40 hover:bg-loss/5 transition-all duration-150;
+    }
+
+    /* pm-nav-btn — top navigation item */
     .pm-nav-btn {
-        @apply flex items-center gap-1.5 px-3 py-2 rounded-md text-sm text-pitch-300 transition-all duration-150 hover:text-pitch-100 hover:bg-pitch-700;
+        @apply flex items-center gap-1.5 px-3 py-2 rounded-md text-pitch-400 hover:text-pitch-100 hover:bg-pitch-700 transition-all duration-150 no-select;
+        font-size: 12px;
+        font-weight: 500;
     }
 
     .pm-nav-btn.active {
-        @apply text-accent bg-accent/10;
+        @apply text-accent bg-accent/10 border border-accent/20;
     }
 
-    /* Mono number — used for all stats, odds, P&L */
-    .pm-number {
-        @apply font-mono font-medium tabular-nums;
+    /* pm-tab — tab switcher button */
+    .pm-tab {
+        @apply px-4 py-2 rounded-md text-sm font-medium bg-pitch-800 text-pitch-400 border border-pitch-600 hover:border-pitch-500 hover:text-pitch-300 transition-all duration-150;
     }
 
-    /* W/L/D result square */
+    .pm-tab.active {
+        @apply bg-accent/15 text-accent border-accent/30;
+        box-shadow: 0 0 12px rgba(0, 212, 170, 0.1);
+    }
+
+    /* pm-input — form inputs */
+    .pm-input {
+        @apply w-full bg-pitch-750 border border-pitch-600 rounded-md px-3 py-2 text-sm text-pitch-200 placeholder:text-pitch-500 focus:outline-none focus:border-accent/50 focus:bg-pitch-700 transition-all duration-150;
+        box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.3);
+    }
+
+    .pm-input:hover:not(:focus) {
+        @apply border-pitch-500;
+    }
+
+    /* pm-select — dropdown */
+    .pm-select {
+        @apply pm-input cursor-pointer appearance-none;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23546480' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 10px center;
+        padding-right: 2rem;
+    }
+
+    /* ══════════════════════════════════════════════════════════════
+     DATA VISUALIZATION PRIMITIVES
+     ══════════════════════════════════════════════════════════════ */
+
+    /* pm-stat-bar — FM26-style attribute bar */
+    .pm-stat-bar {
+        @apply h-[3px] rounded-full bg-pitch-600 overflow-hidden relative;
+    }
+
+    .pm-stat-bar-fill {
+        @apply h-full rounded-full;
+        transition: width 0.7s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    }
+
+    /* pm-progress — taller bar for big metrics */
+    .pm-progress {
+        @apply h-1.5 rounded-full bg-pitch-700 overflow-hidden;
+    }
+
+    .pm-progress-fill {
+        @apply h-full rounded-full;
+        transition: width 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    /* pm-result — W/L/D result square */
     .pm-result {
         @apply w-5 h-5 rounded-sm text-[9px] font-bold flex items-center justify-center;
+    }
+
+    /* ══════════════════════════════════════════════════════════════
+     SKELETON ANIMATION
+     ══════════════════════════════════════════════════════════════ */
+
+    .pm-skeleton {
+        @apply bg-pitch-700 rounded;
+        background: linear-gradient(90deg,
+                #252d3d 0%,
+                #2e3a50 40%,
+                #252d3d 80%);
+        background-size: 200% 100%;
+        animation: shimmer 1.6s ease-in-out infinite;
+    }
+
+    /* ══════════════════════════════════════════════════════════════
+     LIVE INDICATOR
+     ══════════════════════════════════════════════════════════════ */
+
+    .pm-live-dot {
+        @apply w-1.5 h-1.5 rounded-full bg-win inline-block;
+        animation: live-pulse 2s ease-in-out infinite;
+    }
+
+    .pm-live-badge {
+        @apply pm-badge bg-win/10 text-win border border-win/25 flex items-center gap-1;
+    }
+
+    /* ══════════════════════════════════════════════════════════════
+     DIVIDERS
+     ══════════════════════════════════════════════════════════════ */
+
+    .pm-divider {
+        @apply h-px bg-pitch-700 my-3;
+    }
+
+    .pm-divider-v {
+        @apply w-px h-5 bg-pitch-600;
+    }
+
+    /* ══════════════════════════════════════════════════════════════
+     TOOLTIP
+     ══════════════════════════════════════════════════════════════ */
+
+    .pm-tooltip {
+        @apply absolute z-50 px-2.5 py-1.5 rounded-md text-[11px] text-pitch-100 bg-pitch-700 border border-pitch-500 pointer-events-none whitespace-nowrap;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+    }
+
+    /* ══════════════════════════════════════════════════════════════
+     TABLE
+     ══════════════════════════════════════════════════════════════ */
+
+    .pm-table {
+        @apply w-full text-sm;
+    }
+
+    .pm-table thead tr {
+        @apply border-b border-pitch-600;
+    }
+
+    .pm-table th {
+        @apply px-3 py-2.5 text-left pm-label font-semibold;
+    }
+
+    .pm-table tbody tr {
+        @apply border-b border-pitch-700 hover:bg-pitch-750 transition-colors duration-100;
+    }
+
+    .pm-table tbody td {
+        @apply px-3 py-2.5;
+    }
+
+    /* ══════════════════════════════════════════════════════════════
+     SCROLLABLE WRAPPER
+     ══════════════════════════════════════════════════════════════ */
+
+    .pm-scroll-x {
+        @apply overflow-x-auto scrollbar-none;
+        /* Fade edges on overflow */
+        mask-image: linear-gradient(to right, transparent 0, black 12px, black calc(100% - 12px), transparent 100%);
+        -webkit-mask-image: linear-gradient(to right, transparent 0, black 12px, black calc(100% - 12px), transparent 100%);
+        padding-left: 12px;
+        padding-right: 12px;
+    }
+
+    /* ══════════════════════════════════════════════════════════════
+     KEYFRAMES
+     ══════════════════════════════════════════════════════════════ */
+
+    @keyframes shimmer {
+        0% {
+            background-position: 200% 0;
+        }
+
+        100% {
+            background-position: -200% 0;
+        }
+    }
+
+    @keyframes live-pulse {
+
+        0%,
+        100% {
+            opacity: 0.5;
+            transform: scale(1);
+        }
+
+        50% {
+            opacity: 1;
+            transform: scale(1.2);
+        }
+    }
+
+    @keyframes float-up {
+        from {
+            opacity: 0;
+            transform: translateY(6px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    @keyframes score-pop {
+        0% {
+            transform: scale(1);
+        }
+
+        40% {
+            transform: scale(1.12);
+        }
+
+        100% {
+            transform: scale(1);
+        }
+    }
+
+    @keyframes border-glow {
+
+        0%,
+        100% {
+            border-color: rgba(0, 212, 170, 0.3);
+            box-shadow: 0 0 10px rgba(0, 212, 170, 0.1);
+        }
+
+        50% {
+            border-color: rgba(0, 212, 170, 0.6);
+            box-shadow: 0 0 20px rgba(0, 212, 170, 0.2);
+        }
+    }
+
+    /* ══════════════════════════════════════════════════════════════
+     PRINT STYLES
+     ══════════════════════════════════════════════════════════════ */
+
+    @media print {
+
+        .pm-tile,
+        .pm-card {
+            box-shadow: none;
+            border: 1px solid #2e3a50;
+        }
+
+        nav {
+            display: none;
+        }
     }
 }
