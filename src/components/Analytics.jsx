@@ -22,7 +22,7 @@ import {
 import { useStandings, usePlayers } from "../api";
 import { FreshnessTag, RowSkeleton, ErrorState, EmptyState } from "./ui";
 import { signed } from "../utils";
-import { TrendingUp, BarChart2, Zap, Award, Info } from "lucide-react";
+import { TrendingUp, BarChart2, Zap, Award, Info, Star } from "lucide-react";
 
 // ─── Animation presets ────────────────────────────────────────
 const container = { hidden: {}, show: { transition: { staggerChildren: 0.04 } } };
