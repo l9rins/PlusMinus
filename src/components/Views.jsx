@@ -4,7 +4,7 @@ import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip,
 } from "recharts";
 import { TEAM_NAMES, ODDS_GAMES } from "../data";
-import { useStandings, useTodayGames } from "../api";
+import { useStandings, useTodayGames, useOdds, mergeOddsIntoGames } from "../api";
 import { calcPL, BET_STORAGE_KEY } from "../utils";
 import { TileSkeleton, RowSkeleton, ErrorState, FreshnessTag } from "./ui";
 
@@ -17,7 +17,9 @@ const item = {
 // ── SCORES ────────────────────────────────────────────────────
 export function Scores() {
   const [selected, setSelected] = useState(null);
-  const { data: games, isLoading, isError, isFetching, refetch, dataUpdatedAt } = useTodayGames();
+  const { data: rawGames, isLoading, isError, isFetching, refetch, dataUpdatedAt } = useTodayGames();
+  const { data: oddsData } = useOdds();
+  const games = useMemo(() => mergeOddsIntoGames(rawGames, oddsData), [rawGames, oddsData]);
 
   const today = new Date().toLocaleDateString("en-US", {
     weekday: "long", month: "long", day: "numeric",

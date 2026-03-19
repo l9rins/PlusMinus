@@ -1,17 +1,20 @@
 // ─── PlusMinus API Layer ──────────────────────────────────────
 // All data fetching lives here. Components import hooks, not raw data.
 //
-// API: BallDontLie v1 (free tier)
-// Docs: https://www.balldontlie.io/home.html
+// APIs:
+//   1. BallDontLie v1 (free tier) — scores, standings, player stats
+//      Docs: https://www.balldontlie.io/home.html
+//   2. The Odds API v4 (free tier, 500 req/month) — moneyline odds
+//      Docs: https://the-odds-api.com/liveapi/guides/v4/
 //
 // Setup:
-//   1. Sign up at balldontlie.io → get your API key
-//   2. Create a .env file in your project root:
-//        VITE_BDLAPI_KEY=your_key_here
-//   3. npm run dev — Vite injects VITE_* vars at build time
+//   1. Create a .env file in your project root:
+//        VITE_BDLAPI_KEY=your_balldontlie_key
+//        VITE_ODDS_API_KEY=your_odds_api_key
+//   2. npm run dev — Vite injects VITE_* vars at build time
 //
 // Netlify:
-//   Site settings → Environment variables → Add VITE_BDLAPI_KEY
+//   Site settings → Environment variables → Add both keys
 
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -20,6 +23,7 @@ import {
     TODAY_GAMES as GAMES_FALLBACK,
     PLAYERS as PLAYERS_FALLBACK,
 } from "./data";
+import { oddsToImplied } from "./utils";
 
 const API_KEY = import.meta.env.VITE_BDLAPI_KEY;
 const BASE = "https://api.balldontlie.io/v1";
@@ -85,9 +89,8 @@ export function useStandings() {
 
 // ─── TODAY'S GAMES ────────────────────────────────────────────
 // BallDontLie /games returns game status, scores, and teams.
-// Win probability is not available in the free tier — we keep
-// a rough home-court-advantage prior (home 58%, away 42%) as
-// a placeholder until you add The Odds API.
+// Win probabilities come from The Odds API (separate hook, separate cadence).
+// Default 42/58 home-court prior until odds are merged via mergeOddsIntoGames().
 
 function reshapeGames(raw) {
     return raw.map(g => {
@@ -110,8 +113,8 @@ function reshapeGames(raw) {
             id: String(g.id),
             away: g.visitor_team.abbreviation,
             home: g.home_team.abbreviation,
-            awayP: 42,                // placeholder — replace with Odds API
-            homeP: 58,                // placeholder — replace with Odds API
+            awayP: 42,                // default — overridden by mergeOddsIntoGames
+            homeP: 58,                // default — overridden by mergeOddsIntoGames
             time,
             status: isFinal ? "final" : isLive ? "live" : "scheduled",
             awayScore: isFinal || isLive ? g.visitor_team_score : null,
@@ -132,6 +135,105 @@ export function useTodayGames() {
         staleTime: 1000 * 60 * 2,
         refetchInterval: 1000 * 60 * 2,
         placeholderData: GAMES_FALLBACK,
+    });
+}
+
+// ─── ODDS API ─────────────────────────────────────────────────
+// The Odds API (free tier: 500 requests/month)
+// Returns moneyline odds for scheduled NBA games.
+//
+// ⚠️  RATE LIMIT DESIGN:
+//   Lines move slowly pre-game and don't exist mid-game or post-game.
+//   15-minute refresh is plenty — do NOT match the 2-minute game cadence.
+//   At 15-min intervals: ~96 requests/day during heavy usage.
+//   Comfortable margin within the 500/month free budget.
+//
+// Setup: Add VITE_ODDS_API_KEY=your_key to .env
+// Get a free key at https://the-odds-api.com
+
+const ODDS_API_KEY = import.meta.env.VITE_ODDS_API_KEY;
+export const HAS_ODDS_KEY = !!ODDS_API_KEY;
+
+// The Odds API returns full team names. Map to 3-letter abbreviations.
+const ODDS_TEAM_MAP = {
+    "Atlanta Hawks": "ATL",       "Boston Celtics": "BOS",
+    "Brooklyn Nets": "BKN",       "Charlotte Hornets": "CHA",
+    "Chicago Bulls": "CHI",       "Cleveland Cavaliers": "CLE",
+    "Dallas Mavericks": "DAL",    "Denver Nuggets": "DEN",
+    "Detroit Pistons": "DET",     "Golden State Warriors": "GSW",
+    "Houston Rockets": "HOU",     "Indiana Pacers": "IND",
+    "Los Angeles Clippers": "LAC", "Los Angeles Lakers": "LAL",
+    "Memphis Grizzlies": "MEM",   "Miami Heat": "MIA",
+    "Milwaukee Bucks": "MIL",     "Minnesota Timberwolves": "MIN",
+    "New Orleans Pelicans": "NOP", "New York Knicks": "NYK",
+    "Oklahoma City Thunder": "OKC", "Orlando Magic": "ORL",
+    "Philadelphia 76ers": "PHI",  "Phoenix Suns": "PHX",
+    "Portland Trail Blazers": "POR", "Sacramento Kings": "SAC",
+    "San Antonio Spurs": "SAS",   "Toronto Raptors": "TOR",
+    "Utah Jazz": "UTA",           "Washington Wizards": "WAS",
+};
+
+export function useOdds() {
+    return useQuery({
+        queryKey: ["odds", todayStr()],
+        queryFn: async () => {
+            if (!ODDS_API_KEY) throw new Error("VITE_ODDS_API_KEY not set");
+            const url = `https://api.the-odds-api.com/v4/sports/basketball_nba/odds`
+                + `?apiKey=${ODDS_API_KEY}&regions=us&markets=h2h&oddsFormat=american`;
+            const res = await fetch(url);
+            if (!res.ok) throw new Error(`Odds API ${res.status}`);
+            const events = await res.json();
+
+            // Build a lookup: { "ATL@DAL": { awayP, homeP } }
+            // Uses first bookmaker's h2h odds for each event.
+            const lookup = {};
+            for (const ev of events) {
+                const home = ODDS_TEAM_MAP[ev.home_team];
+                const away = ODDS_TEAM_MAP[ev.away_team];
+                if (!home || !away) continue;
+
+                const market = ev.bookmakers?.[0]?.markets?.find(m => m.key === "h2h");
+                if (!market) continue;
+
+                const homeOutcome = market.outcomes.find(o => ODDS_TEAM_MAP[o.name] === home);
+                const awayOutcome = market.outcomes.find(o => ODDS_TEAM_MAP[o.name] === away);
+                if (!homeOutcome || !awayOutcome) continue;
+
+                // Convert American odds → implied probability, then normalize to remove vig
+                const rawHomeP = oddsToImplied(homeOutcome.price);
+                const rawAwayP = oddsToImplied(awayOutcome.price);
+                const total = rawHomeP + rawAwayP;
+
+                lookup[`${away}@${home}`] = {
+                    homeP: +(rawHomeP / total * 100).toFixed(1),
+                    awayP: +(rawAwayP / total * 100).toFixed(1),
+                };
+            }
+            return lookup;
+        },
+        staleTime: 1000 * 60 * 15,
+        refetchInterval: 1000 * 60 * 15,
+        enabled: !!ODDS_API_KEY,
+    });
+}
+
+/**
+ * Merge odds data into game tiles.
+ * Odds only exist for scheduled games — live/final games keep defaults.
+ *
+ * @param {Array} games  - From useTodayGames().data
+ * @param {Object} odds  - From useOdds().data (lookup map, may be undefined)
+ * @returns {Array} Games with real awayP/homeP where available
+ */
+export function mergeOddsIntoGames(games, odds) {
+    if (!games) return games;
+    if (!odds) return games;
+    return games.map(g => {
+        if (g.status !== "scheduled") return g;
+        const key = `${g.away}@${g.home}`;
+        const match = odds[key];
+        if (!match) return g;
+        return { ...g, awayP: match.awayP, homeP: match.homeP };
     });
 }
 

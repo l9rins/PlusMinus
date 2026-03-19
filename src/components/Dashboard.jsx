@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from "react";
 import { motion } from "framer-motion";
 import { TrendingUp, TrendingDown, Target, BarChart2, Zap, ChevronRight } from "lucide-react";
 import { TEAM_NAMES, ODDS_GAMES } from "../data";
-import { useStandings, useTodayGames } from "../api";
+import { useStandings, useTodayGames, useOdds, mergeOddsIntoGames } from "../api";
 import { calcPL, BET_STORAGE_KEY } from "../utils";
 import { TileSkeleton, RowSkeleton, ErrorState, FreshnessTag, NoApiKey } from "./ui";
 
@@ -144,12 +144,14 @@ const HAS_API_KEY = !!import.meta.env.VITE_BDLAPI_KEY;
 export default function Dashboard({ onNavigate }) {
     const games = useTodayGames();
     const standings = useStandings();
+    const { data: oddsData } = useOdds();
 
     const today = new Date().toLocaleDateString("en-US", {
         month: "long", day: "numeric", year: "numeric",
     });
 
-    const gameList = games.data || [];
+    const rawGameList = games.data || [];
+    const gameList = useMemo(() => mergeOddsIntoGames(rawGameList, oddsData) || [], [rawGameList, oddsData]);
     const eastList = standings.data?.east || [];
     const westList = standings.data?.west || [];
     const liveCount = gameList.filter(g => g.status === "live").length;
