@@ -224,12 +224,136 @@ export function Standings() {
 
 // ── BETTING ───────────────────────────────────────────────────
 export function Betting() {
+  const { data: rawGames } = useTodayGames();
+  const { data: oddsData, isFetching: oddsFetching, dataUpdatedAt: oddsUpdatedAt } = useOdds();
+  const { data: standingsData, isFetching: standingsFetching } = useStandings();
+
+  // Build live edge cards from odds + standings data.
+  // modelP = favourite's win% from standings (proxy, not a full model).
+  // impliedP = vig-removed market implied probability from The Odds API.
+  // Minimum 10-game threshold: don't show edge for teams with thin sample.
+  const liveEdges = useMemo(() => {
+    if (!oddsData || !standingsData || !rawGames) return null;
+
+    const allTeams = [...(standingsData.east || []), ...(standingsData.west || [])];
+    const teamPct = {};
+    allTeams.forEach(t => { teamPct[t.team] = { pct: t.pct, games: t.w + t.l }; });
+
+    const edges = [];
+    const scheduled = (rawGames || []).filter(g => g.status === "scheduled");
+
+    for (const game of scheduled) {
+      const key = `${game.away}@${game.home}`;
+      const odds = oddsData[key];
+      if (!odds) continue;
+
+      // Determine favourite from market odds
+      const fav = odds.homeP >= odds.awayP ? game.home : game.away;
+      const impliedP = Math.max(odds.homeP, odds.awayP);
+
+      // modelP: favourite's season win% scaled to probability
+      // Guard: minimum 10 games played or modelP is null
+      const favStats = teamPct[fav];
+      const totalGames = favStats?.games || 0;
+      const modelP = totalGames >= 10
+        ? +(favStats.pct * 100).toFixed(1)
+        : null;
+
+      const diff = modelP !== null ? +(modelP - impliedP).toFixed(1) : null;
+      const edge = diff !== null
+        ? (diff >= 10 ? "high" : diff >= 5 ? "mid" : "low")
+        : "none";
+
+      edges.push({
+        matchup: `${game.away} @ ${game.home}`,
+        fav,
+        modelP,
+        impliedP: +impliedP.toFixed(1),
+        diff,
+        edge,
+        spread: game.spread,
+        total: game.total,
+      });
+    }
+
+    // Sort: high edges first, then mid, then low, then none
+    const order = { high: 0, mid: 1, low: 2, none: 3 };
+    return edges.sort((a, b) => order[a.edge] - order[b.edge]);
+  }, [oddsData, standingsData, rawGames]);
+
+  // Use live edges when available, fall back to static ODDS_GAMES
+  const edgeCards = liveEdges && liveEdges.length > 0 ? liveEdges : null;
+  const isLive = !!edgeCards;
+
   return (
     <motion.div variants={container} initial="hidden" animate="show">
-      <div className="pm-label mb-3">Model vs market · Tonight's edges</div>
+      <div className="flex items-center justify-between mb-3">
+        <div className="pm-label">
+          {isLive ? "Model vs market · Tonight's edges" : "Model vs market · Sample edges"}
+        </div>
+        <FreshnessTag
+          isFetching={oddsFetching || standingsFetching}
+          dataUpdatedAt={oddsUpdatedAt}
+        />
+      </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
-        {ODDS_GAMES.map(g => {
+        {isLive ? edgeCards.map(g => {
+          const edgeColor =
+            g.edge === "high" ? "text-win border-win/30 bg-win/10" :
+              g.edge === "mid" ? "text-draw border-draw/30 bg-draw/10" :
+                g.edge === "none" ? "text-pitch-600 border-pitch-700 bg-pitch-800" :
+                  "text-pitch-400 border-pitch-600 bg-pitch-700";
+
+          const edgeLabel =
+            g.edge === "high" ? "★ EDGE" :
+              g.edge === "mid" ? "MOD" :
+                g.edge === "none" ? "N/A" : "SMALL";
+
+          return (
+            <motion.div key={g.matchup} variants={item} className="pm-tile p-4">
+              <div className="flex items-start justify-between mb-3">
+                <div>
+                  <div className="text-sm font-medium text-pitch-100">{g.matchup}</div>
+                  <div className="text-[10px] text-pitch-400 mt-0.5">
+                    Favourite: <span className="text-accent">{g.fav}</span>
+                    {g.edge === "none" && (
+                      <span className="text-pitch-600 ml-1">· insufficient data</span>
+                    )}
+                  </div>
+                </div>
+                <span className={`pm-badge border ${edgeColor}`}>
+                  {edgeLabel}
+                </span>
+              </div>
+
+              <div className="space-y-1.5 mb-3">
+                <div className="flex justify-between text-[11px]">
+                  <span className="text-pitch-400">Model prob</span>
+                  <span className="font-mono text-pitch-100">
+                    {g.modelP !== null ? `${g.modelP}%` : "—"}
+                  </span>
+                </div>
+                <div className="flex justify-between text-[11px]">
+                  <span className="text-pitch-400">Market implied</span>
+                  <span className="font-mono text-pitch-300">{g.impliedP}%</span>
+                </div>
+                <div className="flex justify-between text-[11px]">
+                  <span className="text-pitch-400">Edge</span>
+                  <span className={`font-mono font-medium
+                    ${g.diff === null ? "text-pitch-600" : g.diff >= 10 ? "text-win" : g.diff >= 5 ? "text-draw" : "text-pitch-400"}`}>
+                    {g.diff !== null ? `${g.diff > 0 ? "+" : ""}${g.diff}%` : "—"}
+                  </span>
+                </div>
+              </div>
+
+              <div className="border-t border-pitch-600 pt-3 flex justify-between text-[10px] text-pitch-500">
+                <span>{g.spread}</span>
+                <span>O/U {g.total}</span>
+              </div>
+            </motion.div>
+          );
+        }) : ODDS_GAMES.map(g => {
           const diff = g.modelP - g.impliedP;
           const edgeColor =
             g.edge === "high" ? "text-win border-win/30 bg-win/10" :
@@ -279,9 +403,20 @@ export function Betting() {
 
       <div className="pm-card p-4 text-[11px] text-pitch-400 leading-relaxed">
         <span className="text-pitch-200 font-medium">How edges are calculated: </span>
-        Model win% uses logistic regression on net rating, season W%, last-10 form, rest days, and home court.
-        Market implied probability converts American moneyline odds. A difference ≥10% is flagged as a high edge.
-        This is not financial advice — always bet responsibly.
+        {isLive ? (
+          <>
+            Model win% is a proxy derived from each team's season win percentage (minimum 10 games required).
+            Market implied probability is computed from live American moneyline odds via The Odds API, with vig removed.
+            A model-vs-market difference ≥10% is flagged as a high edge, ≥5% as moderate.
+            This is a directional signal, not a sophisticated model — always bet responsibly.
+          </>
+        ) : (
+          <>
+            Sample data shown — add VITE_ODDS_API_KEY to .env for live market odds.
+            Model win% uses season W% as a proxy. Market implied probability converts American moneyline odds.
+            A difference ≥10% is flagged as a high edge. This is not financial advice — always bet responsibly.
+          </>
+        )}
       </div>
     </motion.div>
   );
