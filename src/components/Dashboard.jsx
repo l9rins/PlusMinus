@@ -5,9 +5,9 @@ import {
     Zap, ChevronRight, Activity, DollarSign, Flame, Shield,
 } from "lucide-react";
 import { TEAM_NAMES, ODDS_GAMES, TEAM_COLORS } from "../data";
-import { useStandings, useTodayGames, useOdds, mergeOddsIntoGames, useServerConfig } from "../api";
+import { useStandings, useTodayGames, useOdds, mergeOddsIntoGames } from "../api";
 import { calcPL, BET_STORAGE_KEY, lsGet, kellyBet, DEFAULT_BANKROLL, formatCurrency } from "../utils";
-import { TileSkeleton, RowSkeleton, ErrorState, FreshnessTag, NoApiKey, Tooltip } from "./ui";
+import { TileSkeleton, RowSkeleton, ErrorState, FreshnessTag, Tooltip } from "./ui";
 
 const container = { hidden: {}, show: { transition: { staggerChildren: 0.04, delayChildren: 0.05 } } };
 const tile = { hidden: { opacity: 0, y: 14, scale: 0.98 }, show: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.28, ease: [0.25, 0.46, 0.45, 0.94] } } };
@@ -59,7 +59,7 @@ function GameTile({ game }) {
                 <div className="mb-2.5">
                     <div className="flex justify-between text-[9px] text-pitch-600 mb-1"><span>{game.away}</span><span>{game.home}</span></div>
                     <div className="h-1.5 rounded-full bg-pitch-700 overflow-hidden relative">
-                        <motion.div className="h-full rounded-full absolute top-0 left-0" style={{ background: awayColor, opacity: 0.85 }} initial={{ width: 0 }} animate={{ width: `${game.awayP}%` }} transition={{ duration: 0.8, ease: [0.25, 0.46, 0.45, 0.94] }} />
+                        <motion.div className="h-full rounded-full absolute top-0 left-0" style={{ background: awayColor, opacity: 0.85 }} initial={{ width: 0 }} animate={{ width: `${game.awayP}%` }} transition={{ duration: 0.8 }} />
                     </div>
                 </div>
             )}
@@ -118,7 +118,6 @@ function SummaryTile({ label, value, sub, icon: Icon, trend, color, onClick, bad
 }
 
 function KellyTile({ topEdge }) {
-    // kellyBet(winProb, american, bankroll) → dollar amount
     const kelly = kellyBet(topEdge.modelP / 100, -110, DEFAULT_BANKROLL);
     return (
         <motion.div variants={tile} className="pm-tile p-4">
@@ -142,19 +141,16 @@ function readBetStats() {
         const wins = bets.filter(b => b.result === "win").length;
         const losses = bets.filter(b => b.result === "loss").length;
         const pending = bets.filter(b => b.result === "pending").length;
-        // calcPL(stake, odds, result) — matches utils.js signature
         const pl = bets.reduce((s, b) => s + calcPL(b.stake, b.odds, b.result), 0);
         return { total: bets.length, wins, losses, pending, pl };
     } catch { return { total: 0, wins: 0, losses: 0, pending: 0, pl: 0 }; }
 }
 
 export default function Dashboard({ onNavigate }) {
+    // Games and standings now use ESPN (no key needed) — no hasBdl gate
     const games = useTodayGames();
     const standings = useStandings();
     const { data: oddsData } = useOdds();
-    // useServerConfig replaces VITE_BDLAPI_KEY check — key lives server-side now
-    const { data: serverConfig } = useServerConfig();
-    const hasBdlKey = serverConfig?.hasBdl ?? false;
 
     const today = new Date().toLocaleDateString("en-US", { weekday: "short", month: "long", day: "numeric", year: "numeric" });
     const rawGameList = games.data || [];
@@ -208,9 +204,7 @@ export default function Dashboard({ onNavigate }) {
                     <div className="pm-label">Today's Games{liveCount > 0 && <span className="ml-2 pm-badge bg-win/10 text-win border border-win/20 inline-flex items-center gap-1"><span className="pm-live-dot" />{liveCount} live</span>}</div>
                     <button onClick={() => onNavigate("scores")} className="flex items-center gap-1 text-[10px] text-pitch-500 hover:text-accent transition-colors">View all <ChevronRight size={10} /></button>
                 </div>
-                {!hasBdlKey ? (
-                    <NoApiKey service="BallDontLie" envVar="BDL_API_KEY" url="https://www.balldontlie.io" />
-                ) : games.isError ? (
+                {games.isError ? (
                     <ErrorState message="Couldn't load today's games." onRetry={() => games.refetch()} type="network" />
                 ) : games.isLoading ? (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">{Array.from({ length: 6 }).map((_, i) => <TileSkeleton key={i} lines={4} />)}</div>
@@ -229,7 +223,7 @@ export default function Dashboard({ onNavigate }) {
                         <div className="pm-label">Standings</div>
                         <button onClick={() => onNavigate("standings")} className="text-[10px] text-pitch-500 hover:text-accent transition-colors flex items-center gap-0.5">Full table <ChevronRight size={10} /></button>
                     </div>
-                    {!hasBdlKey ? <NoApiKey service="BallDontLie" envVar="BDL_API_KEY" url="https://www.balldontlie.io" /> : standings.isError ? <ErrorState message="Couldn't load standings." onRetry={() => standings.refetch()} /> : standings.isLoading ? <RowSkeleton rows={8} /> : (
+                    {standings.isError ? <ErrorState message="Couldn't load standings." onRetry={() => standings.refetch()} /> : standings.isLoading ? <RowSkeleton rows={8} /> : (
                         <div className="space-y-4">
                             <MiniStandings teams={eastList} conf="Eastern" onNavigate={onNavigate} />
                             <div className="pm-divider" />
