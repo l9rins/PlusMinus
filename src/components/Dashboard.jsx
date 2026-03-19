@@ -198,32 +198,18 @@ export default function Dashboard({ onNavigate }) {
         if (oddsData && Object.keys(oddsData).length > 0) {
             const cards = Object.entries(oddsData).map(([key, o]) => {
                 const [away, home] = key.split("@");
-                return {
-                    matchup: `${away} @ ${home}`,
-                    fav: o.homeP >= o.awayP ? home : away,
-                    modelP: Math.max(o.homeP, o.awayP),
-                    impliedP: Math.min(o.homeP, o.awayP),
-                };
+                return { matchup: `${away} @ ${home}`, fav: o.homeP >= o.awayP ? home : away, modelP: Math.max(o.homeP, o.awayP), impliedP: Math.min(o.homeP, o.awayP) };
             });
-            return cards.reduce((best, g) =>
-                (g.modelP - g.impliedP) > (best.modelP - best.impliedP) ? g : best
-            );
+            return cards.reduce((best, g) => (g.modelP - g.impliedP) > (best.modelP - best.impliedP) ? g : best);
         }
-        return ODDS_GAMES.reduce((best, g) =>
-            (g.modelP - g.impliedP) > (best.modelP - best.impliedP) ? g : best
-        );
+        return ODDS_GAMES.reduce((best, g) => (g.modelP - g.impliedP) > (best.modelP - best.impliedP) ? g : best);
     }, [oddsData]);
 
     const bestProb = useMemo(() => {
         if (oddsData && Object.keys(oddsData).length > 0) {
             const cards = Object.entries(oddsData).map(([key, o]) => {
                 const [away, home] = key.split("@");
-                return {
-                    matchup: `${away} @ ${home}`,
-                    fav: o.homeP >= o.awayP ? home : away,
-                    modelP: Math.max(o.homeP, o.awayP),
-                    impliedP: Math.min(o.homeP, o.awayP),
-                };
+                return { matchup: `${away} @ ${home}`, fav: o.homeP >= o.awayP ? home : away, modelP: Math.max(o.homeP, o.awayP), impliedP: Math.min(o.homeP, o.awayP) };
             });
             return cards.reduce((best, g) => g.modelP > best.modelP ? g : best);
         }

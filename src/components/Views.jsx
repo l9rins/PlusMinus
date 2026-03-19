@@ -447,9 +447,9 @@ const DEMO_BETS = [
 function loadBets() {
   try {
     const raw = localStorage.getItem(BET_STORAGE_KEY);
-    if (raw === null) return DEMO_BETS;          // first visit — show demo
+    if (raw === null) return DEMO_BETS;
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : DEMO_BETS;  // respect empty array
+    return Array.isArray(parsed) ? parsed : DEMO_BETS;
   } catch {
     return DEMO_BETS;
   }
