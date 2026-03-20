@@ -18,9 +18,9 @@ import {
 import {
   EAST_STANDINGS, WEST_STANDINGS, PLAYERS, TEAM_NAMES, TEAM_COLORS,
 } from "../data";
-import { useStandings, useLeagueTeamStats, useLeaguePlayerStats } from "../api";
+import { useStandings, useLeagueTeamStats, useEnrichedPlayerStats } from "../api";
 import { FreshnessTag, RowSkeleton, ErrorState } from "./ui";
-import { signed, reshapeNBAStats } from "../utils";
+import { signed } from "../utils";
 import { TrendingUp, BarChart2, Zap, Award, Info, Star, Trophy } from "lucide-react";
 import PlayoffBracket from "./PlayoffBracket";
 
@@ -576,7 +576,8 @@ function ShotQualityView({ data }) {
         Profiles aggregate all rostered players per team with ≥10 games played.
         Scoring scales to 32 PPG, Playmaking to 11 APG, Rebounding to 13 RPG,
         Efficiency uses TS% above 50%, Offense uses O-RTG above 105, Defense uses D-RTG below 125.
-        Stats sourced live from the NBA Stats API (leaguedashplayerstats).
+        Stats sourced live from the NBA Stats API (leaguedashplayerstats base + MeasureType=Advanced).
+        Efficiency rating uses PIE (Player Impact Estimate). Positions from commonallplayers.
         Click two teams to overlay their polygons.
       </MethodologyNote>
     </motion.div>
@@ -692,7 +693,7 @@ export default function Analytics() {
   });
   const { data: standingsData, isLoading, isError, isFetching, refetch, dataUpdatedAt } = useStandings();
   const { data: nbaTeamStats } = useLeagueTeamStats();
-  const { data: nbaPlayerStats } = useLeaguePlayerStats();
+  const { data: enrichedPlayers } = useEnrichedPlayerStats();
 
   const fourFactors = useMemo(() => {
     if (!nbaTeamStats) return [];
@@ -714,26 +715,7 @@ export default function Analytics() {
     })).sort((a, b) => b.netRtg - a.netRtg);
   }, [nbaTeamStats]);
 
-  const realPlayers = useMemo(() => {
-    if (!nbaPlayerStats) return PLAYERS;
-    const rows = reshapeNBAStats(nbaPlayerStats, "LeagueDashPlayerStats");
-    return rows
-      .filter(r => r.GP >= 10)
-      .map(r => ({
-        id: r.PLAYER_ID,
-        name: r.PLAYER_NAME,
-        pos: "—",
-        team: r.TEAM_ABBREVIATION,
-        age: r.AGE,
-        pts: +r.PTS.toFixed(1),
-        ast: +r.AST.toFixed(1),
-        reb: +r.REB.toFixed(1),
-        ts: r.TS_PCT != null ? +(r.TS_PCT * 100).toFixed(1) : null,
-        per: null, bpm: null, vorp: null,
-        ortg: null, drtg: null,
-        form: null,
-      }));
-  }, [nbaPlayerStats]);
+  const realPlayers = enrichedPlayers ?? PLAYERS;
 
   const eloData = useMemo(() => standingsData ? computeElo(standingsData) : [], [standingsData]);
   const shotData = useMemo(() => computeShotQuality(realPlayers), [realPlayers]);
