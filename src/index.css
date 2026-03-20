@@ -1,4 +1,3 @@
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -28,11 +27,98 @@
   }
 
   html.light {
-    filter: invert(1) hue-rotate(180deg);
+    --theme-accent:     #007a63;
+    --theme-accent-rgb: 0, 122, 99;
+
+    /* Surface colors — inverted pitch palette */
+    --light-bg:         #f0f4f8;
+    --light-card:       #ffffff;
+    --light-border:     #d0dae6;
+    --light-text-1:     #0d1420;
+    --light-text-2:     #2a3a50;
+    --light-text-3:     #546480;
+    --light-text-4:     #7d91ab;
   }
 
-  html.light img, html.light video, html.light svg {
-    filter: invert(1) hue-rotate(180deg);
+  /* Re-map pitch scale under .light so every pm-* component
+     automatically picks up the new values without touching JSX */
+  html.light body {
+    background-color: #f0f4f8;
+    color: #0d1420;
+  }
+
+  /* Cards and tiles */
+  html.light .pm-card,
+  html.light .pm-tile {
+    background-color: #ffffff;
+    border-color: #d0dae6;
+  }
+
+  html.light .pm-tile:hover {
+    background-color: #f5f8fb;
+    border-color: #b0bfcf;
+  }
+
+  /* Navigation */
+  html.light nav.glass-strong {
+    background: rgba(255, 255, 255, 0.92);
+    border-bottom-color: #d0dae6;
+  }
+
+  /* Inputs and selects */
+  html.light .pm-input,
+  html.light .pm-select {
+    background-color: #f5f8fb;
+    border-color: #c0cdd9;
+    color: #0d1420;
+  }
+
+  html.light .pm-input::placeholder {
+    color: #7d91ab;
+  }
+
+  /* Text tones */
+  html.light .text-pitch-50  { color: #0d1420; }
+  html.light .text-pitch-100 { color: #1a2535; }
+  html.light .text-pitch-200 { color: #253345; }
+  html.light .text-pitch-300 { color: #374f68; }
+  html.light .text-pitch-400 { color: #546480; }
+  html.light .text-pitch-500 { color: #6a7f9a; }
+  html.light .text-pitch-600 { color: #8fa3b8; }
+  html.light .text-pitch-700 { color: #b0bfcf; }
+
+  /* Background tones */
+  html.light .bg-pitch-700  { background-color: #e2eaf2; }
+  html.light .bg-pitch-750  { background-color: #eaf0f6; }
+  html.light .bg-pitch-800  { background-color: #ffffff; }
+  html.light .bg-pitch-900  { background-color: #f0f4f8; }
+
+  /* Border tones */
+  html.light .border-pitch-600 { border-color: #d0dae6; }
+  html.light .border-pitch-700 { border-color: #dce5ef; }
+
+  /* Skeletons */
+  html.light .pm-skeleton {
+    background: linear-gradient(90deg, #dce5ef 0%, #e8f0f8 40%, #dce5ef 80%);
+  }
+
+  /* Scrollbars */
+  html.light ::-webkit-scrollbar-thumb { background: #b0bfcf; }
+  html.light ::-webkit-scrollbar-thumb:hover { background: #8fa3b8; }
+
+  /* Charts — recharts SVG text nodes don't inherit CSS classes
+     so we override the hardcoded fill colors here */
+  html.light .recharts-cartesian-axis-tick text,
+  html.light .recharts-label { fill: #546480; }
+  html.light .recharts-cartesian-grid line { stroke: #dce5ef; }
+  html.light .recharts-reference-line line { stroke: #c0cdd9; }
+
+  /* Backdrop blur surfaces */
+  html.light .glass {
+    background: rgba(240, 244, 248, 0.85);
+  }
+  html.light .glass-strong {
+    background: rgba(255, 255, 255, 0.95);
   }
 
   body {

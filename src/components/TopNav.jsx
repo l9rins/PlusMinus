@@ -9,12 +9,12 @@ import {
 
 // ── Nav definition ────────────────────────────────────────────────
 const NAV_ITEMS = [
-  { label: "Dashboard", icon: LayoutDashboard, path: "/",          sub: null },
+  { label: "Dashboard", icon: LayoutDashboard, path: "/", sub: null },
   {
     label: "Scores", icon: Target, path: "/scores",
     sub: [
-      { label: "Tonight's Games",    path: "/scores",    desc: "Live + scheduled matchups" },
-      { label: "Win Probabilities",  path: "/scores",    desc: "Model vs market" },
+      { label: "Tonight's Games", path: "/scores", desc: "Live + scheduled matchups" },
+      { label: "Win Probabilities", path: "/scores", desc: "Model vs market" },
     ],
   },
   {
@@ -27,25 +27,25 @@ const NAV_ITEMS = [
   {
     label: "Players", icon: Users, path: "/players",
     sub: [
-      { label: "Browse Roster",   path: "/players", desc: "Top 30 by stat category" },
+      { label: "Browse Roster", path: "/players", desc: "Top 30 by stat category" },
       { label: "Compare Players", path: "/players", desc: "Side-by-side advanced metrics" },
     ],
   },
   {
     label: "Betting", icon: TrendingUp, path: "/betting",
     sub: [
-      { label: "Edge Finder",  path: "/betting", desc: "Model vs market · multi-book" },
-      { label: "Bet Tracker",  path: "/tracker", desc: "Log, track, and analyze bets" },
+      { label: "Edge Finder", path: "/betting", desc: "Model vs market · multi-book" },
+      { label: "Bet Tracker", path: "/tracker", desc: "Log, track, and analyze bets" },
     ],
   },
   {
     label: "Analytics", icon: Activity, path: "/analytics",
     sub: [
-      { label: "Power Index",    path: "/analytics", desc: "Composite team rankings" },
-      { label: "Four Factors",   path: "/analytics", desc: "Dean Oliver efficiency model" },
-      { label: "Elo Ratings",    path: "/analytics", desc: "Power rankings & trajectory" },
-      { label: "Shot Quality",   path: "/analytics", desc: "Radar profiles & comparison" },
-      { label: "Playoff Sim",    path: "/analytics?tab=playoff", desc: "Monte Carlo bracket odds" },
+      { label: "Power Index", path: "/analytics", desc: "Composite team rankings" },
+      { label: "Four Factors", path: "/analytics", desc: "Dean Oliver efficiency model" },
+      { label: "Elo Ratings", path: "/analytics", desc: "Power rankings & trajectory" },
+      { label: "Shot Quality", path: "/analytics", desc: "Radar profiles & comparison" },
+      { label: "Playoff Sim", path: "/analytics?tab=playoff", desc: "Monte Carlo bracket odds" },
     ],
   },
 ];
@@ -165,7 +165,7 @@ function MobileDrawer({ open, onClose, activePath, onNavigate }) {
             <div className="px-4 py-3 border-t border-pitch-700">
               <div className="pm-label mb-2">Keyboard shortcuts</div>
               <div className="grid grid-cols-2 gap-1">
-                {[["D","Dashboard"],["S","Scores"],["L","Standings"],["P","Players"],["B","Betting"],["A","Analytics"]].map(([k, t]) => (
+                {[["D", "Dashboard"], ["S", "Scores"], ["L", "Standings"], ["P", "Players"], ["B", "Betting"], ["A", "Analytics"]].map(([k, t]) => (
                   <div key={k} className="flex items-center gap-2 text-[10px] text-pitch-500">
                     <kbd className="bg-pitch-700 border border-pitch-600 rounded px-1.5 py-0.5
                                     font-mono text-pitch-300">{k}</kbd>
@@ -183,15 +183,15 @@ function MobileDrawer({ open, onClose, activePath, onNavigate }) {
 
 // ── Main TopNav ───────────────────────────────────────────────────
 export default function TopNav({ activeTab, onTabChange }) {
-  const navigate   = useNavigate();
-  const location   = useLocation();
+  const navigate = useNavigate();
+  const location = useLocation();
   const [hoveredItem, setHoveredItem] = useState(null);
-  const [searchOpen, setSearchOpen]   = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [mobileOpen, setMobileOpen]   = useState(false);
-  const [notifOpen, setNotifOpen]     = useState(false);
-  const [isLight, setIsLight]         = useState(false);
-  const timeoutRef     = useRef(null);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [isLight, setIsLight] = useState(false);
+  const timeoutRef = useRef(null);
   const searchInputRef = useRef(null);
 
   useEffect(() => {
@@ -405,9 +405,9 @@ export default function TopNav({ activeTab, onTabChange }) {
                       </div>
                       <div className="px-4 py-3 space-y-2.5">
                         {[
-                          { icon: Zap,        text: "OKC vs BKN tips off in 2h",       time: "Now", color: "text-accent" },
-                          { icon: TrendingUp, text: "New high-edge bet identified",     time: "15m", color: "text-win"  },
-                          { icon: Activity,   text: "Live game: PHX leads LAL 87–82",  time: "32m", color: "text-draw" },
+                          { icon: Zap, text: "OKC vs BKN tips off in 2h", time: "Now", color: "text-accent" },
+                          { icon: TrendingUp, text: "New high-edge bet identified", time: "15m", color: "text-win" },
+                          { icon: Activity, text: "Live game: PHX leads LAL 87–82", time: "32m", color: "text-draw" },
                         ].map((n, i) => (
                           <div key={i} className="flex items-start gap-2.5 cursor-pointer group">
                             <div className={`w-7 h-7 rounded-md bg-pitch-700 flex items-center

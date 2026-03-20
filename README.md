@@ -121,7 +121,8 @@ PlusMinus/
 │   ├── api.js          # All React Query hooks: useStandings, useTodayGames, useOdds,
 │   │                   #   usePlayers, usePlayerSearch, useTeamSchedule, useServerConfig
 │   ├── data.js         # Static fallback — 30 teams, 30 players, sample odds, TEAM_COLORS
-│   ├── index.css       # Design system — pm-tile, pm-card, pm-badge, pitch palette, tier colors
+│   ├── index.css       # Design system — pm-tile, pm-card, pm-badge, pitch palette,
+│   │                   #   tier colors, light mode CSS variable overrides
 │   ├── utils.js        # Pure functions — calcPL, kellyBet, currentSeason, oddsToImplied,
 │   │                   #   breakEven, lsGet/lsSet, formatCurrency, todayStr, formatShortDate
 │   ├── utils.test.js   # Vitest unit tests covering all utility functions
