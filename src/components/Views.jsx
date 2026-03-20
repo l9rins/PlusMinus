@@ -886,7 +886,7 @@ const RESULT_OPTIONS = [
 ];
 
 export function BetTracker() {
-  const { bets: savedBets, isLoading: betsLoading, saveBets } = useBets();
+  const { bets: savedBets, isLoading: betsLoading, saveBets, isSaving, saveError } = useBets();
   const [bets,         setBets]         = useState([]);
   const [form,         setForm]         = useState({
     game: "", type: "Moneyline", pick: "", odds: "", stake: "", result: "pending",
@@ -1056,13 +1056,22 @@ export function BetTracker() {
         )}
 
         <div className="flex items-center gap-3">
-          <button onClick={addBet} className="pm-btn">
-            <Plus size={13} strokeWidth={1.8} /> Add bet
+          <button onClick={addBet} disabled={isSaving} className="pm-btn disabled:opacity-50 disabled:cursor-not-allowed">
+            {isSaving
+              ? <><Loader size={13} strokeWidth={1.8} className="animate-spin" /> Saving...</>
+              : <><Plus size={13} strokeWidth={1.8} /> Add bet</>
+            }
           </button>
           {formError && (
             <motion.span initial={{ opacity: 0, x: -4 }} animate={{ opacity: 1, x: 0 }}
               className="text-[11px] text-loss">
               {formError}
+            </motion.span>
+          )}
+          {saveError && (
+            <motion.span initial={{ opacity: 0, x: -4 }} animate={{ opacity: 1, x: 0 }}
+              className="text-[11px] text-loss">
+              Save failed: {saveError}
             </motion.span>
           )}
         </div>

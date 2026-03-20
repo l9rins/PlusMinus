@@ -9,7 +9,7 @@
 //   Bets           → Vercel KV via /api/bets      (Clerk JWT auth)
 //   Elo            → /api/elo                     (server-side, 1hr cache)
 import { useMemo } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@clerk/clerk-react";
 import {
     EAST_STANDINGS as EAST_FALLBACK,
@@ -533,6 +533,7 @@ export function useBets() {
     queryKey: ["bets"],
     queryFn: async () => {
       const token = await getToken();
+      if (!token) throw new Error("Not authenticated");
       const res = await fetch("/api/bets", {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -542,18 +543,30 @@ export function useBets() {
     staleTime: Infinity,
   });
 
-  const saveBets = async (bets) => {
-    const token = await getToken();
-    await fetch("/api/bets", {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify(bets),
-    });
-    queryClient.invalidateQueries({ queryKey: ["bets"] });
-  };
+  const mutation = useMutation({
+    mutationFn: async (bets) => {
+      const token = await getToken();
+      if (!token) throw new Error("Not authenticated");
+      const res = await fetch("/api/bets", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(bets),
+      });
+      if (!res.ok) throw new Error("Failed to save bets");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["bets"] });
+    },
+  });
 
-  return { bets: query.data ?? [], isLoading: query.isLoading, saveBets };
+  return {
+    bets:     query.data ?? [],
+    isLoading: query.isLoading,
+    isSaving:  mutation.isPending,
+    saveError: mutation.error?.message ?? null,
+    saveBets:  mutation.mutateAsync,
+  };
 }

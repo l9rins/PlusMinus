@@ -125,14 +125,17 @@ export const currentSeason = () => {
   return month >= 10 ? year : year - 1;
 };
 
-/** "2025-11-14" in local timezone */
+/** "2025-11-14" in US Eastern Time (prevents rollover during late NBA games) */
 export const todayStr = () => {
-  const d = new Date();
-  return [
-    d.getFullYear(),
-    String(d.getMonth() + 1).padStart(2, "0"),
-    String(d.getDate()).padStart(2, "0"),
-  ].join("-");
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York",
+    year: "numeric", month: "2-digit", day: "2-digit",
+  });
+  const parts = formatter.formatToParts(new Date());
+  const yr = parts.find(p => p.type === "year").value;
+  const mo = parts.find(p => p.type === "month").value;
+  const da = parts.find(p => p.type === "day").value;
+  return `${yr}-${mo}-${da}`;
 };
 
 /** "Nov 14" */
