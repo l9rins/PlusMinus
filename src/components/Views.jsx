@@ -58,6 +58,7 @@ export function Scores() {
 
   const today = new Date().toLocaleDateString("en-US", {
     weekday: "long", month: "long", day: "numeric",
+    timeZone: "America/New_York",
   });
 
   const filtered = useMemo(() => {
@@ -470,7 +471,9 @@ export function Standings() {
                         <span className={`pm-badge
                           ${t.streak?.startsWith("W")
                             ? "bg-win/10 text-win border border-win/20"
-                            : "bg-loss/10 text-loss border border-loss/20"}`}>
+                            : t.streak?.startsWith("L")
+                            ? "bg-loss/10 text-loss border border-loss/20"
+                            : "bg-pitch-750 text-pitch-500 border-pitch-600"}`}>
                           {t.streak}
                         </span>
                       </td>
@@ -580,7 +583,9 @@ export function Betting() {
       // Arb opportunities always first
       if (a.isArb && !b.isArb) return -1;
       if (!a.isArb && b.isArb) return 1;
-      return order[a.edge] - order[b.edge];
+      const catDiff = order[a.edge] - order[b.edge];
+      if (catDiff !== 0) return catDiff;
+      return (b.diff ?? 0) - (a.diff ?? 0);
     });
   }, [oddsData, standingsData, rawGames]);
 

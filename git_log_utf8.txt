@@ -1,0 +1,20 @@
+﻿e78daff Fix timezone mismatch: Lock cosmetic date to ET in Dashboard
+fd92755 Fix Dashboard topEdge calculation crash on undefined consensus market probabilities
+ba6690b Final review pass: Added PWA manifest, updated line shopping UI warnings
+66c29bb Implement final app improvements (TeamLink, Bet editing, KV cache, Fallback state flags, Null model edge drops)
+2644523 Fix UI loose ends: analytics dependencies, tooltip leaks, dead topnav button, and elo API bottleneck
+dda58f0 Fix dashboard edge cases, bet tracker errors, playoff simulation bugs, and add API payload limits
+dc64cef fix: Vercel routing block for API calls, import Loader in Views
+b11e7e9 fix: todayStr timezone to ET, useBets useMutation with error/loading states
+5318783 fix: remove sharp-cli, fix workbox navigateFallback regex for PWA build
+fbe34af fix: increase NBA Stats cache TTL to 30min, reduce timeout to 7s
+5eb5210 chore: remap dev server port to 3055
+6f42b7d fix: move registerSW import to top of main.jsx per ES module convention
+06ebb7c feat: PWA ΓÇö installable app with service worker, offline shell, manifest
+dfb3c35 fix: elo retry resilience with exponential backoff; update api.js header comment
+b8f99ce chore: remove dead imports, BPM/VORP AttrBar rows, usePlayers static hook
+70cefe8 feat: lazy usePlayerGameLog ΓÇö real last-5 form strip on card expand
+5c7b1f0 fix: correct game pairing in Elo computation using matchup opponent field
+9da51c7 feat: real game-log Elo via api/elo.js with server-side stagger + 1hr edge cache
+560c00f fix: wire Dashboard bet stats to KV via useBets, remove stale localStorage reads
+9f0ba6b docs: add README with setup, env vars, architecture overview
