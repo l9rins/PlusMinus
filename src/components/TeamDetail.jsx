@@ -66,24 +66,28 @@ function ResultBadge({ result }) {
 
 // ── Form strip ────────────────────────────────────────────────────
 function FormStrip({ games }) {
-    const last10 = [...games].filter(g => g.result).reverse().slice(0, 10);
-    if (!last10.length) return null;
-    return (
-        <div className="flex items-center gap-1">
-            {last10.map((g, i) => (
-                <motion.div
-                    key={g.id}
-                    initial={{ opacity: 0, scale: 0.6 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ delay: i * 0.04 }}
-                    className={`w-5 h-5 rounded flex items-center justify-center text-[9px] font-bold
-            ${g.result === "W" ? "bg-win/15 text-win border border-win/30" : "bg-loss/15 text-loss border border-loss/30"}`}
-                >
-                    {g.result}
-                </motion.div>
-            ))}
-        </div>
-    );
+  // games is already pastGames which is schedule.filter(result).reverse() (newest first)
+  // just slice the first 10 — do NOT reverse again
+  const last10 = games.slice(0, 10);
+  if (!last10.length) return null;
+  return (
+    <div className="flex items-center gap-1">
+      {last10.map((g, i) => (
+        <motion.div
+          key={g.id}
+          initial={{ opacity: 0, scale: 0.6 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: i * 0.04 }}
+          className={`w-5 h-5 rounded flex items-center justify-center text-[9px] font-bold
+            ${g.result === "W"
+              ? "bg-win/15 text-win border border-win/30"
+              : "bg-loss/15 text-loss border border-loss/30"}`}
+        >
+          {g.result}
+        </motion.div>
+      ))}
+    </div>
+  );
 }
 
 // ── Stat tile ─────────────────────────────────────────────────────

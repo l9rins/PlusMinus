@@ -117,21 +117,28 @@ function SummaryTile({ label, value, sub, icon: Icon, trend, color, onClick, bad
     );
 }
 
+// ── Fixed KellyTile — uses real odds from the top edge game ──
 function KellyTile({ topEdge, bankroll }) {
-    const kelly = kellyBet(topEdge.modelP / 100, -110, bankroll);
-    return (
-        <motion.div variants={tile} className="pm-tile p-4">
-            <div className="flex items-start justify-between mb-2.5">
-                <div className="pm-label">Kelly Bet Size</div>
-                <div className="w-7 h-7 rounded-md bg-pitch-750 border border-pitch-600 flex items-center justify-center"><DollarSign size={13} strokeWidth={1.8} className="text-pitch-400" /></div>
-            </div>
-            <div className="pm-number text-3xl text-pitch-50">{kelly > 0 ? formatCurrency(kelly) : "—"}</div>
-            <div className="flex items-center gap-1.5 mt-2">
-                <Shield size={10} className="text-pitch-500 flex-shrink-0" />
-                <span className="text-[11px] text-pitch-500">½-Kelly · {topEdge.matchup}</span>
-            </div>
-        </motion.div>
-    );
+  // Use the actual best available odds, fall back to -110 standard juice
+  const odds = topEdge.bestFavOdds ?? -110;
+  const kelly = kellyBet(topEdge.modelP / 100, odds, bankroll);
+  return (
+    <motion.div variants={tile} className="pm-tile p-4">
+      <div className="flex items-start justify-between mb-2.5">
+        <div className="pm-label">Kelly Bet Size</div>
+        <div className="w-7 h-7 rounded-md bg-pitch-750 border border-pitch-600 flex items-center justify-center">
+          <DollarSign size={13} strokeWidth={1.8} className="text-pitch-400" />
+        </div>
+      </div>
+      <div className="pm-number text-3xl text-pitch-50">{kelly > 0 ? formatCurrency(kelly) : "—"}</div>
+      <div className="flex items-center gap-1.5 mt-2">
+        <Shield size={10} className="text-pitch-500 flex-shrink-0" />
+        <span className="text-[11px] text-pitch-500">
+          ½-Kelly · {topEdge.matchup} · {odds > 0 ? `+${odds}` : odds}
+        </span>
+      </div>
+    </motion.div>
+  );
 }
 
 function readBetStats() {
@@ -177,13 +184,31 @@ export default function Dashboard({ onNavigate }) {
         }
     }, [handleStorage]);
 
-    const topEdge = useMemo(() => {
-        if (oddsData && Object.keys(oddsData).length > 0) {
-            const cards = Object.entries(oddsData).map(([key, o]) => { const [away, home] = key.split("@"); return { matchup: `${away} @ ${home}`, fav: o.homeP >= o.awayP ? home : away, modelP: Math.max(o.homeP, o.awayP), impliedP: Math.min(o.homeP, o.awayP) }; });
-            return cards.reduce((best, g) => (g.modelP - g.impliedP) > (best.modelP - best.impliedP) ? g : best, { matchup: "—", fav: "—", modelP: 0, impliedP: 0 });
-        }
-        return ODDS_GAMES.reduce((best, g) => (g.modelP - g.impliedP) > (best.modelP - best.impliedP) ? g : best);
-    }, [oddsData]);
+  const topEdge = useMemo(() => {
+    if (oddsData && Object.keys(oddsData).length > 0) {
+      const cards = Object.entries(oddsData).map(([key, o]) => {
+        const [away, home] = key.split("@");
+        // Determine which side is the model's favorite
+        const favIsHome = o.homeP >= o.awayP;
+        const modelP = favIsHome ? o.homeP : o.awayP;
+        // The market's vig-removed implied probability for THAT SAME SIDE
+        const marketP = favIsHome ? o.consHomeP : o.consAwayP;
+        const bestFavOdds = favIsHome ? o.bestHomeOdds : o.bestAwayOdds;
+        return {
+          matchup: `${away} @ ${home}`,
+          fav: favIsHome ? home : away,
+          modelP,
+          impliedP: marketP,   // now actually the market's probability for the same side
+          bestFavOdds,
+          edge: modelP - marketP,
+        };
+      });
+      return cards.reduce((best, g) => g.edge > best.edge ? g : best,
+        { matchup: "—", fav: "—", modelP: 0, impliedP: 0, bestFavOdds: null, edge: 0 });
+    }
+    // Fallback to static ODDS_GAMES
+    return ODDS_GAMES.reduce((best, g) => (g.modelP - g.impliedP) > (best.modelP - best.impliedP) ? g : best);
+  }, [oddsData]);
 
     const bestProb = useMemo(() => {
         if (oddsData && Object.keys(oddsData).length > 0) {

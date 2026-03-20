@@ -1,8 +1,12 @@
 import { EAST_STANDINGS, WEST_STANDINGS, TEAM_NAMES, TEAM_COLORS } from "../data.js";
 
+// Simple seeded LCG — safe 32-bit arithmetic only
 function makeLCG(seed) {
-  let s = seed >>> 0;
-  return () => { s = (Math.imul(1664525, s) + 1013904223) >>> 0; return s / 4294967296; };
+  let s = (seed ^ 0xdeadbeef) >>> 0;
+  return () => {
+    s = Math.imul(1664525, s) + 1013904223 >>> 0;
+    return s / 4294967296;
+  };
 }
 
 const SIMS = 10_000;
@@ -12,21 +16,32 @@ function eloWinP(eloA, eloB, home = false) {
   return 1 / (1 + Math.pow(10, -(eloA - eloB + (home ? HOME_BUMP : 0)) / 400));
 }
 
+// Single game (play-in uses this)
+function simGame(eloA, eloB, home, rng) {
+  return rng() < eloWinP(eloA, eloB, home);
+}
+
+// Best-of-7 series
 function simSeries(eloA, eloB, rng) {
   let wA = 0, wB = 0, g = 0;
   const home = [true, true, false, false, true, false, true];
-  while (wA < 4 && wB < 4) { rng() < eloWinP(eloA, eloB, home[g++]) ? wA++ : wB++; }
+  while (wA < 4 && wB < 4) {
+    rng() < eloWinP(eloA, eloB, home[g++]) ? wA++ : wB++;
+  }
   return wA === 4;
 }
 
 self.onmessage = (e) => {
   const { standings, eloData } = e.data;
-  
+
   const buildSeeds = conf => conf.slice(0, 10).map((t, i) => {
-    const e = eloData.find(x => x.team === t.team);
+    const ed = eloData.find(x => x.team === t.team);
     return {
-      team: t.team, name: TEAM_NAMES[t.team] || t.team, color: TEAM_COLORS[t.team] || "#546480",
-      elo: e?.elo ?? (1500 + (t.pct - 0.5) * 400), seed: i + 1, pct: t.pct, w: t.w, l: t.l
+      team: t.team,
+      name: TEAM_NAMES[t.team] || t.team,
+      color: TEAM_COLORS[t.team] || "#546480",
+      elo: ed?.elo ?? Math.round(1500 + (t.pct - 0.5) * 400),
+      seed: i + 1, pct: t.pct, w: t.w, l: t.l,
     };
   });
 
@@ -36,13 +51,17 @@ self.onmessage = (e) => {
   const counts = {};
   all.forEach(t => { counts[t.team] = { pi: 0, r1: 0, r2: 0, conf: 0, finals: 0, champ: 0 }; });
 
+  // Play-in: single elimination games (not best-of-7)
   function simPlayIn(seeds, rng) {
     const [s7, s8, s9, s10] = seeds.slice(6, 10);
     [s7, s8, s9, s10].forEach(t => counts[t.team].pi++);
-    const seed7 = simSeries(s7.elo, s8.elo, rng) ? s7 : s8;
+    // 7 vs 8: winner gets 7 seed
+    const seed7 = simGame(s7.elo, s8.elo, true, rng) ? s7 : s8;
     const loser78 = seed7 === s7 ? s8 : s7;
-    const w910 = simSeries(s9.elo, s10.elo, rng) ? s9 : s10;
-    const seed8 = simSeries(loser78.elo, w910.elo, rng) ? loser78 : w910;
+    // 9 vs 10: winner advances
+    const w910 = simGame(s9.elo, s10.elo, true, rng) ? s9 : s10;
+    // Loser of 7v8 vs winner of 9v10: winner gets 8 seed
+    const seed8 = simGame(loser78.elo, w910.elo, true, rng) ? loser78 : w910;
     return [seed7, seed8];
   }
 
@@ -51,6 +70,7 @@ self.onmessage = (e) => {
     const [pi7, pi8] = simPlayIn(seeds, rng);
     const bracket = [...direct, pi7, pi8];
     bracket.forEach(t => counts[t.team].r1++);
+    // R1: 1v8, 4v5, 3v6, 2v7
     const r2 = [[0, 7], [3, 4], [2, 5], [1, 6]].map(([a, b]) =>
       simSeries(bracket[a].elo, bracket[b].elo, rng) ? bracket[a] : bracket[b]
     );
@@ -66,7 +86,8 @@ self.onmessage = (e) => {
   }
 
   for (let i = 0; i < SIMS; i++) {
-    const rng = makeLCG(i * 6364136223846793 + 1442695040888963407);
+    // Safe 32-bit seed — no large integer precision loss
+    const rng = makeLCG(i * 1664525 + 1013904223);
     const eC = simConf(eastSeeds, rng);
     const wC = simConf(westSeeds, rng);
     const champ = simSeries(eC.elo, wC.elo, rng) ? eC : wC;

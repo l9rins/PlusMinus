@@ -64,6 +64,7 @@ export default async function handler(req, res) {
         const data = await upstream.json();
         res.setHeader("Cache-Control", `s-maxage=${ttl}, stale-while-revalidate=30`);
         res.setHeader("Content-Type", "application/json");
+        res.setHeader("Vary", "Origin"); // ← add this line
         return res.status(200).json(data);
 
     } catch (err) {

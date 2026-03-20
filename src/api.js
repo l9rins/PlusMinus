@@ -28,8 +28,9 @@ class ApiError extends Error {
 
 // ── Shared retry policy ───────────────────────────────────────────
 const shouldRetry = (count, err) => {
-    if ([401, 429, 503].includes(err?.status)) return false;
-    return count < 2;
+  // Don't retry auth failures, rate limits, misconfig, or timeouts
+  if ([401, 429, 503, 504].includes(err?.status)) return false;
+  return count < 2;
 };
 
 // ── ESPN proxy fetcher ────────────────────────────────────────────
@@ -78,13 +79,11 @@ async function oddsFetch(signal) {
 
 // ── Season logic ──────────────────────────────────────────────────
 function currentSeason() {
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = now.getMonth() + 1;
-    const day = now.getDate();
-    if (month >= 10 && day >= 15) return year;
-    if (month >= 10 && day < 15) return year - 1;
-    return year - 1;
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth() + 1;
+  // NBA season starts first week of October — use Oct 1 as cutover
+  return month >= 10 ? year : year - 1;
 }
 
 // ── Server config ─────────────────────────────────────────────────
@@ -173,7 +172,8 @@ function reshapeESPNScoreboard(data) {
         const time = status === "final" ? "Final" : detail;
         return {
             id: String(ev.id), away: awayAbbr, home: homeAbbr,
-            awayP: 42, homeP: 58,
+            awayP: null,   // ← was hardcoded 42
+            homeP: null,   // ← was hardcoded 58
             time, status, awayScore, homeScore, period,
             spread: "—", total: "—",
         };

@@ -542,6 +542,7 @@ export default function Players({ initialQuery = "" }) {
     isLoading: searchLoading,
     isFetching: searchFetching,
     isError: searchError,
+    refetch: searchRefetch,   // ← add this
   } = usePlayerSearch(debouncedQuery);
 
   const browsePlayers = useMemo(() =>
@@ -692,7 +693,7 @@ export default function Players({ initialQuery = "" }) {
       {isError ? (
         <ErrorState
           message={isSearchMode ? "Couldn't search players." : "Couldn't load player stats."}
-          onRetry={refetch}
+          onRetry={isSearchMode ? searchRefetch : refetch}   // ← was always `refetch`
         />
       ) : isLoading ? (
         <div className="space-y-2">

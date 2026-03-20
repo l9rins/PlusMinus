@@ -7,6 +7,7 @@
 //   5. Playoff Sim   — Monte Carlo bracket simulation (10,000 runs)
 
 import { useState, useMemo, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ResponsiveContainer, RadarChart, Radar, PolarGrid,
@@ -702,10 +703,11 @@ const TABS = [
 
 // ─── Main Analytics Component ─────────────────────────────────
 export default function Analytics() {
+  const [searchParams] = useSearchParams();
+  const VALID_TABS = ["power", "factors", "elo", "quality", "playoff"];
   const [activeTab, setActiveTab] = useState(() => {
-    const params = new URLSearchParams(window.location.search);
-    const tab = params.get("tab");
-    return ["power","factors","elo","quality","playoff"].includes(tab) ? tab : "power";
+    const tab = searchParams.get("tab");
+    return VALID_TABS.includes(tab) ? tab : "power";
   });
   const { data: standingsData, isLoading, isError, isFetching, refetch, dataUpdatedAt } = useStandings();
   const { data: playersData } = usePlayers();
