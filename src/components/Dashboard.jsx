@@ -78,12 +78,13 @@ function GameTile({ game }) {
     );
 }
 
-function MiniStandings({ teams, conf, onNavigate }) {
+function MiniStandings({ teams, conf }) {
+    const navigate = useNavigate();
     return (
         <div>
             <div className="flex items-center justify-between mb-2">
                 <div className="pm-label">{conf}</div>
-                <button onClick={() => onNavigate("standings")} className="text-[9px] text-pitch-500 hover:text-accent transition-colors flex items-center gap-0.5">Full <ChevronRight size={9} /></button>
+                <button onClick={() => navigate("/standings")} className="text-[9px] text-pitch-500 hover:text-accent transition-colors flex items-center gap-0.5">Full <ChevronRight size={9} /></button>
             </div>
             <div className="space-y-0">
                 {teams.slice(0, 8).map((t, i) => {
@@ -153,7 +154,7 @@ function KellyTile({ topEdge, bankroll }) {
 }
 
 
-export default function Dashboard({ onNavigate }) {
+export default function Dashboard() {
     const navigate = useNavigate();
     // Games and standings now use ESPN (no key needed) — no hasBdl gate
     const games = useTodayGames();
@@ -228,17 +229,17 @@ export default function Dashboard({ onNavigate }) {
                     <FreshnessTag isFetching={games.isFetching || standings.isFetching} dataUpdatedAt={games.dataUpdatedAt} />
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    <SummaryTile label="Games Today" value={gameCount || "—"} sub={gameCount === 0 ? "No games today" : liveCount > 0 ? `${liveCount} in progress` : "Tip-off tonight"} icon={Target} trend={liveCount > 0 ? "up" : null} badge={liveCount > 0 ? { label: "LIVE", cls: "bg-win/10 text-win border border-win/20" } : null} onClick={() => onNavigate("scores")} />
-                    <SummaryTile label="Top Model Edge" value={edgeDiff > 0 ? `+${edgeDiff.toFixed(1)}%` : "—"} sub={topEdge.matchup} icon={TrendingUp} trend="up" color={edgeDiff >= 10 ? "text-win" : edgeDiff >= 5 ? "text-draw" : "text-pitch-50"} onClick={() => onNavigate("betting")} />
-                    <SummaryTile label="Best Win Prob" value={bestProb.modelP > 0 ? `${bestProb.modelP}%` : "—"} sub={bestProb.fav !== "—" ? `${bestProb.fav} · ${bestProb.matchup}` : "No data"} icon={Zap} onClick={() => onNavigate("betting")} />
-                    <SummaryTile label="Net P&L" value={betStats.total > 0 ? formatCurrency(betStats.pl) : "—"} sub={betSub} icon={BarChart2} color={betStats.pl > 0 ? "text-win" : betStats.pl < 0 ? "text-loss" : "text-pitch-50"} trend={betStats.pl > 0 ? "up" : betStats.pl < 0 ? "down" : null} onClick={() => onNavigate("tracker")} />
+                    <SummaryTile label="Games Today" value={gameCount || "—"} sub={gameCount === 0 ? "No games today" : liveCount > 0 ? `${liveCount} in progress` : "Tip-off tonight"} icon={Target} trend={liveCount > 0 ? "up" : null} badge={liveCount > 0 ? { label: "LIVE", cls: "bg-win/10 text-win border border-win/20" } : null} onClick={() => navigate("/scores")} />
+                    <SummaryTile label="Top Model Edge" value={edgeDiff > 0 ? `+${edgeDiff.toFixed(1)}%` : "—"} sub={topEdge.matchup} icon={TrendingUp} trend="up" color={edgeDiff >= 10 ? "text-win" : edgeDiff >= 5 ? "text-draw" : "text-pitch-50"} onClick={() => navigate("/betting")} />
+                    <SummaryTile label="Best Win Prob" value={bestProb.modelP > 0 ? `${bestProb.modelP}%` : "—"} sub={bestProb.fav !== "—" ? `${bestProb.fav} · ${bestProb.matchup}` : "No data"} icon={Zap} onClick={() => navigate("/betting")} />
+                    <SummaryTile label="Net P&L" value={betStats.total > 0 ? formatCurrency(betStats.pl) : "—"} sub={betSub} icon={BarChart2} color={betStats.pl > 0 ? "text-win" : betStats.pl < 0 ? "text-loss" : "text-pitch-50"} trend={betStats.pl > 0 ? "up" : betStats.pl < 0 ? "down" : null} onClick={() => navigate("/tracker")} />
                 </div>
             </motion.div>
 
             <div className="col-span-12 lg:col-span-8">
                 <div className="flex items-center justify-between mb-2">
                     <div className="pm-label">Today's Games{liveCount > 0 && <span className="ml-2 pm-badge bg-win/10 text-win border border-win/20 inline-flex items-center gap-1"><span className="pm-live-dot" />{liveCount} live</span>}</div>
-                    <button onClick={() => onNavigate("scores")} className="flex items-center gap-1 text-[10px] text-pitch-500 hover:text-accent transition-colors">View all <ChevronRight size={10} /></button>
+                    <button onClick={() => navigate("/scores")} className="flex items-center gap-1 text-[10px] text-pitch-500 hover:text-accent transition-colors">View all <ChevronRight size={10} /></button>
                 </div>
                 {games.isError ? (
                     <ErrorState message="Couldn't load today's games." onRetry={() => games.refetch()} type="network" />
@@ -249,7 +250,7 @@ export default function Dashboard({ onNavigate }) {
                 ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"><AnimatePresence>{gameList.slice(0, 6).map(g => <GameTile key={g.id} game={g} />)}</AnimatePresence></div>
                 )}
-                {gameList.length > 6 && <button onClick={() => onNavigate("scores")} className="mt-3 w-full pm-btn-ghost text-center justify-center">+{gameList.length - 6} more games <ChevronRight size={13} /></button>}
+                {gameList.length > 6 && <button onClick={() => navigate("/scores")} className="mt-3 w-full pm-btn-ghost text-center justify-center">+{gameList.length - 6} more games <ChevronRight size={13} /></button>}
             </div>
 
             <div className="col-span-12 lg:col-span-4 space-y-3">
@@ -257,13 +258,13 @@ export default function Dashboard({ onNavigate }) {
                 <motion.div variants={tile} className="pm-card p-4">
                     <div className="flex items-center justify-between mb-3">
                         <div className="pm-label">Standings</div>
-                        <button onClick={() => onNavigate("standings")} className="text-[10px] text-pitch-500 hover:text-accent transition-colors flex items-center gap-0.5">Full table <ChevronRight size={10} /></button>
+                        <button onClick={() => navigate("/standings")} className="text-[10px] text-pitch-500 hover:text-accent transition-colors flex items-center gap-0.5">Full table <ChevronRight size={10} /></button>
                     </div>
                     {standings.isError ? <ErrorState message="Couldn't load standings." onRetry={() => standings.refetch()} /> : standings.isLoading ? <RowSkeleton rows={8} /> : (
                         <div className="space-y-4">
-                            <MiniStandings teams={eastList} conf="Eastern" onNavigate={onNavigate} />
+                            <MiniStandings teams={eastList} conf="Eastern" />
                             <div className="pm-divider" />
-                            <MiniStandings teams={westList} conf="Western" onNavigate={onNavigate} />
+                            <MiniStandings teams={westList} conf="Western" />
                         </div>
                     )}
                 </motion.div>
