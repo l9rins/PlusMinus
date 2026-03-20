@@ -13,7 +13,6 @@ import {
     EAST_STANDINGS as EAST_FALLBACK,
     WEST_STANDINGS as WEST_FALLBACK,
     TODAY_GAMES as GAMES_FALLBACK,
-    PLAYERS as PLAYERS_FALLBACK,
 } from "./data";
 import { todayStr, currentSeason, reshapeNBAStats } from "./utils";
 
@@ -476,15 +475,6 @@ export function mergeOddsIntoGames(games, odds) {
     });
 }
 
-// ── Players (static) ──────────────────────────────────────────────
-export function usePlayers() {
-    return useQuery({
-        queryKey: ["players", "static"],
-        queryFn: async () => PLAYERS_FALLBACK,
-        staleTime: Infinity,
-        placeholderData: PLAYERS_FALLBACK,
-    });
-}
 
 // ── Player search (BDL free endpoint) ────────────────────────────
 export function usePlayerSearch(query) {

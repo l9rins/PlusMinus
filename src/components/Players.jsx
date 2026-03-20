@@ -2,12 +2,12 @@ import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Search, SlidersHorizontal, ChevronDown, X, Loader,
-  GitCompare, TrendingUp, TrendingDown, Minus, Star,
-  BarChart2, Shield, Zap, Target, Award, ArrowUpDown,
+  GitCompare, TrendingUp, TrendingDown, Minus,
+  BarChart2, Zap, Target, ArrowUpDown,
 } from "lucide-react";
-import { TEAM_COLORS, TEAM_NAMES, PLAYERS } from "../data";
+import { TEAM_COLORS, TEAM_NAMES } from "../data";
 import { useEnrichedPlayerStats, usePlayerSearch, usePlayerGameLog } from "../api";
-import { signed, netRatingTier, formatPct } from "../utils";
+import { signed, netRatingTier } from "../utils";
 import { TileSkeleton, ErrorState, EmptyState } from "./ui";
 
 // ─── Constants ────────────────────────────────────────────────
@@ -368,8 +368,6 @@ function PlayerCard({ player, onCompare, comparePlayer, isComparing, sortKey, is
                     <div className="mt-2 space-y-0">
                       <AttrBar label="PER" value={player.per} max={35} compareValue={comparePlayer?.per} compareColor={cmpColor} />
                       <AttrBar label="TS%" value={player.ts} max={75} compareValue={comparePlayer?.ts} compareColor={cmpColor} />
-                      <AttrBar label="BPM" value={player.bpm} min={-5} max={12} isSigned compareValue={comparePlayer?.bpm} compareColor={cmpColor} />
-                      <AttrBar label="VORP" value={player.vorp} min={-2} max={9} isSigned compareValue={comparePlayer?.vorp} compareColor={cmpColor} />
                       <AttrBar label="O-RTG" value={player.ortg} min={100} max={135} compareValue={comparePlayer?.ortg} compareColor={cmpColor} />
                       <AttrBar label="D-RTG" value={player.drtg} min={100} max={125} invert compareValue={comparePlayer?.drtg} compareColor={cmpColor} />
                     </div>
@@ -401,7 +399,6 @@ function PlayerCard({ player, onCompare, comparePlayer, isComparing, sortKey, is
                         { lbl: "REB", val: player.reb, highlight: sortKey === "reb" },
                         { lbl: "PER", val: player.per, highlight: sortKey === "per" },
                         { lbl: "TS%", val: player.ts != null ? `${player.ts}%` : null, highlight: sortKey === "ts" },
-                        { lbl: "BPM", val: player.bpm != null ? signed(player.bpm) : null, highlight: sortKey === "bpm" },
                       ].map(s => (
                         <StatChip key={s.lbl} label={s.lbl} value={s.val} highlight={s.highlight} />
                       ))}
