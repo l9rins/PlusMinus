@@ -262,9 +262,10 @@ export function useOdds() {
     return useQuery({
         queryKey: ["odds", todayStr()],
         queryFn: ({ signal }) => oddsFetch(signal),
-        staleTime: 1000 * 60 * 15,
+        staleTime: 1000 * 60 * 15, // 15m
         refetchInterval: 1000 * 60 * 15,
         retry: shouldRetry,
+        placeholderData: {},
     });
 }
 

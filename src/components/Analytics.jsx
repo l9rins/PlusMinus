@@ -723,6 +723,10 @@ export default function Analytics() {
   const [playoffData, setPlayoffData] = useState([]);
   const [isSimulating, setIsSimulating] = useState(false);
 
+  const standingsKey = standingsData
+    ? `${standingsData.east?.length}-${standingsData.east?.[0]?.w}-${standingsData.west?.[0]?.w}`
+    : null;
+
   useEffect(() => {
     if (!standingsData || !eloData.length) return;
     setIsSimulating(true);
@@ -732,9 +736,14 @@ export default function Analytics() {
       setIsSimulating(false);
       worker.terminate();
     };
+    worker.onerror = (err) => {
+      console.error("[PlayoffWorker]", err);
+      setIsSimulating(false);
+      worker.terminate();
+    };
     worker.postMessage({ standings: standingsData, eloData });
     return () => worker.terminate();
-  }, [standingsData, eloData]);
+  }, [standingsKey]);
 
   const needsStandings = ["factors", "elo", "power", "playoff"].includes(activeTab);
 

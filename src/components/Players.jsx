@@ -536,6 +536,10 @@ export default function Players({ initialQuery = "" }) {
   const isSearchMode = debouncedQuery.trim().length >= 2;
   const isTyping = query.trim().length >= 2 && query !== debouncedQuery;
 
+  useEffect(() => {
+    if (isSearchMode) setComparePlayer(null);
+  }, [isSearchMode]);
+
   const { data: staticPlayers, isLoading: staticLoading, isError: staticError, refetch } = usePlayers();
   const {
     data: searchResults,

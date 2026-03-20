@@ -129,8 +129,10 @@ export const todayStr = () => {
 
 /** "Nov 14" */
 export const formatShortDate = (dateStr) => {
-  const d = new Date(dateStr + "T00:00:00");
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  const d = new Date(dateStr);
+  return d.toLocaleDateString("en-US", {
+    month: "short", day: "numeric", timeZone: "America/New_York",
+  });
 };
 
 /** ISO string → "7:30 PM ET" */

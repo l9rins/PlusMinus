@@ -350,12 +350,15 @@ export default function PlayoffBracket({ simData }) {
     const handleHover = (team, evt) => {
         setHovered(team);
         if (team && evt) {
+            const clientX = evt.clientX ?? evt.touches?.[0]?.clientX;
+            const clientY = evt.clientY ?? evt.touches?.[0]?.clientY;
+            if (clientX == null) return;
             const svgEl = evt.currentTarget?.closest("svg");
             if (svgEl) {
                 const rect = svgEl.getBoundingClientRect();
                 // position tooltip — try right side, flip left if too close to edge
-                const rawX = evt.clientX - rect.left + 8;
-                const rawY = evt.clientY - rect.top - 40;
+                const rawX = clientX - rect.left + 8;
+                const rawY = clientY - rect.top - 40;
                 setTooltipPos({
                     x: rawX + 150 > SVG_W ? rawX - 160 : rawX,
                     y: Math.max(0, rawY),

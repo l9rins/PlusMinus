@@ -24,13 +24,15 @@ const BetTracker = lazy(() => import("./components/Views").then(m => ({ default:
 export function useTeamTheme(teamAbbr) {
   useEffect(() => {
     const color = (teamAbbr && TEAM_COLORS[teamAbbr]) ? TEAM_COLORS[teamAbbr] : null;
-    if (!color) return;
-    document.documentElement.style.setProperty("--theme-accent", color);
-    const hex = color.replace("#", "");
-    const r = parseInt(hex.substring(0, 2), 16);
-    const g = parseInt(hex.substring(2, 4), 16);
-    const b = parseInt(hex.substring(4, 6), 16);
-    document.documentElement.style.setProperty("--theme-accent-rgb", `${r},${g},${b}`);
+    if (color) {
+      document.documentElement.style.setProperty("--theme-accent", color);
+      const hex = color.replace("#", "");
+      const r = parseInt(hex.substring(0, 2), 16);
+      const g = parseInt(hex.substring(2, 4), 16);
+      const b = parseInt(hex.substring(4, 6), 16);
+      document.documentElement.style.setProperty("--theme-accent-rgb", `${r},${g},${b}`);
+    }
+    // Always clean up on unmount regardless of whether color was set
     return () => {
       document.documentElement.style.setProperty("--theme-accent", "#00d4aa");
       document.documentElement.style.setProperty("--theme-accent-rgb", "0,212,170");
