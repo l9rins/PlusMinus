@@ -187,7 +187,7 @@ export default function Dashboard({ onNavigate }) {
         const favIsHome = o.homeP >= o.awayP;
         const modelP = favIsHome ? o.homeP : o.awayP;
         // The market's vig-removed implied probability for THAT SAME SIDE
-        const marketP = favIsHome ? o.consHomeP : o.consAwayP;
+        const marketP = (favIsHome ? o.consHomeP : o.consAwayP) ?? (favIsHome ? o.homeP : o.awayP);
         const bestFavOdds = favIsHome ? o.bestHomeOdds : o.bestAwayOdds;
         return {
           matchup: `${away} @ ${home}`,
@@ -195,7 +195,7 @@ export default function Dashboard({ onNavigate }) {
           modelP,
           impliedP: marketP,   // now actually the market's probability for the same side
           bestFavOdds,
-          edge: modelP - marketP,
+          edge: isNaN(modelP - marketP) ? 0 : modelP - marketP,
         };
       });
       return cards.reduce((best, g) => g.edge > best.edge ? g : best,
