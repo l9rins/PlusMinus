@@ -269,7 +269,7 @@ export default function Dashboard({ onNavigate }) {
                     <div className="pm-label mb-3">Quick access</div>
                     <div className="grid grid-cols-2 gap-2">
                         {[
-                            { label: "Edge Finder", id: "betting", icon: TrendingUp, color: "text-accent" },
+                            { label: "Line Shopping", id: "betting", icon: TrendingUp, color: "text-accent" },
                             { label: "Bet Tracker", id: "tracker", icon: BarChart2, color: "text-win" },
                             { label: "Four Factors", id: "analytics", icon: Activity, color: "text-draw" },
                             { label: "Players", id: "players", icon: Zap, color: "text-pitch-300" },

@@ -596,7 +596,7 @@ export function Betting() {
         <div>
           <div className="flex items-center gap-2">
             <div className="pm-label">
-              {isLive ? "Live market edges" : "Sample edge data"}
+              {isLive ? "Live Line Shopping" : "Sample Line Shopping"}
             </div>
             {arbCount > 0 && (
               <span className="pm-badge bg-win/15 text-win border border-win/30 flex items-center gap-1">
@@ -841,15 +841,19 @@ export function Betting() {
         })}
       </div>
 
-      {/* Methodology */}
-      <motion.div variants={item} className="pm-card p-4 text-[11px] text-pitch-400 leading-relaxed">
-        <span className="text-pitch-200 font-medium">How edges are calculated: </span>
-        Model win% uses season win percentage (≥10 games) as a team strength proxy. Market implied
-        probability uses the <span className="text-pitch-300 font-medium">best available line
-        across all books</span> (DraftKings, FanDuel, BetMGM, Caesars, ESPN Bet, Bet365) with vig
-        removed. Edge = model − best-line implied. Arbitrage is flagged when
-        1/bestHomeDecimal + 1/bestAwayDecimal &lt; 1 across different books.{" "}
-        <span className="text-pitch-600">Analytical tooling, not financial advice.</span>
+      {/* Methodology Disclaimer */}
+      <motion.div variants={item} className="pm-card p-4 mb-4 border border-draw/30 bg-draw/5">
+        <div className="flex items-start gap-2.5">
+          <AlertCircle size={14} className="text-draw flex-shrink-0 mt-0.5" strokeWidth={2} />
+          <div className="text-[11px] text-pitch-300 leading-relaxed">
+            <span className="text-pitch-100 font-medium mb-1 block">Line Shopping & Edge Estimation</span>
+            This tool is primarily for <strong className="text-pitch-100">line shopping</strong> across books to find the best available odds and arbitrage opportunities. <br/><br/>
+            Currently, the "Model Prob" uses simple season win percentage (≥10 games) as a baseline proxy. 
+            Because actual market lines aggressively price in rest, matchups, injuries, and travel, 
+            <strong className="text-pitch-200"> relying purely on these estimated "Edge" calculations as a betting signal will likely result in systematic losses</strong>. 
+            A robust, fully-featured predictive model is coming soon.
+          </div>
+        </div>
       </motion.div>
     </motion.div>
   );
