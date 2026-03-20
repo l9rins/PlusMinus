@@ -480,9 +480,12 @@ export default function TopNav({ activeTab, onTabChange }) {
                         ))}
                       </div>
                       <div className="px-4 py-2.5 border-t border-pitch-700">
-                        <button className="w-full text-[10px] text-pitch-500 hover:text-accent
-                                           transition-colors text-center">
-                          View all notifications
+                        <button
+                          onClick={() => { navigate("/scores"); setNotifOpen(false); }}
+                          className="w-full text-[10px] text-pitch-500 hover:text-accent
+                                     transition-colors text-center"
+                        >
+                          View live scores
                         </button>
                       </div>
                     </motion.div>

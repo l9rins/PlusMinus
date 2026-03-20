@@ -110,6 +110,24 @@ async function fetchTeamGameLog(teamId, season, attempt = 0) {
 // Small delay to avoid hammering stats.nba.com
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
+// Max 5 concurrent requests to avoid NBA Stats rate limiting
+async function fetchAllGameLogs(teamEntries, season) {
+  const CONCURRENCY = 5;
+  const results = {};
+  
+  for (let i = 0; i < teamEntries.length; i += CONCURRENCY) {
+    const batch = teamEntries.slice(i, i + CONCURRENCY);
+    const batchResults = await Promise.all(
+      batch.map(([teamId, abbr]) =>
+        fetchTeamGameLog(teamId, season).then(log => ({ abbr, log }))
+      )
+    );
+    batchResults.forEach(({ abbr, log }) => { results[abbr] = log; });
+    if (i + CONCURRENCY < teamEntries.length) await sleep(300); // one gap between batches
+  }
+  return results;
+}
+
 export default async function handler(req, res) {
   if (handleOptions(req, res)) return;
   const origin = req.headers.origin || "";
@@ -131,15 +149,7 @@ export default async function handler(req, res) {
     gameCounters[abbr] = 0;
   }
 
-  // Fetch all 30 game logs sequentially with 150ms gap to avoid rate limiting
-  // Total time: ~30 × 150ms = 4.5s worst case, well under Vercel's 10s function timeout
-  // In practice logs are cached at the edge for 1 hour so this only runs ~24 times/day
-  const gameLogs = {};
-  for (const [teamId, abbr] of teamEntries) {
-    gameLogs[abbr] = await fetchTeamGameLog(teamId, season);
-    // 200ms between teams — gives rate limiter room to breathe
-    await sleep(200);
-  }
+  const gameLogs = await fetchAllGameLogs(teamEntries, season);
 
   // Build a unified chronological game list for proper Elo update ordering.
   // Each entry: { date, homeAbbr, awayAbbr, homeWon }

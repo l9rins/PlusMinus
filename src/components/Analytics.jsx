@@ -752,6 +752,7 @@ export default function Analytics() {
   const standingsKey = standingsData
     ? `${standingsData.east?.length}-${standingsData.east?.[0]?.w}-${standingsData.west?.[0]?.w}`
     : null;
+  const eloKey = eloData.length > 0 ? `${eloData[0]?.elo}-${eloData.length}` : null;
 
   useEffect(() => {
     if (!standingsData || !eloData.length) return;
@@ -769,7 +770,7 @@ export default function Analytics() {
     };
     worker.postMessage({ standings: standingsData, eloData });
     return () => worker.terminate();
-  }, [standingsKey]);
+  }, [standingsKey, eloKey]);
 
   const needsStandings = ["factors", "elo", "power", "playoff"].includes(activeTab);
 

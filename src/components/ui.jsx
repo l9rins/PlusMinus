@@ -179,7 +179,7 @@ export function FreshnessTag({ isFetching, dataUpdatedAt }) {
 
 const TOAST_DURATION = 3000;
 
-let _toastListeners = [];
+const _toastListeners = new Set();
 
 export function useToast() {
     const addToast = useCallback((message, type = "info") => {
@@ -212,8 +212,8 @@ export function ToastContainer() {
                 });
             }
         };
-        _toastListeners.push(handler);
-        return () => { _toastListeners = _toastListeners.filter(fn => fn !== handler); };
+        _toastListeners.add(handler);
+        return () => { _toastListeners.delete(handler); };
     }, []);
 
     const colorMap = {
