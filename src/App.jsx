@@ -5,16 +5,18 @@ import {
 } from "react-router-dom";
 import { SignedIn, SignedOut, SignIn } from "@clerk/clerk-react";
 import { AnimatePresence, motion } from "framer-motion";
+import { useQueryClient } from "@tanstack/react-query";
 import TopNav from "./components/TopNav";
 import { ToastContainer } from "./components/ui";
 import { TEAM_COLORS } from "./data";
+import { invalidateErroredQueries } from "./api";
 
 // ── Lazy route components ─────────────────────────────────────────
 const Dashboard = lazy(() => import("./components/Dashboard"));
 const Players = lazy(() => import("./components/Players"));
 const Analytics = lazy(() => import("./components/Analytics"));
 const TeamDetail = lazy(() => import("./components/TeamDetail"));
-const HeadToHead = lazy(() => import("./components/HeadToHead")); // ← NEW
+const HeadToHead = lazy(() => import("./components/HeadToHead"));
 const Scores = lazy(() => import("./components/Views").then(m => ({ default: m.Scores })));
 const Standings = lazy(() => import("./components/Views").then(m => ({ default: m.Standings })));
 const Betting = lazy(() => import("./components/Views").then(m => ({ default: m.Betting })));
@@ -48,21 +50,18 @@ const ROUTE_META = {
   "/betting": { title: "Betting", tab: "betting" },
   "/tracker": { title: "Bet Tracker", tab: "tracker" },
   "/analytics": { title: "Analytics", tab: "analytics" },
-  "/compare": { title: "Compare", tab: "compare" }, // ← NEW
+  "/compare": { title: "Compare", tab: "compare" },
 };
 
 const SHORTCUT_ROUTES = {
   d: "/", s: "/scores", l: "/standings", p: "/players",
-  b: "/betting", t: "/tracker", a: "/analytics",
-  c: "/compare", // ← NEW — note: was previously used for "C = compare player" in Players.jsx
-  //   that shortcut only fires when a player card is focused, so no conflict
+  b: "/betting", t: "/tracker", a: "/analytics", c: "/compare",
 };
 
 const TAB_ROUTES = {
   dashboard: "/", scores: "/scores", standings: "/standings",
   players: "/players", betting: "/betting", tracker: "/tracker",
-  analytics: "/analytics",
-  compare: "/compare", // ← NEW
+  analytics: "/analytics", compare: "/compare",
 };
 
 // ── Page skeleton ─────────────────────────────────────────────────
@@ -78,21 +77,35 @@ function PageSkeleton() {
 }
 
 // ── Error boundary ────────────────────────────────────────────────
-// FIX: the previous "Try again" button called setState immediately,
-// re-rendering the children synchronously. If the error cause hadn't
-// resolved, the component re-threw instantly and the user saw a flash.
-// We now wait 400ms before resetting so there's a brief breathing room
-// (enough for network errors to surface and stale queries to clear).
+// FIX: now accepts a `queryClient` prop and calls
+// invalidateErroredQueries(queryClient) on retry.
+//
+// Gemini suggested queryClient.clear() which nukes ALL cached data —
+// standings, games, odds, players — forcing a full re-fetch of everything.
+// That's worse than the original problem for most error scenarios.
+//
+// invalidateErroredQueries (defined in src/api.js) only marks queries
+// that are already in an error state as stale. Healthy cached data
+// (standings loaded fine, etc.) is left completely untouched.
+// On the next render after setState the stale errored queries re-fetch.
 class ErrorBoundary extends Component {
   constructor(props) {
     super(props);
     this.state = { hasError: false, error: null, retrying: false };
   }
-  static getDerivedStateFromError(error) { return { hasError: true, error, retrying: false }; }
-  componentDidCatch(e, info) { console.error("[PlusMinus]", e, info); }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error, retrying: false };
+  }
+
+  componentDidCatch(e, info) {
+    console.error("[PlusMinus]", e, info);
+  }
 
   handleRetry = () => {
     this.setState({ retrying: true });
+    // Invalidate only errored queries — leave healthy cache alone
+    invalidateErroredQueries(this.props.queryClient);
     setTimeout(() => {
       this.setState({ hasError: false, error: null, retrying: false });
     }, 400);
@@ -104,7 +117,9 @@ class ErrorBoundary extends Component {
         <div className="pm-card p-8 text-center mt-6">
           <div className="text-2xl mb-2">⚠️</div>
           <div className="text-pitch-200 font-medium mb-1">Something went wrong</div>
-          <div className="text-pitch-500 text-sm mb-4 font-mono">{this.state.error?.message}</div>
+          <div className="text-pitch-500 text-sm mb-4 font-mono">
+            {this.state.error?.message}
+          </div>
           <button
             onClick={this.handleRetry}
             disabled={this.state.retrying}
@@ -123,9 +138,9 @@ class ErrorBoundary extends Component {
 function AppInner() {
   const navigate = useNavigate();
   const location = useLocation();
+  const queryClient = useQueryClient(); // passed to ErrorBoundary
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Document title
   useEffect(() => {
     const meta = ROUTE_META[location.pathname];
     if (meta) {
@@ -138,7 +153,6 @@ function AppInner() {
     }
   }, [location.pathname]);
 
-  // Global keyboard shortcuts
   useEffect(() => {
     const handler = (e) => {
       const tag = e.target.tagName.toLowerCase();
@@ -161,9 +175,6 @@ function AppInner() {
   return (
     <div className="min-h-screen bg-pitch-900">
       <SignedOut>
-        {/* FIX: was a plain div with no landmark. Screen readers and skip-link
-            navigation couldn't identify this as the page's primary content.
-            Now wrapped in <main> with role="main" for correct document structure. */}
         <main role="main" className="min-h-screen flex items-center justify-center">
           <div className="text-center mb-8">
             <div className="font-display text-5xl tracking-widest text-accent mb-2">±</div>
@@ -190,7 +201,7 @@ function AppInner() {
               exit={{ opacity: 0, y: -6 }}
               transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
             >
-              <ErrorBoundary>
+              <ErrorBoundary queryClient={queryClient}>
                 <Suspense fallback={<PageSkeleton />}>
                   <Routes>
                     <Route path="/" element={<Dashboard onNavigate={handleTabChange} />} />
@@ -200,7 +211,7 @@ function AppInner() {
                     <Route path="/betting" element={<Betting />} />
                     <Route path="/tracker" element={<BetTracker />} />
                     <Route path="/analytics" element={<Analytics />} />
-                    <Route path="/compare" element={<HeadToHead />} /> {/* ← NEW */}
+                    <Route path="/compare" element={<HeadToHead />} />
                     <Route path="/team/:abbr" element={<TeamDetail />} />
                     <Route path="*" element={<Navigate to="/" replace />} />
                   </Routes>

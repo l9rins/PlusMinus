@@ -3,29 +3,25 @@
 // Import only what you need; tree-shaking removes the rest.
 
 // ── Constants ─────────────────────────────────────────────────────
-export const BET_STORAGE_KEY = "bets_v2";   // bump to invalidate old bet format
-export const DEFAULT_BANKROLL = 1000;         // default bankroll for Kelly sizing ($)
-export const BREAK_EVEN_PCT = 52.38;        // break-even win rate at -110 juice
-export const DEFAULT_JUICE = -110;         // standard American moneyline
-export const KELLY_FRACTION = 0.5;          // ½-Kelly (applied inside kellyBet)
-export const MAX_KELLY_PCT = 0.25;         // max 25% of bankroll on any single bet
+export const BET_STORAGE_KEY = "bets_v2";
+export const DEFAULT_BANKROLL = 1000;
+export const BREAK_EVEN_PCT = 52.38;
+export const DEFAULT_JUICE = -110;
+export const KELLY_FRACTION = 0.5;
+export const MAX_KELLY_PCT = 0.25;
 
 // ── Number formatters ─────────────────────────────────────────────
 
-/** "+5.2" or "-3.1" — always shows sign */
 export const signed = (n) => (n >= 0 ? `+${n}` : `${n}`);
 
-/** "$1,234.50" */
 export const formatCurrency = (n) =>
   new Intl.NumberFormat("en-US", {
     style: "currency", currency: "USD", minimumFractionDigits: 2,
   }).format(n ?? 0);
 
-/** "54.3%" */
 export const formatPct = (n, decimals = 1) =>
   `${Number(n ?? 0).toFixed(decimals)}%`;
 
-/** "999" | "1.5K" | "2.5M" */
 export const compactNumber = (n) => {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
   if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
@@ -34,13 +30,10 @@ export const compactNumber = (n) => {
 
 // ── Odds converters ───────────────────────────────────────────────
 
-/**
- * American → decimal  (-110 → 1.909,  +150 → 2.5)
- * FIX: guard against zero / non-numeric input to avoid division by zero.
- */
+/** American → decimal  (-110 → 1.909,  +150 → 2.5) */
 export const oddsToDecimal = (american) => {
   const n = Number(american);
-  if (!n || !isFinite(n)) return 1;          // ← FIX: was dividing by zero for american=0
+  if (!n || !isFinite(n)) return 1;
   if (n > 0) return +(1 + n / 100).toFixed(3);
   return +(1 - 100 / n).toFixed(3);
 };
@@ -48,80 +41,65 @@ export const oddsToDecimal = (american) => {
 /** American → raw implied probability including vig  (-110 → 0.5238) */
 export const oddsToImplied = (american) => {
   const n = Number(american);
-  if (!n || !isFinite(n)) return 0.5;        // ← FIX: guard for same reason
+  if (!n || !isFinite(n)) return 0.5;
   if (n > 0) return 100 / (n + 100);
   return Math.abs(n) / (Math.abs(n) + 100);
 };
 
-/** Vig-removed implied probability → American odds string ("-110", "+120") */
 export const impliedToOdds = (p) => {
   if (p <= 0 || p >= 1) return "—";
   if (p >= 0.5) return `-${Math.round((p / (1 - p)) * 100)}`;
   return `+${Math.round(((1 - p) / p) * 100)}`;
 };
 
-/** Break-even win rate for a given American line  (-110 → 0.5238) */
 export const breakEven = (american) => oddsToImplied(american);
 
 // ── Financial math ────────────────────────────────────────────────
 
-/**
- * ROI percentage.
- *   calcROI(totalPL, totalStaked) → e.g. calcROI(45, 200) → 22.50
- *
- * FIX: removed the dual-mode overloading. This function now has one
- * clear contract: (net profit/loss, total amount wagered) → % return.
- * Any callers using the old legacy (winRate, american) signature need
- * to be updated — search the codebase for calcROI and confirm both
- * arguments are dollar amounts.
- *
- * @param {number} totalPL     — net profit or loss in dollars
- * @param {number} totalStaked — total amount wagered in dollars
- * @returns {number}           — ROI as a percentage, e.g. 22.50
- */
 export const calcROI = (totalPL, totalStaked) => {
   if (!totalStaked || totalStaked === 0) return 0;
   return +((totalPL / totalStaked) * 100).toFixed(2);
 };
 
 /**
- * Kelly Criterion — returns the DOLLAR amount to bet (not a fraction).
+ * Kelly Criterion — returns the DOLLAR amount to bet.
  *
- * @param {number} winProb  — model probability 0–1
- * @param {number} american — American odds (e.g. -110)
- * @param {number} bankroll — total bankroll in dollars (default DEFAULT_BANKROLL)
- * @returns {number}        — dollar amount, capped at 25% of bankroll, rounded to $1
+ * FIX: added `if (b <= 0) return 0` guard.
  *
- * Uses ½-Kelly for safety (industry standard risk management).
+ * The chain of events before this fix:
+ *   1. User passes american=0 (or any invalid value)
+ *   2. oddsToDecimal(0) correctly returns 1 (our previous fix)
+ *   3. b = dec - 1 = 0
+ *   4. k = (b * winProb - q) / b  →  division by zero  →  NaN
+ *   5. halfKelly = Math.max(0, Math.min(0.25, NaN * 0.5))  →  NaN
+ *   6. Math.round(NaN * bankroll)  →  NaN
+ *   7. NaN silently rendered as an empty string in the Dashboard KellyTile
+ *
+ * b=0 means the bet pays out exactly what you stake (even money at
+ * decimal 1.0). In practice this never comes from a real sportsbook;
+ * it only happens when odds input is missing or corrupt. Returning 0
+ * is the correct bet size: no edge can be calculated, don't bet.
  */
 export const kellyBet = (winProb, american, bankroll = DEFAULT_BANKROLL) => {
   if (!bankroll || bankroll <= 0) return 0;
   const dec = oddsToDecimal(american);
-  const b = dec - 1;       // net odds (profit per $1 wagered)
+  const b = dec - 1; // net odds (profit per $1 wagered)
+
+  // FIX: b=0 means even-money or invalid odds — return 0, don't divide
+  if (b <= 0) return 0;
+
   const q = 1 - winProb;
-  const k = (b * winProb - q) / b;   // full Kelly fraction
+  const k = (b * winProb - q) / b; // full Kelly fraction
 
   // ½-Kelly for safety, capped at 25% of bankroll
   const halfKelly = Math.max(0, Math.min(0.25, k * 0.5));
   return Math.round(halfKelly * bankroll);
 };
 
-/**
- * Calculate P&L for a single bet.
- *
- * Argument order matches ALL callers in Dashboard.jsx and Views.jsx:
- *   calcPL(stake, odds, result)
- *
- * @param {number|string} stake   — dollar amount wagered
- * @param {number|string} american — American odds (-110, +150, etc.)
- * @param {string}        result  — "win" | "loss" | "push" | "pending"
- * @returns {number}              — net P&L in dollars
- */
 export const calcPL = (stake, american, result) => {
   const s = Number(stake) || 0;
   if (!s || !result || result === "pending" || result === "push") return 0;
   if (result === "loss") return -s;
-  // Win — profit = stake × (decimal odds − 1)
   const dec = oddsToDecimal(Number(american) || DEFAULT_JUICE);
   return +(s * (dec - 1)).toFixed(2);
 };
@@ -132,24 +110,51 @@ export const currentSeason = () => {
   const now = new Date();
   const year = now.getFullYear();
   const month = now.getMonth() + 1;
-  // NBA season starts first week of October — use Oct 1 as cutover
   return month >= 10 ? year : year - 1;
 };
 
-/** "2025-11-14" in US Eastern Time (prevents rollover during late NBA games) */
+/**
+ * Returns today's date as "YYYY-MM-DD" in US Eastern Time.
+ *
+ * FIX: added a try/catch fallback around the formatToParts call.
+ *
+ * Why not Gemini's suggested alternative?
+ *   new Date(new Date().toLocaleString("en-US", { timeZone: "America/New_York" }))
+ *   has a documented DST bug on some V8 builds: during the spring-forward
+ *   hour (2:00–3:00 AM ET), toLocaleString produces a string the Date
+ *   constructor parses as one hour ahead of actual wall-clock time,
+ *   returning tomorrow's date for users in that narrow window.
+ *
+ * This version keeps the formatToParts approach (correct everywhere) and
+ * adds a defensive fallback for the rare privacy-hardened browser that
+ * strips locale data and returns undefined parts. In that case we fall
+ * back to the UTC ISO string — off by at most a few hours from ET, only
+ * relevant to users between midnight UTC and ~5 AM ET.
+ */
 export const todayStr = () => {
-  const formatter = new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/New_York",
-    year: "numeric", month: "2-digit", day: "2-digit",
-  });
-  const parts = formatter.formatToParts(new Date());
-  const yr = parts.find(p => p.type === "year").value;
-  const mo = parts.find(p => p.type === "month").value;
-  const da = parts.find(p => p.type === "day").value;
-  return `${yr}-${mo}-${da}`;
+  try {
+    const formatter = new Intl.DateTimeFormat("en-US", {
+      timeZone: "America/New_York",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    });
+    const parts = formatter.formatToParts(new Date());
+    const get = (type) => parts.find(p => p.type === type)?.value;
+    const yr = get("year");
+    const mo = get("month");
+    const da = get("day");
+
+    // If any part is missing, throw to trigger the fallback below
+    if (!yr || !mo || !da) throw new Error("incomplete locale parts");
+
+    return `${yr}-${mo}-${da}`;
+  } catch {
+    // Fallback: UTC ISO date — never throws, always returns YYYY-MM-DD
+    return new Date().toISOString().slice(0, 10);
+  }
 };
 
-/** "Nov 14" */
 export const formatShortDate = (dateStr) => {
   const d = new Date(dateStr);
   return d.toLocaleDateString("en-US", {
@@ -157,7 +162,6 @@ export const formatShortDate = (dateStr) => {
   });
 };
 
-/** ISO string → "7:30 PM ET" */
 export const formatGameTime = (isoStr) => {
   try {
     return new Date(isoStr).toLocaleTimeString("en-US", {
@@ -170,7 +174,6 @@ export const formatGameTime = (isoStr) => {
 
 // ── Analytics helpers ─────────────────────────────────────────────
 
-/** Net rating → tier label */
 export const netRatingTier = (netRtg) => {
   if (netRtg >= 8) return "Elite";
   if (netRtg >= 4) return "Good";
@@ -179,7 +182,6 @@ export const netRatingTier = (netRtg) => {
   return "Poor";
 };
 
-/** Net rating → Tailwind text-color class */
 export const netRatingColor = (netRtg) => {
   if (netRtg >= 8) return "text-tier-elite";
   if (netRtg >= 4) return "text-tier-good";
@@ -188,7 +190,6 @@ export const netRatingColor = (netRtg) => {
   return "text-tier-bad";
 };
 
-/** Edge classification — model vs implied probability (both 0–100) */
 export const edgeLabel = (modelP, impliedP) => {
   const diff = modelP - impliedP;
   if (diff >= 8) return "high";
@@ -198,7 +199,6 @@ export const edgeLabel = (modelP, impliedP) => {
 
 // ── Functional helpers ────────────────────────────────────────────
 
-/** Group array by key function */
 export const groupBy = (arr, keyFn) =>
   arr.reduce((acc, item) => {
     const key = keyFn(item);
@@ -206,13 +206,11 @@ export const groupBy = (arr, keyFn) =>
     return acc;
   }, {});
 
-/** Safe deep clone */
 export const deepClone = (obj) => {
   if (typeof structuredClone === "function") return structuredClone(obj);
   return JSON.parse(JSON.stringify(obj));
 };
 
-/** Debounce — returns a debounced fn that fires after `wait` ms of inactivity */
 export const debounce = (fn, wait = 300) => {
   let timer;
   return (...args) => {
@@ -221,20 +219,12 @@ export const debounce = (fn, wait = 300) => {
   };
 };
 
-/** Clamp value between min and max */
 export const clamp = (val, min, max) => Math.min(max, Math.max(min, val));
-
-/** Linear interpolate from a to b by t (0–1) */
 export const lerp = (a, b, t) => a + (b - a) * clamp(t, 0, 1);
-
-/** Sum array of numbers */
 export const sum = (arr) => arr.reduce((s, n) => s + (n ?? 0), 0);
-
-/** Average of array of numbers */
 export const avg = (arr) => (arr.length ? sum(arr) / arr.length : 0);
 
 // ── Local storage helpers ─────────────────────────────────────────
-// All throw-safe — return null / false on any error.
 
 const LS_PREFIX = "plusminus:";
 
@@ -263,11 +253,6 @@ export const lsRemove = (key) => {
   } catch { return false; }
 };
 
-/**
- * NBA Stats API always returns:
- * { resultSets: [{ name, headers: [...], rowSet: [[...], [...]] }] }
- * This turns any resultSet into an array of plain objects.
- */
 export function reshapeNBAStats(data, setName = null) {
   const resultSet = setName
     ? data?.resultSets?.find(rs => rs.name === setName)

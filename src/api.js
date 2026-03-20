@@ -30,7 +30,6 @@ class ApiError extends Error {
 
 // ── Shared retry policy ───────────────────────────────────────────
 const shouldRetry = (count, err) => {
-  // Don't retry auth failures, rate limits, misconfig, or timeouts
   if ([401, 429, 503, 504].includes(err?.status)) return false;
   return count < 2;
 };
@@ -90,7 +89,7 @@ async function nbaFetch(endpoint, params = {}, signal) {
   return res.json();
 }
 
-// Real team stats — eFG%, TOV%, ORB%, FT Rate, NetRtg, OffRtg, DefRtg
+// ── League team stats ─────────────────────────────────────────────
 export function useLeagueTeamStats() {
   return useQuery({
     queryKey: ["nba", "leagueTeamStats", currentSeason()],
@@ -109,7 +108,7 @@ export function useLeagueTeamStats() {
   });
 }
 
-// Real player stats — PTS, AST, REB, TS%, PER, BPM etc.
+// ── League player stats ───────────────────────────────────────────
 export function useLeaguePlayerStats() {
   return useQuery({
     queryKey: ["nba", "leaguePlayerStats", currentSeason()],
@@ -162,30 +161,47 @@ export function useAllPlayers() {
   });
 }
 
+/**
+ * Enriched player stats — merges base, advanced, and roster queries.
+ *
+ * FIX: previously returned partial data as soon as `base` resolved,
+ * leaving `per`, `ortg`, `drtg`, `usg` as null until `advanced` finished.
+ * This caused a visible layout shift: player cards rendered without
+ * advanced stats, then re-rendered a moment later to fill them in.
+ *
+ * New behaviour: `data` is null until ALL three sub-queries have data.
+ * Callers see a clean loading state (skeletons) the whole time, then
+ * the fully-enriched array appears in one render with no pop-in.
+ *
+ * The `isLoading` / `isFetching` flags still reflect all three queries
+ * so callers can show appropriate loading UI.
+ *
+ * Trade-off: users wait slightly longer before seeing any players.
+ * Acceptable because: (a) all three queries are cached for 10 min so
+ * the wait only happens on the first load of the session, and (b) a
+ * single complete render is a better UX than two partial renders.
+ */
 export function useEnrichedPlayerStats() {
   const base = useLeaguePlayerStats();
   const advanced = useLeaguePlayerStatsAdvanced();
   const allPlayers = useAllPlayers();
 
   const data = useMemo(() => {
-    if (!base.data) return null;
+    // FIX: wait for all three before computing — prevents partial renders
+    if (!base.data || !advanced.data || !allPlayers.data) return null;
 
     const baseRows = reshapeNBAStats(base.data, "LeagueDashPlayerStats")
       .filter(r => r.GP >= 10);
 
     const advMap = {};
-    if (advanced.data) {
-      reshapeNBAStats(advanced.data, "LeagueDashPlayerStats").forEach(r => {
-        advMap[r.PLAYER_ID] = r;
-      });
-    }
+    reshapeNBAStats(advanced.data, "LeagueDashPlayerStats").forEach(r => {
+      advMap[r.PLAYER_ID] = r;
+    });
 
     const posMap = {};
-    if (allPlayers.data) {
-      reshapeNBAStats(allPlayers.data, "CommonAllPlayers").forEach(r => {
-        posMap[r.PERSON_ID] = r.POSITION ?? "—";
-      });
-    }
+    reshapeNBAStats(allPlayers.data, "CommonAllPlayers").forEach(r => {
+      posMap[r.PERSON_ID] = r.POSITION ?? "—";
+    });
 
     return baseRows.map(r => {
       const adv = advMap[r.PLAYER_ID] ?? {};
@@ -213,7 +229,7 @@ export function useEnrichedPlayerStats() {
   return {
     data,
     isLoading: base.isLoading || advanced.isLoading || allPlayers.isLoading,
-    isError: base.isError,
+    isError: base.isError || advanced.isError || allPlayers.isError,
     isFetching: base.isFetching || advanced.isFetching || allPlayers.isFetching,
     dataUpdatedAt: base.dataUpdatedAt,
     refetch: base.refetch,
@@ -252,7 +268,6 @@ export function usePlayerGameLog(playerId, enabled = false) {
       if (!resultSet) return [];
       const headers = resultSet.headers;
       const rows = resultSet.rowSet;
-
       const wlIdx = headers.indexOf("WL");
       if (wlIdx === -1) return [];
 
@@ -293,7 +308,6 @@ function reshapeESPNStandings(data) {
     return entries.map((e) => {
       const abbr = fixAbbr(e.team?.abbreviation ?? "???");
       const sv = (name) => e.stats?.find((s) => s.name === name)?.value ?? 0;
-      const sd = (name) => e.stats?.find((s) => s.name === name)?.displayValue ?? "—";
       const sid = (id) => e.stats?.find((s) => s.id === id)?.displayValue ?? "—";
       const w = sv("wins");
       const l = sv("losses");
@@ -302,8 +316,7 @@ function reshapeESPNStandings(data) {
       const streakV = sv("streak");
       const streak = streakV > 0 ? `W${streakV}` : streakV < 0 ? `L${Math.abs(streakV)}` : "—";
       return {
-        team: abbr,
-        w, l, pct,
+        team: abbr, w, l, pct,
         gb: gb === 0 ? 0 : +parseFloat(gb).toFixed(1),
         last10: sid("901"),
         home: sid("33"),
@@ -331,7 +344,7 @@ export function useStandings() {
   });
 }
 
-// ── Today's games (ESPN scoreboard) ──────────────────────────────
+// ── Today's games ─────────────────────────────────────────────────
 function reshapeESPNScoreboard(data) {
   return (data?.events ?? []).map((ev) => {
     const comp = ev.competitions?.[0];
@@ -350,27 +363,13 @@ function reshapeESPNScoreboard(data) {
     const time = status === "final" ? "Final" : detail;
     return {
       id: String(ev.id), away: awayAbbr, home: homeAbbr,
-      awayP: null,
-      homeP: null,
+      awayP: null, homeP: null,
       time, status, awayScore, homeScore, period,
       spread: "—", total: "—",
     };
   });
 }
 
-// ── FIX: refetchInterval gated on live game count ─────────────────
-// Previously refetchInterval was hardcoded to 60s regardless of whether
-// any games were actually in progress. On off-nights (no live games) this
-// hammered ESPN's endpoint once a minute for nothing.
-//
-// New behaviour:
-//   • Any live game in progress  → poll every 30s (score updates matter)
-//   • Games today but none live  → poll every 2 min (tip-off timing)
-//   • No games today / data      → poll every 10 min (just checking)
-//
-// The refetchInterval callback receives the latest cached data so we can
-// inspect game statuses without an extra query. React Query calls it after
-// each successful fetch and uses the returned interval for the next tick.
 export function useTodayGames() {
   const today = todayStr().replace(/-/g, "");
   return useQuery({
@@ -382,10 +381,10 @@ export function useTodayGames() {
     staleTime: 1000 * 30,
     refetchInterval: (query) => {
       const games = query.state.data;
-      if (!Array.isArray(games) || games.length === 0) return 1000 * 60 * 10; // 10 min — no games
+      if (!Array.isArray(games) || games.length === 0) return 1000 * 60 * 10;
       const liveCount = games.filter(g => g.status === "live").length;
-      if (liveCount > 0) return 1000 * 30;       // 30s  — games in progress
-      return 1000 * 60 * 2;                       // 2min — games today, none live yet
+      if (liveCount > 0) return 1000 * 30;
+      return 1000 * 60 * 2;
     },
     placeholderData: GAMES_FALLBACK,
     retry: shouldRetry,
@@ -423,15 +422,8 @@ function reshapeTeamSchedule(data, teamAbbr) {
       : "—";
 
     return {
-      id: String(ev.id),
-      date: ev.date ?? "",
-      dateStr,
-      isHome,
-      opponent,
-      status,
-      result,
-      teamScore,
-      oppScore,
+      id: String(ev.id), date: ev.date ?? "", dateStr,
+      isHome, opponent, status, result, teamScore, oppScore,
       detail: statusType?.detail ?? "",
     };
   }).sort((a, b) => new Date(a.date) - new Date(b.date));
@@ -470,23 +462,17 @@ export function mergeOddsIntoGames(games, odds) {
     if (!match) return g;
     return {
       ...g,
-      awayP: match.awayP,
-      homeP: match.homeP,
-      bestHomeBook: match.bestHomeBook,
-      bestAwayBook: match.bestAwayBook,
-      bestHomeOdds: match.bestHomeOdds,
-      bestAwayOdds: match.bestAwayOdds,
-      consHomeP: match.consHomeP,
-      consAwayP: match.consAwayP,
-      books: match.books,
-      isArb: match.isArb,
-      arbPct: match.arbPct,
-      bookCount: match.bookCount,
+      awayP: match.awayP, homeP: match.homeP,
+      bestHomeBook: match.bestHomeBook, bestAwayBook: match.bestAwayBook,
+      bestHomeOdds: match.bestHomeOdds, bestAwayOdds: match.bestAwayOdds,
+      consHomeP: match.consHomeP, consAwayP: match.consAwayP,
+      books: match.books, isArb: match.isArb,
+      arbPct: match.arbPct, bookCount: match.bookCount,
     };
   });
 }
 
-// ── Player search (BDL free endpoint) ────────────────────────────
+// ── Player search ─────────────────────────────────────────────────
 export function usePlayerSearch(query) {
   const trimmed = query?.trim() ?? "";
   const enabled = trimmed.length >= 2;
@@ -507,8 +493,7 @@ export function usePlayerSearch(query) {
           id: p.id, name,
           pos: p.position || "—",
           team: p.team?.abbreviation || "—",
-          age: null,
-          per: null, bpm: null, vorp: null,
+          age: null, per: null, bpm: null, vorp: null,
           ortg: null, drtg: null, form: null,
           pts: 0, ast: 0, reb: 0, ts: null,
         };
@@ -531,30 +516,43 @@ export const queryClientConfig = {
   },
 };
 
-// ── Bets Persistence ──────────────────────────────────────────────
+// ── Targeted cache invalidation for ErrorBoundary ─────────────────
+// Gemini suggested queryClient.clear() inside ErrorBoundary.handleRetry,
+// but that nukes ALL cached data — standings, games, odds, players — so
+// the entire app re-fetches from scratch after every error, which is
+// worse than the original problem.
 //
-// Three operations exposed from useBets:
+// Instead, export this function so ErrorBoundary can call it with the
+// queryClient instance. It only invalidates queries that are in an error
+// state, leaving healthy cached data untouched.
 //
-//   saveBets(bets[])   — PUT /api/bets       — replace the full array
-//                        Used when adding a new bet or editing an existing one.
-//                        The caller builds the new array and passes it in.
+// Usage in App.jsx ErrorBoundary:
+//   import { invalidateErroredQueries } from "./api";
+//   handleRetry = () => {
+//     invalidateErroredQueries(this.props.queryClient);
+//     setTimeout(() => this.setState(...), 400);
+//   }
 //
-//   deleteBet(id)      — DELETE /api/bets/:id — remove a single bet server-side
-//                        Atomic: server reads, filters, writes in one handler.
-//                        Does NOT require the caller to manage the array.
-//
-// ID generation:
-//   IDs are created client-side with crypto.randomUUID() (see generateBetId below).
-//   This is exported so BetTracker can call it when constructing a new bet object
-//   before passing it to saveBets. The server validates that id is a non-empty
-//   string but does not care about format.
+// Note: ErrorBoundary needs access to queryClient. Pass it as a prop:
+//   <ErrorBoundary queryClient={queryClient}>
+//     <App />
+//   </ErrorBoundary>
+// And get queryClient from useQueryClient() in AppInner, pass down.
+// See App.jsx for the updated wiring.
+export function invalidateErroredQueries(queryClient) {
+  if (!queryClient) return;
+  const cache = queryClient.getQueryCache();
+  const erroredQueries = cache.getAll().filter(q => q.state.status === "error");
+  erroredQueries.forEach(q => {
+    queryClient.invalidateQueries({ queryKey: q.queryKey });
+  });
+}
 
-/** Generate a collision-resistant bet ID (client-side). */
+// ── Bets Persistence ──────────────────────────────────────────────
 export function generateBetId() {
   if (typeof crypto !== "undefined" && crypto.randomUUID) {
     return crypto.randomUUID();
   }
-  // Fallback for environments without crypto.randomUUID
   return `bet_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
 }
 
@@ -562,7 +560,6 @@ export function useBets() {
   const { getToken } = useAuth();
   const queryClient = useQueryClient();
 
-  // ── Fetch ───────────────────────────────────────────────────────
   const query = useQuery({
     queryKey: ["bets"],
     queryFn: async () => {
@@ -577,7 +574,6 @@ export function useBets() {
     staleTime: Infinity,
   });
 
-  // ── PUT — replace full array ────────────────────────────────────
   const saveMutation = useMutation({
     mutationFn: async (bets) => {
       const token = await getToken();
@@ -597,10 +593,6 @@ export function useBets() {
     },
   });
 
-  // ── DELETE — remove single bet by ID ───────────────────────────
-  // Optimistic update: immediately remove the bet from the local cache
-  // so the UI responds instantly, then sync with the server. On error,
-  // roll back to the previous state so no data is silently lost.
   const deleteMutation = useMutation({
     mutationFn: async (betId) => {
       const token = await getToken();
@@ -613,31 +605,19 @@ export function useBets() {
       if (!res.ok) throw new Error("Failed to delete bet");
       return res.json();
     },
-
-    // Optimistically remove from cache before the server responds
     onMutate: async (betId) => {
-      // Cancel any in-flight fetches for this key so they don't overwrite us
       await queryClient.cancelQueries({ queryKey: ["bets"] });
-
-      // Snapshot the current value for rollback
       const previous = queryClient.getQueryData(["bets"]);
-
-      // Optimistically update
       queryClient.setQueryData(["bets"], (old) =>
         Array.isArray(old) ? old.filter(b => b.id !== betId) : old
       );
-
       return { previous };
     },
-
-    // On error, roll back to the snapshot
     onError: (_err, _betId, context) => {
       if (context?.previous !== undefined) {
         queryClient.setQueryData(["bets"], context.previous);
       }
     },
-
-    // Always re-sync with server after settle (success or error)
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["bets"] });
     },
@@ -651,6 +631,6 @@ export function useBets() {
     saveError: saveMutation.error?.message ?? null,
     deleteError: deleteMutation.error?.message ?? null,
     saveBets: saveMutation.mutateAsync,
-    deleteBet: deleteMutation.mutateAsync,  // deleteBet(id: string) → Promise
+    deleteBet: deleteMutation.mutateAsync,
   };
 }

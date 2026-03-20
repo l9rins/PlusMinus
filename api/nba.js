@@ -10,22 +10,59 @@ const NBA_HEADERS = {
   "Origin": "https://www.nba.com",
 };
 
-const ALLOWED_ENDPOINTS = [
-  "leaguedashteamstats",
-  "leaguedashplayerstats",
-  "leaguedashteamclutch",
-  "teamdashboardbygeneralsplits",
-  "playerdashboardbyyearoveryear",
-  "leaguestandingsv3",
-  "commonallplayers",
-  "teamgamelog",
-  "playergamelog",
-];
+// ── SECURITY FIX: per-endpoint parameter whitelists ───────────────
+// Previously: const params = { ...req.query }; delete params.endpoint;
+// That forwarded ALL query params to the upstream NBA API unchanged.
+// A malicious client could append ?cachebuster=1, cachebuster=2, etc.
+// making every request a unique URL — bypassing Vercel's edge cache,
+// executing the serverless function on every call, and burning both
+// Vercel compute budget and NBA Stats rate-limit quota.
+//
+// Fix: each endpoint declares exactly which params it accepts.
+// Anything not in the whitelist is silently dropped before the upstream
+// URL is constructed, so the cache key is always deterministic.
+//
+// Param values are passed through as-is (NBA Stats API validates them).
+// We only control *which* params reach the upstream, not their values.
+
+const ENDPOINT_PARAMS = {
+  leaguedashteamstats: [
+    "Season", "SeasonType", "PerMode", "MeasureType",
+    "PaceAdjust", "PlusMinus", "Rank",
+  ],
+  leaguedashplayerstats: [
+    "Season", "SeasonType", "PerMode", "MeasureType",
+    "PaceAdjust", "PlusMinus", "Rank",
+  ],
+  leaguedashteamclutch: [
+    "Season", "SeasonType", "PerMode", "MeasureType",
+  ],
+  teamdashboardbygeneralsplits: [
+    "TeamID", "Season", "SeasonType", "PerMode", "MeasureType",
+  ],
+  playerdashboardbyyearoveryear: [
+    "PlayerID", "Season", "SeasonType", "PerMode", "MeasureType",
+  ],
+  leaguestandingsv3: [
+    "Season", "SeasonType", "LeagueID",
+  ],
+  commonallplayers: [
+    "LeagueID", "Season", "IsOnlyCurrentSeason",
+  ],
+  teamgamelog: [
+    "TeamID", "Season", "SeasonType", "LeagueID",
+  ],
+  playergamelog: [
+    "PlayerID", "Season", "SeasonType", "LeagueID",
+  ],
+};
+
+const ALLOWED_ENDPOINTS = Object.keys(ENDPOINT_PARAMS);
 
 function cacheTTL(endpoint) {
-  if (endpoint === "playergamelog") return 1800;   // 30 min
-  if (endpoint.includes("dashboard")) return 600;  // 10 min — team/player specific
-  return 1800;                                     // 30 min — league-wide
+  if (endpoint === "playergamelog") return 1800;
+  if (endpoint.includes("dashboard")) return 600;
+  return 1800;
 }
 
 export default async function handler(req, res) {
@@ -40,9 +77,15 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: `Unknown endpoint: ${endpoint}` });
   }
 
-  // Forward all query params except "endpoint" directly to NBA Stats
-  const params = { ...req.query };
-  delete params.endpoint;
+  // Build params from whitelist only — drop everything else
+  const allowed = ENDPOINT_PARAMS[endpoint];
+  const params = {};
+  for (const key of allowed) {
+    if (req.query[key] !== undefined) {
+      params[key] = req.query[key];
+    }
+  }
+
   const qs = new URLSearchParams(params).toString();
   const url = `${BASE}/${endpoint}?${qs}`;
 
