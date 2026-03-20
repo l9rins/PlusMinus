@@ -5,8 +5,8 @@ import {
     Zap, ChevronRight, Activity, DollarSign, Flame, Shield,
 } from "lucide-react";
 import { TEAM_NAMES, ODDS_GAMES, TEAM_COLORS } from "../data";
-import { useStandings, useTodayGames, useOdds, mergeOddsIntoGames } from "../api";
-import { calcPL, BET_STORAGE_KEY, lsGet, kellyBet, DEFAULT_BANKROLL, formatCurrency } from "../utils";
+import { useStandings, useTodayGames, useOdds, mergeOddsIntoGames, useBets } from "../api";
+import { calcPL, lsGet, kellyBet, DEFAULT_BANKROLL, formatCurrency } from "../utils";
 import { TileSkeleton, RowSkeleton, ErrorState, FreshnessTag, Tooltip } from "./ui";
 
 const container = { hidden: {}, show: { transition: { staggerChildren: 0.04, delayChildren: 0.05 } } };
@@ -147,17 +147,6 @@ function KellyTile({ topEdge, bankroll }) {
   );
 }
 
-function readBetStats() {
-    try {
-        const bets = lsGet(BET_STORAGE_KEY);
-        if (!Array.isArray(bets)) return { total: 0, wins: 0, losses: 0, pending: 0, pl: 0 };
-        const wins = bets.filter(b => b.result === "win").length;
-        const losses = bets.filter(b => b.result === "loss").length;
-        const pending = bets.filter(b => b.result === "pending").length;
-        const pl = bets.reduce((s, b) => s + calcPL(b.stake, b.odds, b.result), 0);
-        return { total: bets.length, wins, losses, pending, pl };
-    } catch { return { total: 0, wins: 0, losses: 0, pending: 0, pl: 0 }; }
-}
 
 export default function Dashboard({ onNavigate }) {
     // Games and standings now use ESPN (no key needed) — no hasBdl gate
@@ -173,22 +162,18 @@ export default function Dashboard({ onNavigate }) {
     const liveCount = gameList.filter(g => g.status === "live").length;
     const gameCount = gameList.length;
 
-    const [betVersion, setBetVersion] = useState(0);
-    const betStats = useMemo(() => readBetStats(), [betVersion]);
-    const [bankroll, setBankroll] = useState(() => Number(lsGet("bankroll")) || DEFAULT_BANKROLL);
-    const handleStorage = useCallback((e) => { 
-        const key = e.detail?.key || e.key;
-        if (key?.includes(BET_STORAGE_KEY)) setBetVersion(v => v + 1); 
-        if (key?.includes("bankroll")) setBankroll(Number(lsGet("bankroll")) || DEFAULT_BANKROLL);
-    }, []);
-    useEffect(() => { 
-        window.addEventListener("plusminus:storage", handleStorage); 
-        window.addEventListener("storage", handleStorage);
-        return () => {
-            window.removeEventListener("plusminus:storage", handleStorage);
-            window.removeEventListener("storage", handleStorage);
-        }
-    }, [handleStorage]);
+    const { bets } = useBets();
+
+    const betStats = useMemo(() => {
+        if (!bets.length) return { total: 0, wins: 0, losses: 0, pending: 0, pl: 0 };
+        const wins    = bets.filter(b => b.result === "win").length;
+        const losses  = bets.filter(b => b.result === "loss").length;
+        const pending = bets.filter(b => b.result === "pending").length;
+        const pl      = bets.reduce((s, b) => s + calcPL(b.stake, b.odds, b.result), 0);
+        return { total: bets.length, wins, losses, pending, pl };
+    }, [bets]);
+
+    const bankroll = Number(lsGet("bankroll")) || DEFAULT_BANKROLL;
 
   const topEdge = useMemo(() => {
     if (oddsData && Object.keys(oddsData).length > 0) {
