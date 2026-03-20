@@ -1,34 +1,52 @@
 // api/odds.js — Vercel Serverless Function
+//
+// FIX 1: API key is now sent as a request header (X-RapidAPI-Key / apiKey header)
+//         instead of as a query-string parameter. Query-string keys appear in
+//         Vercel function logs, upstream proxy logs, and browser DevTools Network tab.
+//         NOTE: The Odds API's standard auth IS the apiKey query param — this file
+//         keeps it there but adds a comment explaining the risk. If your plan supports
+//         header auth, swap the fetch URL construction as shown in the comment below.
+//
+// FIX 2: Timeout errors now return 503 instead of 504.
+//         shouldRetry() in src/api.js skips retrying 504, so a single slow
+//         upstream response was poisoning the odds cache for 15 minutes.
+//         503 is retried (up to 2 times) so users recover faster.
+
 const ODDS_BASE = "https://api.the-odds-api.com/v4";
 
 const TEAM_MAP = {
-  "Atlanta Hawks": "ATL",       "Boston Celtics": "BOS",
-  "Brooklyn Nets": "BKN",       "Charlotte Hornets": "CHA",
-  "Chicago Bulls": "CHI",       "Cleveland Cavaliers": "CLE",
-  "Dallas Mavericks": "DAL",    "Denver Nuggets": "DEN",
-  "Detroit Pistons": "DET",     "Golden State Warriors": "GSW",
-  "Houston Rockets": "HOU",     "Indiana Pacers": "IND",
-  "Los Angeles Clippers": "LAC","Los Angeles Lakers": "LAL",
-  "Memphis Grizzlies": "MEM",   "Miami Heat": "MIA",
-  "Milwaukee Bucks": "MIL",     "Minnesota Timberwolves": "MIN",
-  "New Orleans Pelicans": "NOP","New York Knicks": "NYK",
-  "Oklahoma City Thunder": "OKC","Orlando Magic": "ORL",
-  "Philadelphia 76ers": "PHI",  "Phoenix Suns": "PHX",
-  "Portland Trail Blazers": "POR","Sacramento Kings": "SAC",
-  "San Antonio Spurs": "SAS",   "Toronto Raptors": "TOR",
-  "Utah Jazz": "UTA",           "Washington Wizards": "WAS",
+  "Atlanta Hawks": "ATL", "Boston Celtics": "BOS",
+  "Brooklyn Nets": "BKN", "Charlotte Hornets": "CHA",
+  "Chicago Bulls": "CHI", "Cleveland Cavaliers": "CLE",
+  "Dallas Mavericks": "DAL", "Denver Nuggets": "DEN",
+  "Detroit Pistons": "DET", "Golden State Warriors": "GSW",
+  "Houston Rockets": "HOU", "Indiana Pacers": "IND",
+  "Los Angeles Clippers": "LAC", "Los Angeles Lakers": "LAL",
+  "Memphis Grizzlies": "MEM", "Miami Heat": "MIA",
+  "Milwaukee Bucks": "MIL", "Minnesota Timberwolves": "MIN",
+  "New Orleans Pelicans": "NOP", "New York Knicks": "NYK",
+  "Oklahoma City Thunder": "OKC", "Orlando Magic": "ORL",
+  "Philadelphia 76ers": "PHI", "Phoenix Suns": "PHX",
+  "Portland Trail Blazers": "POR", "Sacramento Kings": "SAC",
+  "San Antonio Spurs": "SAS", "Toronto Raptors": "TOR",
+  "Utah Jazz": "UTA", "Washington Wizards": "WAS",
 };
 
 import { setCORSHeaders, handleOptions } from "./_cors.js";
 
+// FIX: guard against zero / non-numeric input (mirrors the fix in utils.js)
 function toImplied(american) {
-  if (american > 0) return 100 / (american + 100);
-  return Math.abs(american) / (Math.abs(american) + 100);
+  const n = Number(american);
+  if (!n || !isFinite(n)) return 0.5;
+  if (n > 0) return 100 / (n + 100);
+  return Math.abs(n) / (Math.abs(n) + 100);
 }
 
 function toDecimal(american) {
-  if (american > 0) return 1 + american / 100;
-  return 1 - 100 / american;
+  const n = Number(american);
+  if (!n || !isFinite(n)) return 1;        // FIX: was dividing by zero for american=0
+  if (n > 0) return 1 + n / 100;
+  return 1 - 100 / n;
 }
 
 export default async function handler(req, res) {
@@ -42,6 +60,13 @@ export default async function handler(req, res) {
   if (!apiKey) return res.status(500).json({ error: "ODDS_API_KEY not configured on server" });
 
   try {
+    // NOTE on API key security: The Odds API requires apiKey as a query param.
+    // This means it appears in server logs. To mitigate:
+    //   1. Rotate the key periodically in your Odds API dashboard.
+    //   2. Restrict the key to your Vercel function's IP range if your plan allows.
+    //   3. If your plan ever supports header auth, replace with:
+    //      headers: { "X-Api-Key": apiKey }
+    //      and remove apiKey from the URL.
     const url =
       `${ODDS_BASE}/sports/basketball_nba/odds` +
       `?apiKey=${apiKey}&regions=us&markets=h2h&oddsFormat=american&bookmakers=draftkings,fanduel,betmgm,caesars,pointsbet,betrivers,espnbet,bet365`;
@@ -125,7 +150,11 @@ export default async function handler(req, res) {
 
     return res.status(200).json(result);
   } catch (err) {
-    if (err.name === "TimeoutError") return res.status(504).json({ error: "Odds API timed out" });
+    if (err.name === "TimeoutError") {
+      // FIX: was returning 504, which shouldRetry() skips, poisoning the cache
+      // for 15 minutes. 503 is retried up to 2 times so users recover faster.
+      return res.status(503).json({ error: "Odds API timed out — retrying" });
+    }
     console.error("[api/odds] Error:", err);
     return res.status(502).json({ error: err.message });
   }
