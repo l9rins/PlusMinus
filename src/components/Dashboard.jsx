@@ -7,7 +7,7 @@ import {
 import { TEAM_NAMES, ODDS_GAMES, TEAM_COLORS } from "../data";
 import { useStandings, useTodayGames, useOdds, mergeOddsIntoGames, useBets } from "../api";
 import { calcPL, lsGet, kellyBet, DEFAULT_BANKROLL, formatCurrency } from "../utils";
-import { TileSkeleton, RowSkeleton, ErrorState, FreshnessTag, Tooltip } from "./ui";
+import { TileSkeleton, RowSkeleton, ErrorState, FreshnessTag, Tooltip, TeamLink } from "./ui";
 
 const container = { hidden: {}, show: { transition: { staggerChildren: 0.04, delayChildren: 0.05 } } };
 const tile = { hidden: { opacity: 0, y: 14, scale: 0.98 }, show: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.28, ease: [0.25, 0.46, 0.45, 0.94] } } };
@@ -91,7 +91,7 @@ function MiniStandings({ teams, conf, onNavigate }) {
                         <div key={t.team} className={`flex items-center gap-2 px-2 py-1.5 rounded-sm transition-colors hover:bg-pitch-700 cursor-pointer ${i === 6 ? "border-t border-dashed border-pitch-600 mt-1 pt-2.5" : ""}`}>
                             <span className="pm-number text-[10px] text-pitch-600 w-4 flex-shrink-0">{i + 1}</span>
                             <div className="w-1.5 h-1.5 rounded-full flex-shrink-0 opacity-80" style={{ background: TEAM_COLORS[t.team] || "#546480" }} />
-                            <span className={`font-display text-sm tracking-wider flex-1 ${i === 0 ? "text-accent" : isPlayoff ? "text-pitch-200" : "text-pitch-400"}`}>{t.team}</span>
+                            <TeamLink abbr={t.team} className={`font-display text-sm tracking-wider flex-1 block ${i === 0 ? "text-accent" : isPlayoff ? "text-pitch-200" : "text-pitch-400"}`}>{t.team}</TeamLink>
                             {t.streak && <span className={`text-[9px] font-mono hidden sm:inline ${
                               t.streak.startsWith("W") ? "text-win/60"
                               : t.streak.startsWith("L") ? "text-loss/60"

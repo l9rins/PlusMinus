@@ -6,6 +6,21 @@
 import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { AlertCircle, RefreshCw, Wifi, Key, Clock } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+
+// ── Team Link ───────────────────────────────────────────────────
+export function TeamLink({ abbr, children, className, style }) {
+  const navigate = useNavigate();
+  return (
+    <span
+      onClick={(e) => { e.stopPropagation(); navigate(`/team/${abbr}`); }}
+      className={`cursor-pointer hover:text-accent transition-colors ${className ?? ""}`}
+      style={style}
+    >
+      {children}
+    </span>
+  );
+}
 
 // ── Skeleton pulse ────────────────────────────────────────────────
 export function Skeleton({ className = "", style }) {

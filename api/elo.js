@@ -1,4 +1,10 @@
 import { handleOptions, setCORSHeaders } from "./_cors.js";
+import { createClient } from "@vercel/kv";
+
+const kv = createClient({
+  url: process.env.KV_REST_API_URL,
+  token: process.env.KV_REST_API_TOKEN,
+});
 
 const NBA_BASE = "https://stats.nba.com/stats";
 const NBA_HEADERS = {
@@ -136,6 +142,19 @@ export default async function handler(req, res) {
   if (req.method !== "GET") return res.status(405).end();
 
   const season = currentSeasonStr();
+  
+  try {
+    const CACHE_KEY = `elo:${season}`;
+    const cached = await kv.get(CACHE_KEY);
+    if (cached) {
+      res.setHeader("Cache-Control", "s-maxage=3600, stale-while-revalidate=300");
+      res.setHeader("Content-Type", "application/json");
+      return res.status(200).json(cached);
+    }
+  } catch (e) {
+    console.error("KV cache skip:", e);
+  }
+
   const teamEntries = Object.entries(TEAM_IDS); // 30 teams
 
   // Initialize all Elo ratings at 1500
@@ -213,14 +232,23 @@ export default async function handler(req, res) {
   // In the final result build, add a teamsWithData count:
   const teamsWithData = Object.values(gameLogs).filter(log => log.length > 0).length;
 
-  // Cache for 1 hour at the edge — recomputes at most 24 times per day
-  res.setHeader("Cache-Control", "s-maxage=3600, stale-while-revalidate=300");
-  res.setHeader("Content-Type", "application/json");
-  return res.status(200).json({
+  const responsePayload = {
     season,
     teams: result,
     computedAt: new Date().toISOString(),
     teamsWithData,          // client can show a warning if < 30
     partial: teamsWithData < 30,
-  });
+  };
+
+  try {
+    const CACHE_KEY = `elo:${season}`;
+    await kv.set(CACHE_KEY, responsePayload, { ex: 3600 }); // 1hr TTL
+  } catch (e) {
+    console.error("KV cache skip:", e);
+  }
+
+  // Cache for 1 hour at the edge — recomputes at most 24 times per day
+  res.setHeader("Cache-Control", "s-maxage=3600, stale-while-revalidate=300");
+  res.setHeader("Content-Type", "application/json");
+  return res.status(200).json(responsePayload);
 }

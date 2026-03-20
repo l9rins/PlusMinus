@@ -479,14 +479,21 @@ function EloView({ data }) {
 }
 
 // ─── Shot Quality View ────────────────────────────────────────
-function ShotQualityView({ data }) {
+function ShotQualityView({ data, isUsingFallback }) {
   const [selected, setSelected] = useState(0);
   const [compareIdx, setCompareIdx] = useState(null);
   const primary = data[selected];
   const comparison = compareIdx !== null ? data[compareIdx] : null;
   return (
     <motion.div variants={container} initial="hidden" animate="show">
-      <motion.div variants={item} className="pm-label mb-3">Offensive & defensive profiles built from roster-level advanced metrics</motion.div>
+      <motion.div variants={item} className="pm-label mb-3 flex items-center gap-2">
+        <span>Offensive & defensive profiles built from roster-level advanced metrics</span>
+        {isUsingFallback && (
+          <span className="pm-badge bg-draw/10 text-draw border border-draw/20 text-[9px]">
+            Using cached data
+          </span>
+        )}
+      </motion.div>
       <motion.div variants={item} className="flex flex-wrap gap-1.5 mb-4">
         {data.map((t, i) => (
           <button key={t.team}
@@ -704,6 +711,7 @@ export default function Analytics() {
   }, [nbaTeamStats]);
 
   const realPlayers = enrichedPlayers ?? PLAYERS;
+  const isUsingFallback = !enrichedPlayers;
 
   const eloData = useMemo(() => {
     if (!standingsData) return [];
@@ -805,7 +813,7 @@ export default function Analytics() {
             {activeTab === "power" && <PowerIndexView data={powerData} />}
             {activeTab === "factors" && <FourFactorsView data={fourFactors} />}
             {activeTab === "elo" && <EloView data={eloData} />}
-            {activeTab === "quality" && <ShotQualityView data={shotData} />}
+            {activeTab === "quality" && <ShotQualityView data={shotData} isUsingFallback={isUsingFallback} />}
             {activeTab === "playoff" && (isSimulating ? <div className="pm-card p-4 flex justify-center items-center"><div className="text-pitch-500 animate-pulse text-sm">Simulating 10,000 runs...</div></div> : <PlayoffSimView data={playoffData} />)}
           </motion.div>
         </AnimatePresence>

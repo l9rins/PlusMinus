@@ -16,7 +16,7 @@ import {
   formatCurrency, formatPct, kellyBet, DEFAULT_BANKROLL,
   calcROI, breakEven, oddsToImplied,
 } from "../utils";
-import { TileSkeleton, RowSkeleton, ErrorState, FreshnessTag, EmptyState, useToast } from "./ui";
+import { TileSkeleton, RowSkeleton, ErrorState, FreshnessTag, EmptyState, useToast, TeamLink } from "./ui";
 
 // ── Shared animation + tooltip config ────────────────────────────
 const container = { hidden: {}, show: { transition: { staggerChildren: 0.035 } } };
@@ -171,13 +171,13 @@ export function Scores() {
                 {/* Teams */}
                 <div className="flex items-center gap-3 mb-3">
                   <div className="flex-1">
-                    <div
-                      className={`font-display text-2xl tracking-widest leading-none
+                    <TeamLink abbr={g.away}
+                      className={`font-display text-2xl tracking-widest leading-none block
                         ${fav === "away" ? "" : "text-pitch-400"}`}
                       style={{ color: fav === "away" && fav !== null ? awayColor : undefined }}
                     >
                       {g.away}
-                    </div>
+                    </TeamLink>
                     <div className="text-[10px] text-pitch-500 mt-0.5 truncate">
                       {TEAM_NAMES[g.away] || g.away}
                     </div>
@@ -213,13 +213,13 @@ export function Scores() {
                   </div>
 
                   <div className="flex-1 text-right">
-                    <div
-                      className={`font-display text-2xl tracking-widest leading-none
+                    <TeamLink abbr={g.home}
+                      className={`font-display text-2xl tracking-widest leading-none block
                         ${fav === "home" ? "" : "text-pitch-400"}`}
                       style={{ color: fav === "home" && fav !== null ? homeColor : undefined }}
                     >
                       {g.home}
-                    </div>
+                    </TeamLink>
                     <div className="text-[10px] text-pitch-500 mt-0.5 truncate text-right">
                       {TEAM_NAMES[g.home] || g.home}
                     </div>
@@ -445,10 +445,10 @@ export function Standings() {
                         <div className="flex items-center gap-2">
                           <div className="w-2 h-2 rounded-full flex-shrink-0"
                             style={{ background: TEAM_COLORS[t.team] || "#546480" }} />
-                          <span className={`font-display text-base tracking-wider
+                          <TeamLink abbr={t.team} className={`font-display text-base tracking-wider block
                             ${isFirst ? "text-accent" : isPlayoff ? "text-pitch-200" : "text-pitch-400"}`}>
                             {t.team}
-                          </span>
+                          </TeamLink>
                           {isPlayIn && (
                             <span className="text-[9px] text-draw border border-draw/30
                                              bg-draw/10 px-1.5 py-0.5 rounded">
@@ -573,7 +573,9 @@ export function Betting() {
       });
     }
 
-    return edges.sort((a, b) => {
+    return edges
+      .filter(e => e.modelP !== null)
+      .sort((a, b) => {
       const order = { high: 0, mid: 1, low: 2, none: 3 };
       // Arb opportunities always first
       if (a.isArb && !b.isArb) return -1;
@@ -922,6 +924,45 @@ export function BetTracker() {
     toast.success("Bet logged!");
   }, [form, toast, bets, saveBets]);
 
+  const [editingBet, setEditingBet] = useState(null);
+
+  const updateBet = useCallback(async () => {
+    const { game, pick, odds, stake } = form;
+    if (!game.trim() || !pick.trim() || !odds || !stake) {
+      setFormError("Game, Pick, Odds, and Stake are required."); return;
+    }
+    const oddsNum = parseFloat(odds);
+    if (isNaN(oddsNum) || oddsNum === 0) {
+      setFormError("Odds must be a valid number (e.g. -110 or +150)."); return;
+    }
+    if (parseFloat(stake) <= 0) {
+      setFormError("Stake must be greater than $0."); return;
+    }
+    setFormError("");
+
+    const updated = bets.map(b =>
+      b.id === editingBet.id
+        ? { ...form, id: b.id, odds: oddsNum, stake: parseFloat(stake) }
+        : b
+    );
+    setBets(updated);
+    setEditingBet(null);
+    setForm({ game: "", type: "Moneyline", pick: "", odds: "", stake: "", result: "pending" });
+    try {
+      await saveBets(updated);
+      toast.success("Bet updated!");
+    } catch {
+      setBets(bets);
+      toast.error("Update failed — rolled back.");
+    }
+  }, [form, editingBet, bets, saveBets, toast]);
+
+  const cancelEdit = () => {
+    setEditingBet(null);
+    setForm({ game: "", type: "Moneyline", pick: "", odds: "", stake: "", result: "pending" });
+    setFormError("");
+  };
+
   const deleteBet = async (id) => {
     const newBets = bets.filter(b => b.id !== id);
     setBets(newBets);
@@ -1073,12 +1114,17 @@ export function BetTracker() {
         )}
 
         <div className="flex items-center gap-3">
-          <button onClick={addBet} disabled={isSaving} className="pm-btn disabled:opacity-50 disabled:cursor-not-allowed">
+          <button onClick={editingBet ? updateBet : addBet} disabled={isSaving} className="pm-btn disabled:opacity-50 disabled:cursor-not-allowed">
             {isSaving
               ? <><Loader size={13} strokeWidth={1.8} className="animate-spin" /> Saving...</>
-              : <><Plus size={13} strokeWidth={1.8} /> Add bet</>
+              : editingBet
+                ? "Update bet"
+                : <><Plus size={13} strokeWidth={1.8} /> Add bet</>
             }
           </button>
+          {editingBet && !isSaving && (
+            <button onClick={cancelEdit} className="pm-btn-ghost">Cancel</button>
+          )}
           {formError && (
             <motion.span initial={{ opacity: 0, x: -4 }} animate={{ opacity: 1, x: 0 }}
               className="text-[11px] text-loss">
@@ -1201,9 +1247,16 @@ export function BetTracker() {
                         </button>
                       )}
                     </td>
-                    <td className="px-3 py-2.5">
+                    <td className="px-3 py-2.5 flex items-center justify-end gap-1">
+                      <button onClick={() => {
+                          setEditingBet(b);
+                          setForm({ game: b.game, type: b.type, pick: b.pick, odds: b.odds, stake: b.stake, result: b.result });
+                        }}
+                        className="text-[10px] text-pitch-600 hover:text-accent transition-colors p-0.5 rounded px-1.5" title="Edit bet">
+                        Edit
+                      </button>
                       <button onClick={() => deleteBet(b.id)}
-                        className="text-pitch-600 hover:text-loss transition-colors p-0.5 rounded">
+                        className="text-pitch-600 hover:text-loss transition-colors p-0.5 rounded" title="Delete bet">
                         <X size={13} strokeWidth={1.8} />
                       </button>
                     </td>
