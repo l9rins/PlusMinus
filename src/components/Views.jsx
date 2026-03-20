@@ -10,7 +10,7 @@ import {
   Zap, ExternalLink, AlertTriangle, CheckCircle,
 } from "lucide-react";
 import { TEAM_NAMES, ODDS_GAMES, TEAM_COLORS } from "../data";
-import { useStandings, useTodayGames, useOdds, mergeOddsIntoGames } from "../api";
+import { useStandings, useTodayGames, useOdds, mergeOddsIntoGames, useBets } from "../api";
 import {
   calcPL, BET_STORAGE_KEY, lsGet, lsSet,
   formatCurrency, formatPct, kellyBet, DEFAULT_BANKROLL,
@@ -898,7 +898,8 @@ const RESULT_OPTIONS = [
 ];
 
 export function BetTracker() {
-  const [bets,         setBets]         = useState(loadBets);
+  const { bets: savedBets, isLoading: betsLoading, saveBets } = useBets();
+  const [bets,         setBets]         = useState([]);
   const [form,         setForm]         = useState({
     game: "", type: "Moneyline", pick: "", odds: "", stake: "", result: "pending",
   });
@@ -907,7 +908,9 @@ export function BetTracker() {
   const [filterResult, setFilterResult] = useState("all");
   const toast = useToast();
 
-  useEffect(() => { lsSet(BET_STORAGE_KEY, bets); }, [bets]);
+  useEffect(() => {
+    if (savedBets.length > 0 || !betsLoading) setBets(savedBets);
+  }, [savedBets, betsLoading]);
 
   const addBet = useCallback(() => {
     const { game, pick, odds, stake } = form;
@@ -922,22 +925,32 @@ export function BetTracker() {
       setFormError("Stake must be greater than $0."); return;
     }
     setFormError("");
-    setBets(prev => [{
+    const newBets = [{
       ...form, id: Date.now(), odds: oddsNum, stake: parseFloat(stake),
-    }, ...prev]);
+    }, ...bets];
+    setBets(newBets);
+    saveBets(newBets);
     setForm({ game: "", type: "Moneyline", pick: "", odds: "", stake: "", result: "pending" });
     toast.success("Bet logged!");
-  }, [form, toast]);
+  }, [form, toast, bets, saveBets]);
 
-  const deleteBet    = id    => setBets(prev => prev.filter(b => b.id !== id));
+  const deleteBet = id => {
+    const newBets = bets.filter(b => b.id !== id);
+    setBets(newBets);
+    saveBets(newBets);
+  };
   const updateResult = (id, r) => {
-    setBets(prev => prev.map(b => b.id === id ? { ...b, result: r } : b));
+    const newBets = bets.map(b => b.id === id ? { ...b, result: r } : b);
+    setBets(newBets);
+    saveBets(newBets);
     setEditingId(null);
     toast.success("Result updated.");
   };
   const clearAll = () => {
     if (window.confirm("Clear all bets? This cannot be undone.")) {
-      setBets([]); toast.info("Bet log cleared.");
+      setBets([]);
+      saveBets([]); 
+      toast.info("Bet log cleared.");
     }
   };
 

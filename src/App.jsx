@@ -1,8 +1,9 @@
-import { useState, useEffect, useCallback, Suspense, Component, lazy } from "react";
+import { useState, useEffect, useCallback, Suspense, lazy } from "react";
 import {
   BrowserRouter, Routes, Route, Navigate,
   useNavigate, useLocation,
 } from "react-router-dom";
+import { SignedIn, SignedOut, SignIn } from "@clerk/clerk-react";
 import { AnimatePresence, motion } from "framer-motion";
 import TopNav from "./components/TopNav";
 import { ToastContainer } from "./components/ui";
@@ -136,7 +137,19 @@ function AppInner() {
   const activeTab = ROUTE_META[location.pathname]?.tab || "dashboard";
 
   return (
-    <div className="min-h-screen bg-pitch-900">
+  <div className="min-h-screen bg-pitch-900">
+    <SignedOut>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center mb-8">
+          <div className="font-display text-5xl tracking-widest text-accent mb-2">±</div>
+          <div className="font-display text-2xl tracking-[4px] text-pitch-50 mb-1">PLUSMINUS</div>
+          <div className="text-[11px] tracking-[2px] text-pitch-500 uppercase mb-8">NBA Analytics</div>
+          <SignIn routing="hash" />
+        </div>
+      </div>
+    </SignedOut>
+
+    <SignedIn>
       <div role="status" aria-live="polite" aria-atomic="true" className="sr-only">
         {ROUTE_META[location.pathname]?.title} page
       </div>
@@ -172,13 +185,13 @@ function AppInner() {
       </main>
 
       <ToastContainer />
-
       <div className="hidden sm:block fixed bottom-3 right-4 z-10 pointer-events-none select-none">
         <div className="text-[9px] text-pitch-700 font-mono">
           D·S·L·P·B·T·A &nbsp;shortcuts &nbsp;|&nbsp; / &nbsp;search
         </div>
       </div>
-    </div>
+    </SignedIn>
+  </div>
   );
 }
 

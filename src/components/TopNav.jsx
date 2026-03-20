@@ -6,6 +6,7 @@ import {
   TrendingUp, Activity, ChevronDown, Search, Bell,
   Settings, X, Menu, Zap, ChevronRight, Sun, Moon,
 } from "lucide-react";
+import { UserButton } from "@clerk/clerk-react";
 import { useTodayGames, useOdds } from "../api";
 
 // ── Nav definition ────────────────────────────────────────────────
@@ -493,6 +494,15 @@ export default function TopNav({ activeTab, onTabChange }) {
               <button className="pm-nav-btn" title="Toggle theme" aria-label="Toggle theme" onClick={toggleTheme}>
                 {isLight ? <Moon size={13} strokeWidth={1.8} /> : <Sun size={13} strokeWidth={1.8} />}
               </button>
+
+              <UserButton
+                appearance={{
+                  elements: {
+                    avatarBox: "w-7 h-7",
+                    userButtonPopoverCard: "bg-pitch-800 border border-pitch-600",
+                  }
+                }}
+              />
 
               {/* Settings */}
               <button className="pm-nav-btn" title="Settings" aria-label="Settings"

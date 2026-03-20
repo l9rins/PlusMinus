@@ -8,6 +8,7 @@
 //   Search         → BDL /players endpoint        (BDL_API_KEY, free tier)
 
 import { useQuery } from "@tanstack/react-query";
+import { useAuth } from "@clerk/clerk-react";
 import {
     EAST_STANDINGS as EAST_FALLBACK,
     WEST_STANDINGS as WEST_FALLBACK,
@@ -386,3 +387,37 @@ export const queryClientConfig = {
         },
     },
 };
+
+// ── Bets Persistence ─────────────────────────────────────────────
+export function useBets() {
+  const { getToken } = useAuth();
+
+  const query = useQuery({
+    queryKey: ["bets"],
+    queryFn: async () => {
+      const token = await getToken();
+      const res = await fetch("/api/bets", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error("Failed to load bets");
+      return res.json();
+    },
+    staleTime: Infinity, // bets don't go stale — user controls them
+  });
+
+  const saveBets = async (bets) => {
+    const token = await getToken();
+    await fetch("/api/bets", {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(bets),
+    });
+    // Invalidate query so it refetches on next mount
+    query.refetch();
+  };
+
+  return { bets: query.data ?? [], isLoading: query.isLoading, saveBets };
+}
