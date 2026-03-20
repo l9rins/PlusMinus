@@ -1,4 +1,24 @@
-import { handleOptions, setCORSHeaders } from "./_cors.js";
+// api/bets/[id].js — Vercel Serverless Function
+//
+// Handles DELETE /api/bets/:id
+//
+// Why a separate file instead of adding DELETE to api/bets.js:
+//   Vercel routes by filename. api/bets.js handles /api/bets (no segment).
+//   api/bets/[id].js handles /api/bets/:id (dynamic segment).
+//   The two files can coexist — Vercel picks the more specific route first.
+//
+// ID contract:
+//   Bet IDs are client-generated strings (nanoid, crypto.randomUUID, or
+//   Date.now().toString()). The server treats them as opaque strings and
+//   never generates them — it just filters by equality.
+//
+// Atomic pattern:
+//   GET bets array → filter out target id → SET back.
+//   Vercel KV has no native array-element delete, so this is the correct
+//   approach. The operation is fast (single round-trip per op on KV) and
+//   safe because Vercel KV GET+SET is serialized per key within a region.
+
+import { handleOptions, setCORSHeaders } from "../_cors.js";
 import { createClient } from "@vercel/kv";
 import { createClerkClient } from "@clerk/backend";
 
@@ -21,65 +41,43 @@ async function getUserId(req) {
   }
 }
 
-// ── FIX: Validate each bet object before writing to KV ────────────
-// Previously only Array.isArray + length were checked. A malformed or
-// malicious payload was stored as-is and would crash any component
-// reading it back.
-//
-// Rules:
-//   • Each bet must be a plain object (not null, not an array)
-//   • Required string fields: id, result
-//   • Required numeric fields: stake, odds
-//   • result must be one of the four known values
-//   • No extra nesting — deeply nested objects are rejected
-const VALID_RESULTS = new Set(["win", "loss", "push", "pending"]);
-
-function isValidBet(bet) {
-  if (!bet || typeof bet !== "object" || Array.isArray(bet)) return false;
-  if (typeof bet.id !== "string" || !bet.id.trim()) return false;
-  if (typeof bet.stake !== "number" || !isFinite(bet.stake) || bet.stake < 0) return false;
-  if (typeof bet.odds !== "number" || !isFinite(bet.odds)) return false;
-  if (!VALID_RESULTS.has(bet.result)) return false;
-  return true;
-}
-
 export default async function handler(req, res) {
+  // Allow OPTIONS preflight — _cors.js handles the headers
   if (handleOptions(req, res)) return;
   const origin = req.headers.origin || "";
   setCORSHeaders(res, origin);
 
+  // Only DELETE is handled here; everything else is 405
+  if (req.method !== "DELETE") {
+    res.setHeader("Allow", "DELETE, OPTIONS");
+    return res.status(405).json({ error: "Method not allowed" });
+  }
+
+  // Auth
   const userId = await getUserId(req);
   if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
-  const key = `bets:${userId}`;
-
-  if (req.method === "GET") {
-    const bets = await kv.get(key);
-    return res.status(200).json(bets ?? []);
+  // Extract :id from the URL path — Vercel puts it in req.query.id
+  const betId = req.query.id;
+  if (!betId || typeof betId !== "string" || !betId.trim()) {
+    return res.status(400).json({ error: "Missing or invalid bet id" });
   }
 
-  if (req.method === "PUT") {
-    const bets = req.body;
+  const kvKey = `bets:${userId}`;
 
-    if (!Array.isArray(bets)) {
-      return res.status(400).json({ error: "Body must be an array" });
-    }
+  // Read current array
+  const existing = await kv.get(kvKey);
+  const bets = Array.isArray(existing) ? existing : [];
 
-    if (bets.length > 500) {
-      return res.status(400).json({ error: "Maximum 500 bets allowed" });
-    }
-
-    // FIX: validate every element before persisting
-    const invalidIdx = bets.findIndex(b => !isValidBet(b));
-    if (invalidIdx !== -1) {
-      return res.status(400).json({
-        error: `Invalid bet at index ${invalidIdx}. Each bet must have: id (string), stake (number ≥ 0), odds (number), result (win|loss|push|pending).`,
-      });
-    }
-
-    await kv.set(key, bets);
-    return res.status(200).json({ ok: true });
+  // Check the bet actually exists before writing
+  const idx = bets.findIndex(b => b.id === betId);
+  if (idx === -1) {
+    return res.status(404).json({ error: `Bet '${betId}' not found` });
   }
 
-  return res.status(405).end();
+  // Filter it out and persist
+  const updated = bets.filter(b => b.id !== betId);
+  await kv.set(kvKey, updated);
+
+  return res.status(200).json({ ok: true, deleted: betId, remaining: updated.length });
 }
