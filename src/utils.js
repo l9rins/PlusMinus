@@ -248,3 +248,19 @@ export const lsRemove = (key) => {
     return true;
   } catch { return false; }
 };
+
+/**
+ * NBA Stats API always returns:
+ * { resultSets: [{ name, headers: [...], rowSet: [[...], [...]] }] }
+ * This turns any resultSet into an array of plain objects.
+ */
+export function reshapeNBAStats(data, setName = null) {
+  const resultSet = setName
+    ? data?.resultSets?.find(rs => rs.name === setName)
+    : data?.resultSets?.[0];
+  if (!resultSet) return [];
+  const { headers, rowSet } = resultSet;
+  return rowSet.map(row =>
+    Object.fromEntries(headers.map((h, i) => [h, row[i]]))
+  );
+}

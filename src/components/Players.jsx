@@ -5,9 +5,9 @@ import {
   GitCompare, TrendingUp, TrendingDown, Minus, Star,
   BarChart2, Shield, Zap, Target, Award, ArrowUpDown,
 } from "lucide-react";
-import { TEAM_COLORS, TEAM_NAMES } from "../data";
-import { usePlayers, usePlayerSearch } from "../api";
-import { signed, netRatingTier, formatPct } from "../utils";
+import { TEAM_COLORS, TEAM_NAMES, PLAYERS } from "../data";
+import { useLeaguePlayerStats, usePlayerSearch } from "../api";
+import { signed, netRatingTier, formatPct, reshapeNBAStats } from "../utils";
 import { TileSkeleton, ErrorState, EmptyState } from "./ui";
 
 // ─── Constants ────────────────────────────────────────────────
@@ -540,7 +540,28 @@ export default function Players({ initialQuery = "" }) {
     if (isSearchMode) setComparePlayer(null);
   }, [isSearchMode]);
 
-  const { data: staticPlayers, isLoading: staticLoading, isError: staticError, refetch } = usePlayers();
+  const { data: nbaPlayerStats, isLoading: staticLoading, isError: staticError, refetch } = useLeaguePlayerStats();
+
+  const staticPlayers = useMemo(() => {
+    if (!nbaPlayerStats) return PLAYERS;
+    const rows = reshapeNBAStats(nbaPlayerStats, "LeagueDashPlayerStats");
+    return rows
+      .filter(r => r.GP >= 10)
+      .map(r => ({
+        id: r.PLAYER_ID,
+        name: r.PLAYER_NAME,
+        pos: "—",
+        team: r.TEAM_ABBREVIATION,
+        age: r.AGE,
+        pts: +r.PTS.toFixed(1),
+        ast: +r.AST.toFixed(1),
+        reb: +r.REB.toFixed(1),
+        ts: r.TS_PCT != null ? +(r.TS_PCT * 100).toFixed(1) : null,
+        per: null, bpm: null, vorp: null,
+        ortg: null, drtg: null,
+        form: null,
+      }));
+  }, [nbaPlayerStats]);
   const {
     data: searchResults,
     isLoading: searchLoading,

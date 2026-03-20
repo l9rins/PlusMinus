@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
@@ -6,6 +6,7 @@ import {
   TrendingUp, Activity, ChevronDown, Search, Bell,
   Settings, X, Menu, Zap, ChevronRight, Sun, Moon,
 } from "lucide-react";
+import { useTodayGames, useOdds } from "../api";
 
 // ── Nav definition ────────────────────────────────────────────────
 const NAV_ITEMS = [
@@ -193,6 +194,59 @@ export default function TopNav({ activeTab, onTabChange }) {
   const [isLight, setIsLight] = useState(false);
   const timeoutRef = useRef(null);
   const searchInputRef = useRef(null);
+
+  const { data: games } = useTodayGames();
+  const { data: oddsData } = useOdds();
+
+  const notifications = useMemo(() => {
+    const items = [];
+    
+    // Live games
+    (games || [])
+      .filter(g => g.status === "live")
+      .forEach(g => items.push({
+        id: `live-${g.id}`,
+        icon: Activity,
+        text: `${g.away} @ ${g.home} — Q${g.period} · ${g.awayScore}–${g.homeScore}`,
+        time: "Live",
+        color: "text-win",
+        action: () => { navigate("/scores"); setNotifOpen(false); }
+      }));
+
+    // High-edge bets from real odds
+    if (oddsData) {
+      Object.entries(oddsData)
+        .map(([key, o]) => {
+          const [away, home] = key.split("@");
+          const favIsHome = o.homeP >= o.awayP;
+          const edge = (favIsHome ? o.homeP : o.awayP) - (favIsHome ? o.consHomeP : o.consAwayP);
+          return { away, home, edge, fav: favIsHome ? home : away };
+        })
+        .filter(g => g.edge >= 8)
+        .forEach(g => items.push({
+          id: `edge-${g.away}-${g.home}`,
+          icon: TrendingUp,
+          text: `High edge detected: ${g.fav} in ${g.away} @ ${g.home} (+${g.edge.toFixed(1)}%)`,
+          time: "Now",
+          color: "text-win",
+          action: () => { navigate("/betting"); setNotifOpen(false); }
+        }));
+    }
+
+    // Upcoming games starting within 2 hours
+    (games || [])
+      .filter(g => g.status === "scheduled")
+      .forEach(g => items.push({
+        id: `sched-${g.id}`,
+        icon: Zap,
+        text: `${g.away} @ ${g.home} tips off at ${g.time}`,
+        time: "Tonight",
+        color: "text-accent",
+        action: () => { navigate("/scores"); setNotifOpen(false); }
+      }));
+
+    return items.slice(0, 5); // cap at 5
+  }, [games, oddsData, navigate]);
 
   useEffect(() => {
     if (localStorage.getItem("pm-theme") === "light") {
@@ -384,6 +438,9 @@ export default function TopNav({ activeTab, onTabChange }) {
                   className={`pm-nav-btn relative ${notifOpen ? "text-accent bg-accent/10" : ""}`}
                 >
                   <Bell size={13} strokeWidth={1.8} />
+                  {notifications.length > 0 && (
+                    <div className="absolute top-2 right-2 w-1.5 h-1.5 bg-accent rounded-full animate-pulse-glow" />
+                  )}
                 </button>
 
                 <AnimatePresence>
@@ -404,19 +461,17 @@ export default function TopNav({ activeTab, onTabChange }) {
                         </button>
                       </div>
                       <div className="px-4 py-3 space-y-2.5">
-                        {[
-                          { icon: Zap, text: "OKC vs BKN tips off in 2h", time: "Now", color: "text-accent" },
-                          { icon: TrendingUp, text: "New high-edge bet identified", time: "15m", color: "text-win" },
-                          { icon: Activity, text: "Live game: PHX leads LAL 87–82", time: "32m", color: "text-draw" },
-                        ].map((n, i) => (
-                          <div key={i} className="flex items-start gap-2.5 cursor-pointer group">
+                        {notifications.length === 0 ? (
+                          <div className="text-[11px] text-pitch-500 text-center py-2 border border-pitch-700 border-dashed rounded-lg">No active game alerts or edges.</div>
+                        ) : notifications.map((n) => (
+                          <div key={n.id} onClick={n.action} className="flex items-start gap-2.5 cursor-pointer group">
                             <div className={`w-7 h-7 rounded-md bg-pitch-700 flex items-center
                                             justify-center flex-shrink-0 ${n.color}`}>
                               <n.icon size={12} strokeWidth={1.8} />
                             </div>
                             <div className="flex-1 min-w-0">
                               <div className="text-[11px] text-pitch-200 leading-snug">{n.text}</div>
-                              <div className="text-[10px] text-pitch-500 mt-0.5">{n.time} ago</div>
+                              <div className="text-[10px] text-pitch-500 mt-0.5">{n.time}</div>
                             </div>
                             <ChevronRight size={10} className="text-pitch-600 group-hover:text-pitch-400
                                                                mt-1 transition-colors flex-shrink-0" />

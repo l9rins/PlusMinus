@@ -18,9 +18,9 @@ import {
 import {
   EAST_STANDINGS, WEST_STANDINGS, PLAYERS, TEAM_NAMES, TEAM_COLORS,
 } from "../data";
-import { useStandings, usePlayers } from "../api";
+import { useStandings, usePlayers, useLeagueTeamStats, useLeaguePlayerStats } from "../api";
 import { FreshnessTag, RowSkeleton, ErrorState } from "./ui";
-import { signed } from "../utils";
+import { signed, reshapeNBAStats } from "../utils";
 import { TrendingUp, BarChart2, Zap, Award, Info, Star, Trophy } from "lucide-react";
 import PlayoffBracket from "./PlayoffBracket";
 
@@ -44,27 +44,6 @@ const tooltipStyle = {
   cursor: { stroke: "#2e3a50", strokeWidth: 1 },
 };
 
-// ─── Four Factors ─────────────────────────────────────────────
-function computeFourFactors(standings) {
-  const allTeams = [...(standings?.east || EAST_STANDINGS), ...(standings?.west || WEST_STANDINGS)];
-  return allTeams.map(t => {
-    const abbr = t.team;
-    const teamPlayers = PLAYERS.filter(p => p.team === abbr);
-    const best = teamPlayers.length > 0 ? teamPlayers.reduce((a, b) => (a.per ?? 0) > (b.per ?? 0) ? a : b) : null;
-    return {
-      team: abbr, name: TEAM_NAMES[abbr] || abbr, w: t.w, l: t.l, pct: t.pct,
-      efg: +(42 + t.pct * 16 + teamSeed(abbr, 0) * 2.1).toFixed(1),
-      tov: +(16.5 - t.pct * 5 + teamSeed(abbr, 1) * 1.4).toFixed(1),
-      orb: +(24 + t.pct * 8 + teamSeed(abbr, 2) * 2.8).toFixed(1),
-      ftRate: +(0.22 + t.pct * 0.1 + teamSeed(abbr, 3) * 0.04).toFixed(3),
-      netRtg: best
-        ? +((best.ortg ?? 110) - (best.drtg ?? 112) + teamSeed(abbr, 4) * 1.5).toFixed(1)
-        : +(t.pct * 22 - 5 + teamSeed(abbr, 5) * 2).toFixed(1),
-      ortg: best?.ortg ?? 110, drtg: best?.drtg ?? 112,
-      color: TEAM_COLORS[abbr] || "#546480",
-    };
-  }).sort((a, b) => b.netRtg - a.netRtg);
-}
 
 // ─── Elo ──────────────────────────────────────────────────────
 function computeElo(standings) {
@@ -711,10 +690,52 @@ export default function Analytics() {
   });
   const { data: standingsData, isLoading, isError, isFetching, refetch, dataUpdatedAt } = useStandings();
   const { data: playersData } = usePlayers();
+  const { data: nbaTeamStats } = useLeagueTeamStats();
+  const { data: nbaPlayerStats } = useLeaguePlayerStats();
 
-  const fourFactors = useMemo(() => standingsData ? computeFourFactors(standingsData) : [], [standingsData]);
+  const fourFactors = useMemo(() => {
+    if (!standingsData || !nbaTeamStats) return [];
+    const rows = reshapeNBAStats(nbaTeamStats, "LeagueDashTeamStats");
+    
+    return rows.map(r => ({
+      team: r.TEAM_ABBREVIATION,
+      name: r.TEAM_NAME,
+      w: r.W, l: r.L,
+      pct: r.W_PCT,
+      efg: +(r.EFG_PCT * 100).toFixed(1),
+      tov: +(r.TM_TOV_PCT * 100).toFixed(1),
+      orb: +(r.OREB_PCT * 100).toFixed(1),
+      ftRate: +r.FTA_RATE.toFixed(3),
+      netRtg: +r.NET_RATING.toFixed(1),
+      ortg: +r.OFF_RATING.toFixed(1),
+      drtg: +r.DEF_RATING.toFixed(1),
+      color: TEAM_COLORS[r.TEAM_ABBREVIATION] || "#546480",
+    })).sort((a, b) => b.netRtg - a.netRtg);
+  }, [standingsData, nbaTeamStats]);
+
+  const realPlayers = useMemo(() => {
+    if (!nbaPlayerStats) return PLAYERS;
+    const rows = reshapeNBAStats(nbaPlayerStats, "LeagueDashPlayerStats");
+    return rows
+      .filter(r => r.GP >= 10)
+      .map(r => ({
+        id: r.PLAYER_ID,
+        name: r.PLAYER_NAME,
+        pos: "—",
+        team: r.TEAM_ABBREVIATION,
+        age: r.AGE,
+        pts: +r.PTS.toFixed(1),
+        ast: +r.AST.toFixed(1),
+        reb: +r.REB.toFixed(1),
+        ts: r.TS_PCT != null ? +(r.TS_PCT * 100).toFixed(1) : null,
+        per: null, bpm: null, vorp: null,
+        ortg: null, drtg: null,
+        form: null,
+      }));
+  }, [nbaPlayerStats]);
+
   const eloData = useMemo(() => standingsData ? computeElo(standingsData) : [], [standingsData]);
-  const shotData = useMemo(() => computeShotQuality(playersData ?? PLAYERS), [playersData]);
+  const shotData = useMemo(() => computeShotQuality(realPlayers), [realPlayers]);
   const powerData = useMemo(() =>
     fourFactors.length && eloData.length && shotData.length
       ? computePowerIndex(fourFactors, eloData, shotData) : [],

@@ -77,6 +77,52 @@ async function oddsFetch(signal) {
     return res.json();
 }
 
+// ── NBA stats proxy fetcher ───────────────────────────────────────
+async function nbaFetch(endpoint, params = {}, signal) {
+  const qs = new URLSearchParams({ endpoint, ...params });
+  const res = await fetch(`/api/nba?${qs}`, { signal });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new ApiError(body.error || `NBA proxy ${res.status}`, res.status);
+  }
+  return res.json();
+}
+
+// Real team stats — eFG%, TOV%, ORB%, FT Rate, NetRtg, OffRtg, DefRtg
+export function useLeagueTeamStats() {
+  return useQuery({
+    queryKey: ["nba", "leagueTeamStats", currentSeason()],
+    queryFn: async ({ signal }) => {
+      const data = await nbaFetch("leaguedashteamstats", {
+        Season: `${currentSeason() - 1}-${String(currentSeason()).slice(2)}`,
+        SeasonType: "Regular Season",
+        PerMode: "PerGame",
+        MeasureType: "Advanced",
+      }, signal);
+      return data;
+    },
+    staleTime: 1000 * 60 * 10,
+    retry: shouldRetry,
+  });
+}
+
+// Real player stats — PTS, AST, REB, TS%, PER, BPM etc.
+export function useLeaguePlayerStats() {
+  return useQuery({
+    queryKey: ["nba", "leaguePlayerStats", currentSeason()],
+    queryFn: async ({ signal }) => {
+      const data = await nbaFetch("leaguedashplayerstats", {
+        Season: `${currentSeason() - 1}-${String(currentSeason()).slice(2)}`,
+        SeasonType: "Regular Season",
+        PerMode: "PerGame",
+      }, signal);
+      return data;
+    },
+    staleTime: 1000 * 60 * 10,
+    retry: shouldRetry,
+  });
+}
+
 // ── Server config ─────────────────────────────────────────────────
 export function useServerConfig() {
     return useQuery({
