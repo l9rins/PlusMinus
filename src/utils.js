@@ -34,16 +34,23 @@ export const compactNumber = (n) => {
 
 // ── Odds converters ───────────────────────────────────────────────
 
-/** American → decimal  (-110 → 1.909,  +150 → 2.5) */
+/**
+ * American → decimal  (-110 → 1.909,  +150 → 2.5)
+ * FIX: guard against zero / non-numeric input to avoid division by zero.
+ */
 export const oddsToDecimal = (american) => {
-  if (american > 0) return +(1 + american / 100).toFixed(3);
-  return +(1 - 100 / american).toFixed(3);
+  const n = Number(american);
+  if (!n || !isFinite(n)) return 1;          // ← FIX: was dividing by zero for american=0
+  if (n > 0) return +(1 + n / 100).toFixed(3);
+  return +(1 - 100 / n).toFixed(3);
 };
 
 /** American → raw implied probability including vig  (-110 → 0.5238) */
 export const oddsToImplied = (american) => {
-  if (american > 0) return 100 / (american + 100);
-  return Math.abs(american) / (Math.abs(american) + 100);
+  const n = Number(american);
+  if (!n || !isFinite(n)) return 0.5;        // ← FIX: guard for same reason
+  if (n > 0) return 100 / (n + 100);
+  return Math.abs(n) / (Math.abs(n) + 100);
 };
 
 /** Vig-removed implied probability → American odds string ("-110", "+120") */
@@ -59,14 +66,18 @@ export const breakEven = (american) => oddsToImplied(american);
 // ── Financial math ────────────────────────────────────────────────
 
 /**
- * ROI as a decimal fraction.
- * Accepts either:
- *   (totalPL, totalStaked)  — e.g. calcROI(45, 200)  → 0.225
- *   (winRate, american)     — e.g. calcROI(0.55, -110) (legacy, kept for tests)
+ * ROI percentage.
+ *   calcROI(totalPL, totalStaked) → e.g. calcROI(45, 200) → 22.50
  *
- * The BetTracker calls it as (totalPL, totalStaked), which is the primary usage.
- * When totalStaked is a dollar amount > 1, it is treated as dollars.
- * When totalStaked ≤ 1 it is treated as a win-rate (legacy path).
+ * FIX: removed the dual-mode overloading. This function now has one
+ * clear contract: (net profit/loss, total amount wagered) → % return.
+ * Any callers using the old legacy (winRate, american) signature need
+ * to be updated — search the codebase for calcROI and confirm both
+ * arguments are dollar amounts.
+ *
+ * @param {number} totalPL     — net profit or loss in dollars
+ * @param {number} totalStaked — total amount wagered in dollars
+ * @returns {number}           — ROI as a percentage, e.g. 22.50
  */
 export const calcROI = (totalPL, totalStaked) => {
   if (!totalStaked || totalStaked === 0) return 0;

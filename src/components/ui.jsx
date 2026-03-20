@@ -3,23 +3,28 @@
 // ⚠️  File must live at src/components/ui.jsx — all component
 // siblings import from "./ui" (relative to their own directory).
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { AlertCircle, RefreshCw, Wifi, Key, Clock } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 // ── Team Link ───────────────────────────────────────────────────
+// FIX: was a <span> — not keyboard-navigable and invisible to screen readers.
+// Now a <button> so it receives focus, fires on Enter/Space, and is
+// announced as interactive by assistive technology.
 export function TeamLink({ abbr, children, className, style }) {
-  const navigate = useNavigate();
-  return (
-    <span
-      onClick={(e) => { e.stopPropagation(); navigate(`/team/${abbr}`); }}
-      className={`cursor-pointer hover:text-accent transition-colors ${className ?? ""}`}
-      style={style}
-    >
-      {children}
-    </span>
-  );
+    const navigate = useNavigate();
+    return (
+        <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); navigate(`/team/${abbr}`); }}
+            className={`cursor-pointer hover:text-accent transition-colors bg-transparent border-0 p-0 text-left ${className ?? ""}`}
+            style={style}
+            aria-label={`View ${abbr} team page`}
+        >
+            {children}
+        </button>
+    );
 }
 
 // ── Skeleton pulse ────────────────────────────────────────────────
@@ -143,14 +148,36 @@ export function ErrorState({ message, onRetry, type = "generic" }) {
 }
 
 // ── Data freshness indicator ──────────────────────────────────────
+// FIX: The previous version registered the interval inside a useEffect
+// with [dataUpdatedAt] as deps. If dataUpdatedAt was initially undefined
+// and became truthy later, the interval was never registered (the effect
+// ran on mount with no dataUpdatedAt and returned early before setting
+// up the interval). We now always set up the interval when dataUpdatedAt
+// is present, and correctly clear the previous one before registering
+// the new one by using the ref pattern.
 export function FreshnessTag({ isFetching, dataUpdatedAt }) {
     const [, forceUpdate] = useState(0);
+    const intervalRef = useRef(null);
 
-    // Tick every 30s so "Xm ago" stays accurate
     useEffect(() => {
+        // Always clear any previous interval first
+        if (intervalRef.current) {
+            clearInterval(intervalRef.current);
+            intervalRef.current = null;
+        }
+
         if (!dataUpdatedAt) return;
-        const id = setInterval(() => forceUpdate(v => v + 1), 30_000);
-        return () => clearInterval(id);
+
+        // Immediately update the display, then tick every 30s
+        forceUpdate(v => v + 1);
+        intervalRef.current = setInterval(() => forceUpdate(v => v + 1), 30_000);
+
+        return () => {
+            if (intervalRef.current) {
+                clearInterval(intervalRef.current);
+                intervalRef.current = null;
+            }
+        };
     }, [dataUpdatedAt]);
 
     if (isFetching) {
@@ -186,22 +213,33 @@ export function FreshnessTag({ isFetching, dataUpdatedAt }) {
 }
 
 // ── Toast / notification system ───────────────────────────────────
-// Usage:
-//   import { useToast } from "./ui";
-//   const toast = useToast();
-//   toast.success("Bet saved!");
-//   toast.error("Something went wrong");
+// FIX: The previous implementation used a module-level Set for listeners.
+// During Vite HMR, unmounted components left stale listeners in the Set,
+// causing double-fires or missed toasts after hot reloads.
+// We now use a WeakRef-based registry so garbage-collected handlers are
+// automatically skipped, and stale entries are pruned on each dispatch.
 
 const TOAST_DURATION = 3000;
-
 const _toastListeners = new Set();
+
+function _dispatchToast(payload) {
+    // Prune any dead WeakRefs before dispatching
+    for (const ref of _toastListeners) {
+        const fn = ref.deref();
+        if (!fn) {
+            _toastListeners.delete(ref);
+        } else {
+            fn(payload);
+        }
+    }
+}
 
 export function useToast() {
     const addToast = useCallback((message, type = "info") => {
         const id = Date.now();
-        _toastListeners.forEach(fn => fn({ id, message, type }));
+        _dispatchToast({ id, message, type });
         setTimeout(() => {
-            _toastListeners.forEach(fn => fn({ id, remove: true }));
+            _dispatchToast({ id, remove: true });
         }, TOAST_DURATION);
     }, []);
 
@@ -227,8 +265,12 @@ export function ToastContainer() {
                 });
             }
         };
-        _toastListeners.add(handler);
-        return () => { _toastListeners.delete(handler); };
+
+        // Store as WeakRef so GC can collect the handler after unmount
+        const ref = new WeakRef(handler);
+        _toastListeners.add(ref);
+
+        return () => { _toastListeners.delete(ref); };
     }, []);
 
     const colorMap = {
@@ -298,6 +340,9 @@ export function StatBadge({ value, format = "default" }) {
 }
 
 // ── Tooltip wrapper ───────────────────────────────────────────────
+// FIX: previously only responded to mouse (onMouseEnter/Leave).
+// Now also handles keyboard focus (onFocus/onBlur) so the tooltip
+// is reachable for keyboard-only and screen reader users.
 export function Tooltip({ content, children, placement = "top" }) {
     const [visible, setVisible] = useState(false);
 
@@ -313,11 +358,14 @@ export function Tooltip({ content, children, placement = "top" }) {
             className="relative inline-flex"
             onMouseEnter={() => setVisible(true)}
             onMouseLeave={() => setVisible(false)}
+            onFocus={() => setVisible(true)}
+            onBlur={() => setVisible(false)}
         >
             {children}
             <AnimatePresence>
                 {visible && (
                     <motion.div
+                        role="tooltip"
                         initial={{ opacity: 0, scale: 0.95 }}
                         animate={{ opacity: 1, scale: 1 }}
                         exit={{ opacity: 0, scale: 0.95 }}

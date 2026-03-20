@@ -14,14 +14,13 @@ const Dashboard = lazy(() => import("./components/Dashboard"));
 const Players = lazy(() => import("./components/Players"));
 const Analytics = lazy(() => import("./components/Analytics"));
 const TeamDetail = lazy(() => import("./components/TeamDetail"));
+const HeadToHead = lazy(() => import("./components/HeadToHead")); // ← NEW
 const Scores = lazy(() => import("./components/Views").then(m => ({ default: m.Scores })));
 const Standings = lazy(() => import("./components/Views").then(m => ({ default: m.Standings })));
 const Betting = lazy(() => import("./components/Views").then(m => ({ default: m.Betting })));
 const BetTracker = lazy(() => import("./components/Views").then(m => ({ default: m.BetTracker })));
 
 // ── Dynamic team theming ──────────────────────────────────────────
-// Call useTeamTheme("OKC") from any view to shift the global --theme-accent
-// CSS variable to that team's brand color — buttons, borders, glows update.
 export function useTeamTheme(teamAbbr) {
   useEffect(() => {
     const color = (teamAbbr && TEAM_COLORS[teamAbbr]) ? TEAM_COLORS[teamAbbr] : null;
@@ -33,7 +32,6 @@ export function useTeamTheme(teamAbbr) {
       const b = parseInt(hex.substring(4, 6), 16);
       document.documentElement.style.setProperty("--theme-accent-rgb", `${r},${g},${b}`);
     }
-    // Always clean up on unmount regardless of whether color was set
     return () => {
       document.documentElement.style.setProperty("--theme-accent", "#00d4aa");
       document.documentElement.style.setProperty("--theme-accent-rgb", "0,212,170");
@@ -50,17 +48,21 @@ const ROUTE_META = {
   "/betting": { title: "Betting", tab: "betting" },
   "/tracker": { title: "Bet Tracker", tab: "tracker" },
   "/analytics": { title: "Analytics", tab: "analytics" },
+  "/compare": { title: "Compare", tab: "compare" }, // ← NEW
 };
 
 const SHORTCUT_ROUTES = {
   d: "/", s: "/scores", l: "/standings", p: "/players",
   b: "/betting", t: "/tracker", a: "/analytics",
+  c: "/compare", // ← NEW — note: was previously used for "C = compare player" in Players.jsx
+  //   that shortcut only fires when a player card is focused, so no conflict
 };
 
 const TAB_ROUTES = {
   dashboard: "/", scores: "/scores", standings: "/standings",
   players: "/players", betting: "/betting", tracker: "/tracker",
   analytics: "/analytics",
+  compare: "/compare", // ← NEW
 };
 
 // ── Page skeleton ─────────────────────────────────────────────────
@@ -76,10 +78,26 @@ function PageSkeleton() {
 }
 
 // ── Error boundary ────────────────────────────────────────────────
+// FIX: the previous "Try again" button called setState immediately,
+// re-rendering the children synchronously. If the error cause hadn't
+// resolved, the component re-threw instantly and the user saw a flash.
+// We now wait 400ms before resetting so there's a brief breathing room
+// (enough for network errors to surface and stale queries to clear).
 class ErrorBoundary extends Component {
-  constructor(props) { super(props); this.state = { hasError: false, error: null }; }
-  static getDerivedStateFromError(error) { return { hasError: true, error }; }
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null, retrying: false };
+  }
+  static getDerivedStateFromError(error) { return { hasError: true, error, retrying: false }; }
   componentDidCatch(e, info) { console.error("[PlusMinus]", e, info); }
+
+  handleRetry = () => {
+    this.setState({ retrying: true });
+    setTimeout(() => {
+      this.setState({ hasError: false, error: null, retrying: false });
+    }, 400);
+  };
+
   render() {
     if (this.state.hasError) {
       return (
@@ -87,8 +105,12 @@ class ErrorBoundary extends Component {
           <div className="text-2xl mb-2">⚠️</div>
           <div className="text-pitch-200 font-medium mb-1">Something went wrong</div>
           <div className="text-pitch-500 text-sm mb-4 font-mono">{this.state.error?.message}</div>
-          <button onClick={() => this.setState({ hasError: false, error: null })} className="pm-btn text-sm">
-            Try again
+          <button
+            onClick={this.handleRetry}
+            disabled={this.state.retrying}
+            className="pm-btn text-sm"
+          >
+            {this.state.retrying ? "Retrying…" : "Try again"}
           </button>
         </div>
       );
@@ -103,7 +125,7 @@ function AppInner() {
   const location = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Document title — handles /team/:abbr dynamically
+  // Document title
   useEffect(() => {
     const meta = ROUTE_META[location.pathname];
     if (meta) {
@@ -116,7 +138,7 @@ function AppInner() {
     }
   }, [location.pathname]);
 
-  // Global keyboard shortcuts (when no input is focused)
+  // Global keyboard shortcuts
   useEffect(() => {
     const handler = (e) => {
       const tag = e.target.tagName.toLowerCase();
@@ -137,61 +159,65 @@ function AppInner() {
   const activeTab = ROUTE_META[location.pathname]?.tab || "dashboard";
 
   return (
-  <div className="min-h-screen bg-pitch-900">
-    <SignedOut>
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center mb-8">
-          <div className="font-display text-5xl tracking-widest text-accent mb-2">±</div>
-          <div className="font-display text-2xl tracking-[4px] text-pitch-50 mb-1">PLUSMINUS</div>
-          <div className="text-[11px] tracking-[2px] text-pitch-500 uppercase mb-8">NBA Analytics</div>
-          <SignIn routing="hash" />
+    <div className="min-h-screen bg-pitch-900">
+      <SignedOut>
+        {/* FIX: was a plain div with no landmark. Screen readers and skip-link
+            navigation couldn't identify this as the page's primary content.
+            Now wrapped in <main> with role="main" for correct document structure. */}
+        <main role="main" className="min-h-screen flex items-center justify-center">
+          <div className="text-center mb-8">
+            <div className="font-display text-5xl tracking-widest text-accent mb-2">±</div>
+            <div className="font-display text-2xl tracking-[4px] text-pitch-50 mb-1">PLUSMINUS</div>
+            <div className="text-[11px] tracking-[2px] text-pitch-500 uppercase mb-8">NBA Analytics</div>
+            <SignIn routing="hash" />
+          </div>
+        </main>
+      </SignedOut>
+
+      <SignedIn>
+        <div role="status" aria-live="polite" aria-atomic="true" className="sr-only">
+          {ROUTE_META[location.pathname]?.title} page
         </div>
-      </div>
-    </SignedOut>
 
-    <SignedIn>
-      <div role="status" aria-live="polite" aria-atomic="true" className="sr-only">
-        {ROUTE_META[location.pathname]?.title} page
-      </div>
+        <TopNav activeTab={activeTab} onTabChange={handleTabChange} />
 
-      <TopNav activeTab={activeTab} onTabChange={handleTabChange} />
+        <main className="max-w-[1400px] mx-auto px-4 py-5">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={location.pathname}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+            >
+              <ErrorBoundary>
+                <Suspense fallback={<PageSkeleton />}>
+                  <Routes>
+                    <Route path="/" element={<Dashboard onNavigate={handleTabChange} />} />
+                    <Route path="/scores" element={<Scores />} />
+                    <Route path="/standings" element={<Standings />} />
+                    <Route path="/players" element={<Players initialQuery={searchQuery} />} />
+                    <Route path="/betting" element={<Betting />} />
+                    <Route path="/tracker" element={<BetTracker />} />
+                    <Route path="/analytics" element={<Analytics />} />
+                    <Route path="/compare" element={<HeadToHead />} /> {/* ← NEW */}
+                    <Route path="/team/:abbr" element={<TeamDetail />} />
+                    <Route path="*" element={<Navigate to="/" replace />} />
+                  </Routes>
+                </Suspense>
+              </ErrorBoundary>
+            </motion.div>
+          </AnimatePresence>
+        </main>
 
-      <main className="max-w-[1400px] mx-auto px-4 py-5">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={location.pathname}
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -6 }}
-            transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
-          >
-            <ErrorBoundary>
-              <Suspense fallback={<PageSkeleton />}>
-                <Routes>
-                  <Route path="/" element={<Dashboard onNavigate={handleTabChange} />} />
-                  <Route path="/scores" element={<Scores />} />
-                  <Route path="/standings" element={<Standings />} />
-                  <Route path="/players" element={<Players initialQuery={searchQuery} />} />
-                  <Route path="/betting" element={<Betting />} />
-                  <Route path="/tracker" element={<BetTracker />} />
-                  <Route path="/analytics" element={<Analytics />} />
-                  <Route path="/team/:abbr" element={<TeamDetail />} />
-                  <Route path="*" element={<Navigate to="/" replace />} />
-                </Routes>
-              </Suspense>
-            </ErrorBoundary>
-          </motion.div>
-        </AnimatePresence>
-      </main>
-
-      <ToastContainer />
-      <div className="hidden sm:block fixed bottom-3 right-4 z-10 pointer-events-none select-none">
-        <div className="text-[9px] text-pitch-700 font-mono">
-          D·S·L·P·B·T·A &nbsp;shortcuts &nbsp;|&nbsp; / &nbsp;search
+        <ToastContainer />
+        <div className="hidden sm:block fixed bottom-3 right-4 z-10 pointer-events-none select-none">
+          <div className="text-[9px] text-pitch-700 font-mono">
+            D·S·L·P·B·T·A·C &nbsp;shortcuts &nbsp;|&nbsp; / &nbsp;search
+          </div>
         </div>
-      </div>
-    </SignedIn>
-  </div>
+      </SignedIn>
+    </div>
   );
 }
 
