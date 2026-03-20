@@ -219,6 +219,23 @@ export function useEnrichedPlayerStats() {
   };
 }
 
+export function useEloData() {
+  return useQuery({
+    queryKey: ["elo", currentSeason()],
+    queryFn: async ({ signal }) => {
+      const res = await fetch("/api/elo", { signal });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new ApiError(body.error || `Elo proxy ${res.status}`, res.status);
+      }
+      return res.json();
+    },
+    staleTime: 1000 * 60 * 60,
+    placeholderData: null,
+    retry: shouldRetry,
+  });
+}
+
 // ── Server config ─────────────────────────────────────────────────
 export function useServerConfig() {
     return useQuery({

@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
     TrendingUp, TrendingDown, Target, BarChart2,

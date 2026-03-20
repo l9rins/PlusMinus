@@ -18,6 +18,7 @@ const ALLOWED_ENDPOINTS = [
   "playerdashboardbyyearoveryear",
   "leaguestandingsv3",
   "commonallplayers",
+  "teamgamelog",
 ];
 
 function cacheTTL(endpoint) {

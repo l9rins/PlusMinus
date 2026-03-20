@@ -18,7 +18,7 @@ import {
 import {
   EAST_STANDINGS, WEST_STANDINGS, PLAYERS, TEAM_NAMES, TEAM_COLORS,
 } from "../data";
-import { useStandings, useLeagueTeamStats, useEnrichedPlayerStats } from "../api";
+import { useStandings, useLeagueTeamStats, useEnrichedPlayerStats, useEloData } from "../api";
 import { FreshnessTag, RowSkeleton, ErrorState } from "./ui";
 import { signed } from "../utils";
 import { TrendingUp, BarChart2, Zap, Award, Info, Star, Trophy } from "lucide-react";
@@ -46,36 +46,23 @@ const tooltipStyle = {
 
 
 // ─── Elo ──────────────────────────────────────────────────────
-function computeElo(standings) {
-  const allTeams = [...(standings?.east || EAST_STANDINGS), ...(standings?.west || WEST_STANDINGS)];
+function buildDerivedTrajectory(t) {
   const BASE = 1500, K = 20;
-  return allTeams.map(t => {
-    const elo = Math.round(BASE + (t.pct - 0.5) * 600 + teamSeed(t.team, 6) * 20);
-    const trajectory = [];
-    let running = BASE;
-    for (let cp = 1; cp <= 10; cp++) {
-      const gAt = Math.round((cp / 10) * (t.w + t.l));
-      const gPrev = Math.round(((cp - 1) / 10) * (t.w + t.l));
-      const seg = gAt - gPrev, wins = Math.round(t.pct * seg);
-      const noise = Math.sin(cp * 0.8 + teamSeed(t.team, cp) * 3) * 12;
-      for (let g = 0; g < seg; g++) {
-        const isW = g < wins;
-        running += K * ((isW ? 1 : 0) - 1 / (1 + Math.pow(10, (BASE - running) / 400)));
-      }
-      trajectory.push({ game: gAt, elo: Math.round(running + noise) });
+  const trajectory = [];
+  let running = BASE;
+  for (let cp = 1; cp <= 10; cp++) {
+    const gAt   = Math.round((cp / 10) * (t.w + t.l));
+    const gPrev = Math.round(((cp - 1) / 10) * (t.w + t.l));
+    const seg   = gAt - gPrev;
+    const wins  = Math.round(t.pct * seg);
+    const noise = Math.sin(cp * 0.8 + teamSeed(t.team, cp) * 3) * 12;
+    for (let g = 0; g < seg; g++) {
+      const isW = g < wins;
+      running += K * ((isW ? 1 : 0) - 1 / (1 + Math.pow(10, (BASE - running) / 400)));
     }
-    const tier = elo >= 1640 ? ["Championship", "text-tier-elite"]
-      : elo >= 1560 ? ["Contender", "text-tier-good"]
-        : elo >= 1480 ? ["Playoff", "text-tier-avg"]
-          : elo >= 1400 ? ["Lottery", "text-tier-poor"]
-            : ["Rebuild", "text-tier-bad"];
-    return {
-      team: t.team, name: TEAM_NAMES[t.team] || t.team,
-      elo, pct: t.pct, w: t.w, l: t.l,
-      tier: tier[0], tierColor: tier[1], trajectory,
-      color: TEAM_COLORS[t.team] || "#546480",
-    };
-  }).sort((a, b) => b.elo - a.elo);
+    trajectory.push({ game: gAt, elo: Math.round(running + noise) });
+  }
+  return trajectory;
 }
 
 // ─── Shot Quality ─────────────────────────────────────────────
@@ -694,6 +681,7 @@ export default function Analytics() {
   const { data: standingsData, isLoading, isError, isFetching, refetch, dataUpdatedAt } = useStandings();
   const { data: nbaTeamStats } = useLeagueTeamStats();
   const { data: enrichedPlayers } = useEnrichedPlayerStats();
+  const { data: eloApiData } = useEloData();
 
   const fourFactors = useMemo(() => {
     if (!nbaTeamStats) return [];
@@ -717,7 +705,41 @@ export default function Analytics() {
 
   const realPlayers = enrichedPlayers ?? PLAYERS;
 
-  const eloData = useMemo(() => standingsData ? computeElo(standingsData) : [], [standingsData]);
+  const eloData = useMemo(() => {
+    if (!standingsData) return [];
+
+    const allTeams = [
+      ...(standingsData.east || EAST_STANDINGS),
+      ...(standingsData.west || WEST_STANDINGS),
+    ];
+
+    return allTeams.map(t => {
+      // Use real Elo from API if available, fall back to derived
+      const apiEntry = eloApiData?.teams?.find(e => e.team === t.team);
+      const elo = apiEntry
+        ? apiEntry.elo
+        : Math.round(1500 + (t.pct - 0.5) * 600 + teamSeed(t.team, 6) * 20);
+
+      // Use real trajectory if available, fall back to derived
+      const trajectory = apiEntry?.trajectory?.length
+        ? apiEntry.trajectory
+        : buildDerivedTrajectory(t); // extract existing trajectory logic into helper
+
+      const tier = elo >= 1640 ? ["Championship", "text-tier-elite"]
+        : elo >= 1560 ? ["Contender",     "text-tier-good"]
+        : elo >= 1480 ? ["Playoff",        "text-tier-avg"]
+        : elo >= 1400 ? ["Lottery",        "text-tier-poor"]
+        :               ["Rebuild",         "text-tier-bad"];
+
+      return {
+        team: t.team, name: TEAM_NAMES[t.team] || t.team,
+        elo, pct: t.pct, w: t.w, l: t.l,
+        tier: tier[0], tierColor: tier[1], trajectory,
+        color: TEAM_COLORS[t.team] || "#546480",
+        fromApi: !!apiEntry,
+      };
+    }).sort((a, b) => b.elo - a.elo);
+  }, [standingsData, eloApiData]);
   const shotData = useMemo(() => computeShotQuality(realPlayers), [realPlayers]);
   const powerData = useMemo(() =>
     fourFactors.length && eloData.length && shotData.length
