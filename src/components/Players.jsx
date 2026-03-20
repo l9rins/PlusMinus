@@ -13,16 +13,6 @@ import { TileSkeleton, ErrorState, EmptyState } from "./ui";
 // ─── Constants ────────────────────────────────────────────────
 const POSITIONS = ["", "PG", "SG", "SF", "PF", "C"];
 
-const SORT_OPTIONS = [
-  { key: "pts", label: "Points" },
-  { key: "ast", label: "Assists" },
-  { key: "reb", label: "Rebounds" },
-  { key: "per", label: "PER" },
-  { key: "bpm", label: "BPM" },
-  { key: "ts", label: "TS%" },
-  { key: "vorp", label: "VORP" },
-];
-
 // ─── useDebounce ──────────────────────────────────────────────
 function useDebounce(value, delay = 350) {
   const [debounced, setDebounced] = useState(value);
@@ -645,8 +635,8 @@ export default function Players({ initialQuery = "" }) {
           )}
         </div>
 
-        {/* Position filter — only in browse mode */}
-        {!isSearchMode && (
+        {/* Position filter — only in browse mode and when positions are available */}
+        {!isSearchMode && staticPlayers.some(p => p.pos !== "—") && (
           <div className="flex gap-1" role="group" aria-label="Filter by position">
             {POSITIONS.map(p => (
               <button
@@ -675,7 +665,17 @@ export default function Players({ initialQuery = "" }) {
               aria-label="Sort players by"
               className="pm-select text-[11px]"
             >
-              {SORT_OPTIONS.map(o => (
+              {[
+                { key: "pts", label: "Points" },
+                { key: "ast", label: "Assists" },
+                { key: "reb", label: "Rebounds" },
+                { key: "ts",  label: "TS%" },
+                ...(staticPlayers.some(p => p.per !== null) ? [
+                  { key: "per",  label: "PER" },
+                  { key: "bpm",  label: "BPM" },
+                  { key: "vorp", label: "VORP" },
+                ] : []),
+              ].map(o => (
                 <option key={o.key} value={o.key}>Sort: {o.label}</option>
               ))}
             </select>

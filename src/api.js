@@ -102,6 +102,7 @@ export function useLeagueTeamStats() {
       return data;
     },
     staleTime: 1000 * 60 * 10,
+    placeholderData: null,
     retry: shouldRetry,
   });
 }
@@ -119,6 +120,7 @@ export function useLeaguePlayerStats() {
       return data;
     },
     staleTime: 1000 * 60 * 10,
+    placeholderData: null,
     retry: shouldRetry,
   });
 }
