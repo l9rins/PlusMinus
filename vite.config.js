@@ -79,7 +79,7 @@ export default defineConfig({
   // served alongside Vite. For plain `vite`, proxy /api to a local
   // dev server if you want to test without Vercel CLI.
   server: {
-    port: 3000,
+    port: 3055,
     proxy: {
       "/api": {
         target: process.env.VITE_API_PROXY || "http://localhost:3001",
