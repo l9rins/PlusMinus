@@ -149,7 +149,7 @@ function MobileDrawer({ open, onClose, activePath, onNavigate }) {
                           <button key={sub.label}
                             onClick={() => { onNavigate(sub.path); onClose(); }}
                             className={`w-full text-left px-2 py-1.5 rounded-md text-[11px]
-                              transition-colors ${activePath === sub.path
+                              transition-colors ${activePath === sub.path || (sub.path.startsWith(activePath) && sub.path.includes("?"))
                                 ? "text-accent" : "text-pitch-400 hover:text-pitch-200"}`}
                           >
                             {sub.label}
@@ -384,8 +384,6 @@ export default function TopNav({ activeTab, onTabChange }) {
                   className={`pm-nav-btn relative ${notifOpen ? "text-accent bg-accent/10" : ""}`}
                 >
                   <Bell size={13} strokeWidth={1.8} />
-                  <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full
-                                   bg-accent animate-pulse-glow" />
                 </button>
 
                 <AnimatePresence>

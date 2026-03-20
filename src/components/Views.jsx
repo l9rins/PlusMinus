@@ -544,8 +544,9 @@ export function Betting() {
         ? +(favStats.pct * 100).toFixed(1) : null;
       const diff      = modelP !== null ? +(modelP - impliedP).toFixed(1) : null;
       const edge      = diff !== null ? (diff >= 10 ? "high" : diff >= 5 ? "mid" : "low") : "none";
+      const favOdds   = (fav === game.home ? odds.bestHomeOdds : odds.bestAwayOdds) ?? -110;
       const kellyAmt  = diff !== null && diff >= 5
-        ? kellyBet(modelP / 100, -110, bankroll) : null;
+        ? kellyBet(modelP / 100, favOdds, bankroll) : null;
 
       edges.push({
         matchup:    `${game.away} @ ${game.home}`,
@@ -568,6 +569,7 @@ export function Betting() {
         bestAwayBook: odds.bestAwayBook,
         bestHomeOdds: odds.bestHomeOdds,
         bestAwayOdds: odds.bestAwayOdds,
+        favOdds,
       });
     }
 
@@ -733,6 +735,7 @@ export function Betting() {
                     <span className="text-pitch-600 flex items-center gap-1">
                       on 
                       <input type="number" value={bankroll} onChange={e => updateBankroll(Number(e.target.value))} className="bg-transparent w-12 text-pitch-300 border-b border-pitch-600 focus:outline-none focus:border-accent font-mono px-0.5 py-0 placeholder-pitch-600" aria-label="Bankroll amount" />
+                      at {g.favOdds > 0 ? `+${g.favOdds}` : g.favOdds}
                     </span>
                   </div>
                 </div>
@@ -859,7 +862,7 @@ const DEMO_BETS = [
   { id: 3, game: "POR @ IND",  type: "Over/Under", pick: "Over 228",  odds: -112, stake: 40,  result: "loss"    },
   { id: 4, game: "LAL @ HOU",  type: "Spread",     pick: "HOU -1",    odds: -108, stake: 55,  result: "pending" },
   { id: 5, game: "MIA @ MIL",  type: "Moneyline",  pick: "MIL ML",    odds: -160, stake: 80,  result: "loss"    },
-];
+].map(b => ({ ...b, isDemo: true }));
 
 function loadBets() {
   const raw = lsGet(BET_STORAGE_KEY);

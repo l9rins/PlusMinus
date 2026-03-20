@@ -206,7 +206,10 @@ export function ToastContainer() {
             if (remove) {
                 setToasts(prev => prev.filter(t => t.id !== id));
             } else {
-                setToasts(prev => [...prev.slice(-4), { id, message, type }]);
+                setToasts(prev => {
+                    if (prev.some(t => t.id === id)) return prev;
+                    return [...prev.slice(-4), { id, message, type }];
+                });
             }
         };
         _toastListeners.push(handler);
