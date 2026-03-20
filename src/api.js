@@ -237,6 +237,39 @@ export function useEloData() {
 }
 
 // ── Server config ─────────────────────────────────────────────────
+export function usePlayerGameLog(playerId, enabled = false) {
+  return useQuery({
+    queryKey: ["nba", "playerGameLog", playerId, currentSeason()],
+    queryFn: async ({ signal }) => {
+      const data = await nbaFetch("playergamelog", {
+        PlayerID:   playerId,
+        Season:     `${currentSeason() - 1}-${String(currentSeason()).slice(2)}`,
+        SeasonType: "Regular Season",
+        LeagueID:   "00",
+      }, signal);
+
+      // NBA response: resultSets[0].headers + rowSet
+      const resultSet = data?.resultSets?.[0];
+      if (!resultSet) return [];
+      const headers = resultSet.headers;
+      const rows    = resultSet.rowSet;
+
+      const wlIdx = headers.indexOf("WL");
+      if (wlIdx === -1) return [];
+
+      // NBA returns newest-first — take first 5, extract WL, reverse to oldest-first
+      return rows
+        .slice(0, 5)
+        .map(row => row[wlIdx])   // "W" or "L"
+        .reverse();               // oldest → newest so the strip reads left-to-right
+    },
+    staleTime: 1000 * 60 * 30,   // 30 min
+    enabled: enabled && !!playerId,
+    placeholderData: null,
+    retry: shouldRetry,
+  });
+}
+
 export function useServerConfig() {
     return useQuery({
         queryKey: ["serverConfig"],

@@ -6,7 +6,7 @@ import {
   BarChart2, Shield, Zap, Target, Award, ArrowUpDown,
 } from "lucide-react";
 import { TEAM_COLORS, TEAM_NAMES, PLAYERS } from "../data";
-import { useEnrichedPlayerStats, usePlayerSearch } from "../api";
+import { useEnrichedPlayerStats, usePlayerSearch, usePlayerGameLog } from "../api";
 import { signed, netRatingTier, formatPct } from "../utils";
 import { TileSkeleton, ErrorState, EmptyState } from "./ui";
 
@@ -197,6 +197,11 @@ function PlayerCard({ player, onCompare, comparePlayer, isComparing, sortKey, is
 
   const hasAdvanced = player.per !== null && player.per !== undefined;
   const hasStats = player.pts > 0 || player.ast > 0 || player.reb > 0;
+
+  const {
+    data: gameLogForm,
+    isFetching: formFetching,
+  } = usePlayerGameLog(player.id, expanded && hasAdvanced);
 
   // Radar data for mini chart
   const radarValues = hasAdvanced ? [
@@ -402,15 +407,18 @@ function PlayerCard({ player, onCompare, comparePlayer, isComparing, sortKey, is
                       ))}
                     </div>
 
-                    {/* Form */}
-                    {player.form && player.form.length > 0 && (
-                      <>
-                        <div className="pm-label mb-2 flex items-center gap-2">
-                          <Zap size={10} />
-                          Last 5 games
-                        </div>
+                    {/* Form — lazy loaded on expand */}
+                    <div className="mt-1">
+                      <div className="pm-label mb-2 flex items-center gap-2">
+                        <Zap size={10} />
+                        Last 5 games
+                        {formFetching && (
+                          <Loader size={9} className="text-pitch-500 animate-spin ml-1" />
+                        )}
+                      </div>
+                      {gameLogForm && gameLogForm.length > 0 ? (
                         <div className="flex gap-1.5">
-                          {player.form.map((r, i) => (
+                          {gameLogForm.map((r, i) => (
                             <motion.span
                               key={i}
                               initial={{ opacity: 0, scale: 0.7 }}
@@ -425,8 +433,16 @@ function PlayerCard({ player, onCompare, comparePlayer, isComparing, sortKey, is
                             </motion.span>
                           ))}
                         </div>
-                      </>
-                    )}
+                      ) : !formFetching ? (
+                        <div className="text-[10px] text-pitch-600 italic">No recent games</div>
+                      ) : (
+                        <div className="flex gap-1.5">
+                          {Array.from({ length: 5 }).map((_, i) => (
+                            <div key={i} className="w-6 h-6 rounded bg-pitch-750 animate-pulse" />
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               ) : (
