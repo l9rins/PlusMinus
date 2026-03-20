@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, Suspense, lazy } from "react";
+import { useState, useEffect, useCallback, Suspense, Component, lazy } from "react";
 import {
   BrowserRouter, Routes, Route, Navigate,
   useNavigate, useLocation,

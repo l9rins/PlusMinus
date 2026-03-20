@@ -39,7 +39,7 @@ export default async function handler(req, res) {
   if (req.method === "PUT") {
     const bets = req.body;
     if (!Array.isArray(bets)) return res.status(400).json({ error: "Body must be array" });
-    await kv.set(key, JSON.stringify(bets));
+    await kv.set(key, bets);
     return res.status(200).json({ ok: true });
   }
 
