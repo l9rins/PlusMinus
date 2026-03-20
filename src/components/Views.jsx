@@ -911,7 +911,7 @@ export function BetTracker() {
     if (savedBets.length > 0 || !betsLoading) setBets(savedBets);
   }, [savedBets, betsLoading]);
 
-  const addBet = useCallback(() => {
+  const addBet = useCallback(async () => {
     const { game, pick, odds, stake } = form;
     if (!game.trim() || !pick.trim() || !odds || !stake) {
       setFormError("Game, Pick, Odds, and Stake are required."); return;
@@ -928,9 +928,14 @@ export function BetTracker() {
       ...form, id: Date.now(), odds: oddsNum, stake: parseFloat(stake),
     }, ...bets];
     setBets(newBets);
-    saveBets(newBets);
-    setForm({ game: "", type: "Moneyline", pick: "", odds: "", stake: "", result: "pending" });
-    toast.success("Bet logged!");
+    try {
+      await saveBets(newBets);
+      setForm({ game: "", type: "Moneyline", pick: "", odds: "", stake: "", result: "pending" });
+      toast.success("Bet logged!");
+    } catch {
+      setBets(bets);
+      toast.error("Failed to log bet — check connection.");
+    }
   }, [form, toast, bets, saveBets]);
 
   const [editingBet, setEditingBet] = useState(null);
