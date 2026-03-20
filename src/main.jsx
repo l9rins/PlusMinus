@@ -26,3 +26,13 @@ ReactDOM.createRoot(rootEl).render(
 );
 
 inject();
+
+import { registerSW } from "virtual:pwa-register";
+
+registerSW({
+  onUpdatedSW() {
+    // Could wire this into the Toast system — for now just reload
+    console.info("[PlusMinus] App updated. Reloading.");
+    window.location.reload();
+  },
+});

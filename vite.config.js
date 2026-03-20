@@ -1,8 +1,58 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
+import { VitePWA } from "vite-plugin-pwa";
+
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    VitePWA({
+      registerType: "autoUpdate",
+      // Don't cache API routes — service worker should be network-only for /api
+      workbox: {
+        navigateFallback: "/index.html",
+        navigateFallbackDenylist: [/^\/api\//],
+        globPatterns: ["**/*.{js,css,html,svg,png,woff2}"],
+        runtimeCaching: [
+          {
+            // ESPN API — cache with network-first, 5min TTL
+            urlPattern: /^https:\/\/site\.api\.espn\.com/,
+            handler: "NetworkFirst",
+            options: {
+              cacheName: "espn-api",
+              expiration: { maxAgeSeconds: 300 },
+            },
+          },
+        ],
+      },
+      includeAssets: ["favicon.svg", "og-image.png"],
+      manifest: {
+        name: "PlusMinus — NBA Analytics",
+        short_name: "PlusMinus",
+        description: "Real-time NBA analytics, odds, and bet tracking",
+        theme_color: "#00d4aa",
+        background_color: "#0a0b0d",
+        display: "standalone",
+        orientation: "portrait-primary",
+        scope: "/",
+        start_url: "/",
+        icons: [
+          {
+            src: "/icons/icon-192.png",
+            sizes: "192x192",
+            type: "image/png",
+            purpose: "any maskable",
+          },
+          {
+            src: "/icons/icon-512.png",
+            sizes: "512x512",
+            type: "image/png",
+            purpose: "any maskable",
+          },
+        ],
+      },
+    }),
+  ],
 
   // ── Build & Bundle Splitting ───────────────────────────────────
   build: {
