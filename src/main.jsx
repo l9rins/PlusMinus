@@ -1,5 +1,6 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
+import { inject } from "@vercel/analytics";
 import { ClerkProvider } from "@clerk/clerk-react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import App from "./App.jsx";
@@ -23,3 +24,5 @@ ReactDOM.createRoot(rootEl).render(
     </ClerkProvider>
   </React.StrictMode>
 );
+
+inject();
