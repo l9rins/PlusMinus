@@ -152,7 +152,7 @@ function AppInner() {
             exit={{ opacity: 0, y: -6 }}
             transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
           >
-            <ErrorBoundary key={location.pathname}>
+            <ErrorBoundary>
               <Suspense fallback={<PageSkeleton />}>
                 <Routes>
                   <Route path="/" element={<Dashboard onNavigate={handleTabChange} />} />

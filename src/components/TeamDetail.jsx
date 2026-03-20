@@ -151,9 +151,6 @@ export default function TeamDetail() {
     // Schedule splits
     const pastGames = useMemo(() => (schedule || []).filter(g => g.result).reverse(), [schedule]);
     const upcomingGames = useMemo(() => (schedule || []).filter(g => g.status === "scheduled").slice(0, 5), [schedule]);
-    const last5 = pastGames.slice(0, 5);
-    const wins = pastGames.filter(g => g.result === "W").length;
-    const losses = pastGames.filter(g => g.result === "L").length;
 
     // Win streak
     const currentStreak = useMemo(() => {

@@ -117,6 +117,14 @@ export const calcPL = (stake, american, result) => {
 
 // ── Date helpers ──────────────────────────────────────────────────
 
+export const currentSeason = () => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth() + 1;
+  // NBA season starts first week of October — use Oct 1 as cutover
+  return month >= 10 ? year : year - 1;
+};
+
 /** "2025-11-14" in local timezone */
 export const todayStr = () => {
   const d = new Date();

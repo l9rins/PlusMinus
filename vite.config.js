@@ -9,8 +9,9 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks: {
-          vendor: ["react", "react-dom", "react-router-dom"],
-          charts: ["recharts", "framer-motion", "lucide-react"],
+          vendor: ["react", "react-dom", "react-router-dom", "lucide-react"],
+          charts: ["recharts"],
+          animation: ["framer-motion"],
         },
       },
     },

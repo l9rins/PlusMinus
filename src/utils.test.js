@@ -7,9 +7,8 @@ import {
   todayStr, netRatingTier, edgeLabel,
   groupBy, deepClone, clamp, lerp, sum, avg,
   lsGet, lsSet, lsRemove,
-  BET_STORAGE_KEY, BREAK_EVEN_PCT, DEFAULT_BANKROLL,
+  BET_STORAGE_KEY, BREAK_EVEN_PCT, DEFAULT_BANKROLL, currentSeason,
 } from "./utils";
-import { currentSeason } from "./api";
 
 describe("signed()", () => {
   it("+", () => expect(signed(5.2)).toBe("+5.2"));

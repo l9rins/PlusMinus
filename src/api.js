@@ -14,7 +14,7 @@ import {
     TODAY_GAMES as GAMES_FALLBACK,
     PLAYERS as PLAYERS_FALLBACK,
 } from "./data";
-import { todayStr } from "./utils";
+import { todayStr, currentSeason } from "./utils";
 
 // ── Typed error ───────────────────────────────────────────────────
 class ApiError extends Error {
@@ -75,15 +75,6 @@ async function oddsFetch(signal) {
         throw new ApiError(body.error || `Odds proxy ${res.status}`, res.status);
     }
     return res.json();
-}
-
-// ── Season logic ──────────────────────────────────────────────────
-export function currentSeason() {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth() + 1;
-  // NBA season starts first week of October — use Oct 1 as cutover
-  return month >= 10 ? year : year - 1;
 }
 
 // ── Server config ─────────────────────────────────────────────────
