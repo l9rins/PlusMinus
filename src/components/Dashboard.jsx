@@ -13,7 +13,7 @@ const container = { hidden: {}, show: { transition: { staggerChildren: 0.04, del
 const tile = { hidden: { opacity: 0, y: 14, scale: 0.98 }, show: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.28, ease: [0.25, 0.46, 0.45, 0.94] } } };
 
 function GameTile({ game }) {
-    const fav = game.homeP >= game.awayP ? "home" : "away";
+    const fav = (game.homeP === null || game.awayP === null) ? null : game.homeP >= game.awayP ? "home" : "away";
     const isFinal = game.status === "final";
     const isLive = game.status === "live";
     const isScheduled = game.status === "scheduled";
@@ -41,7 +41,7 @@ function GameTile({ game }) {
             </div>
             <div className="flex items-center gap-2 mb-3">
                 <div className="flex-1 text-center">
-                    <div className={`font-display text-xl tracking-wider leading-none mb-0.5 ${fav === "away" ? "" : "text-pitch-300"}`} style={{ color: fav === "away" ? awayColor : undefined }}>{game.away}</div>
+                    <div className={`font-display text-xl tracking-wider leading-none mb-0.5 ${fav === "away" ? "" : "text-pitch-300"}`} style={{ color: fav === "away" && fav !== null ? awayColor : undefined }}>{game.away}</div>
                     <div className="text-[10px] text-pitch-500 truncate px-1">{TEAM_NAMES[game.away] || game.away}</div>
                     {(isFinal || isLive) ? <motion.div key={game.awayScore} initial={{ scale: 1.1 }} animate={{ scale: 1 }} className="pm-number text-lg mt-1 text-pitch-100">{game.awayScore}</motion.div>
                         : game.awayP !== null
@@ -53,7 +53,7 @@ function GameTile({ game }) {
                     {isScheduled && game.spread !== "—" && <div className="text-[9px] text-pitch-600">{game.spread}</div>}
                 </div>
                 <div className="flex-1 text-center">
-                    <div className={`font-display text-xl tracking-wider leading-none mb-0.5 ${fav === "home" ? "" : "text-pitch-300"}`} style={{ color: fav === "home" ? homeColor : undefined }}>{game.home}</div>
+                    <div className={`font-display text-xl tracking-wider leading-none mb-0.5 ${fav === "home" ? "" : "text-pitch-300"}`} style={{ color: fav === "home" && fav !== null ? homeColor : undefined }}>{game.home}</div>
                     <div className="text-[10px] text-pitch-500 truncate px-1">{TEAM_NAMES[game.home] || game.home}</div>
                     {(isFinal || isLive) ? <motion.div key={game.homeScore} initial={{ scale: 1.1 }} animate={{ scale: 1 }} className="pm-number text-lg mt-1 text-pitch-100">{game.homeScore}</motion.div>
                         : game.homeP !== null
@@ -92,7 +92,11 @@ function MiniStandings({ teams, conf, onNavigate }) {
                             <span className="pm-number text-[10px] text-pitch-600 w-4 flex-shrink-0">{i + 1}</span>
                             <div className="w-1.5 h-1.5 rounded-full flex-shrink-0 opacity-80" style={{ background: TEAM_COLORS[t.team] || "#546480" }} />
                             <span className={`font-display text-sm tracking-wider flex-1 ${i === 0 ? "text-accent" : isPlayoff ? "text-pitch-200" : "text-pitch-400"}`}>{t.team}</span>
-                            {t.streak && <span className={`text-[9px] font-mono hidden sm:inline ${t.streak.startsWith("W") ? "text-win/60" : "text-loss/60"}`}>{t.streak}</span>}
+                            {t.streak && <span className={`text-[9px] font-mono hidden sm:inline ${
+                              t.streak.startsWith("W") ? "text-win/60"
+                              : t.streak.startsWith("L") ? "text-loss/60"
+                              : "text-pitch-500"
+                            }`}>{t.streak}</span>}
                             <span className="pm-number text-[10px] text-pitch-400 flex-shrink-0">{t.w}-{t.l}</span>
                             {isPlayIn && <span className="text-[8px] text-draw border border-draw/30 bg-draw/10 px-1 py-0.5 rounded flex-shrink-0">PI</span>}
                         </div>
@@ -198,6 +202,7 @@ export default function Dashboard({ onNavigate }) {
         { matchup: "—", fav: "—", modelP: 0, impliedP: 0, bestFavOdds: null, edge: 0 });
     }
     // Fallback to static ODDS_GAMES
+    if (!ODDS_GAMES.length) return { matchup: "—", fav: "—", modelP: 0, impliedP: 0, bestFavOdds: null, edge: 0 };
     return ODDS_GAMES.reduce((best, g) => (g.modelP - g.impliedP) > (best.modelP - best.impliedP) ? g : best);
   }, [oddsData]);
 
@@ -206,6 +211,7 @@ export default function Dashboard({ onNavigate }) {
             const cards = Object.entries(oddsData).map(([key, o]) => { const [away, home] = key.split("@"); return { matchup: `${away} @ ${home}`, fav: o.homeP >= o.awayP ? home : away, modelP: Math.max(o.homeP, o.awayP) }; });
             return cards.reduce((best, g) => g.modelP > best.modelP ? g : best, { matchup: "—", fav: "—", modelP: 0 });
         }
+        if (!ODDS_GAMES.length) return { matchup: "—", fav: "—", modelP: 0 };
         return ODDS_GAMES.reduce((best, g) => g.modelP > best.modelP ? g : best);
     }, [oddsData]);
 

@@ -317,9 +317,9 @@ export default function TeamDetail() {
                             </div>
                             <div className="space-y-1.5">
                                 {[
-                                    { lbl: "PER", val: starPlayer.per, max: 35 },
-                                    { lbl: "TS%", val: starPlayer.ts, max: 75 },
-                                    { lbl: "BPM", val: Math.max(0, starPlayer.bpm + 5), max: 17 },
+                                    { lbl: "PER", val: starPlayer.per, barVal: starPlayer.per, max: 35 },
+                                    { lbl: "TS%", val: starPlayer.ts, barVal: starPlayer.ts, max: 75 },
+                                    { lbl: "BPM", val: starPlayer.bpm, barVal: Math.max(0, (starPlayer.bpm ?? 0) + 5), max: 17 },
                                 ].map(s => (
                                     <div key={s.lbl} className="flex items-center gap-2">
                                         <span className="text-[10px] text-pitch-500 w-7">{s.lbl}</span>
@@ -327,7 +327,7 @@ export default function TeamDetail() {
                                             <motion.div className="h-full rounded-full"
                                                 style={{ background: color, opacity: 0.8 }}
                                                 initial={{ width: 0 }}
-                                                animate={{ width: `${Math.min(100, (s.val / s.max) * 100)}%` }}
+                                                animate={{ width: `${Math.min(100, (s.barVal / s.max) * 100)}%` }}
                                                 transition={{ duration: 0.7 }} />
                                         </div>
                                         <span className="font-mono text-[10px] text-pitch-300 w-6 text-right tabular-nums">{s.val}</span>

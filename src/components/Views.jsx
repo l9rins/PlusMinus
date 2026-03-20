@@ -127,7 +127,7 @@ export function Scores() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {filtered.map(g => {
-            const fav = g.homeP >= g.awayP ? "home" : "away";
+            const fav = (g.homeP === null || g.awayP === null) ? null : g.homeP >= g.awayP ? "home" : "away";
             const isSelected = selected === g.id;
             const isFinal    = g.status === "final";
             const isLive     = g.status === "live";
@@ -174,7 +174,7 @@ export function Scores() {
                     <div
                       className={`font-display text-2xl tracking-widest leading-none
                         ${fav === "away" ? "" : "text-pitch-400"}`}
-                      style={{ color: fav === "away" ? awayColor : undefined }}
+                      style={{ color: fav === "away" && fav !== null ? awayColor : undefined }}
                     >
                       {g.away}
                     </div>
@@ -216,7 +216,7 @@ export function Scores() {
                     <div
                       className={`font-display text-2xl tracking-widest leading-none
                         ${fav === "home" ? "" : "text-pitch-400"}`}
-                      style={{ color: fav === "home" ? homeColor : undefined }}
+                      style={{ color: fav === "home" && fav !== null ? homeColor : undefined }}
                     >
                       {g.home}
                     </div>
@@ -922,23 +922,40 @@ export function BetTracker() {
     toast.success("Bet logged!");
   }, [form, toast, bets, saveBets]);
 
-  const deleteBet = id => {
+  const deleteBet = async (id) => {
     const newBets = bets.filter(b => b.id !== id);
     setBets(newBets);
-    saveBets(newBets);
+    try {
+      await saveBets(newBets);
+    } catch {
+      toast.error("Failed to delete bet — check connection.");
+      setBets(bets);
+    }
   };
-  const updateResult = (id, r) => {
+  const updateResult = async (id, r) => {
     const newBets = bets.map(b => b.id === id ? { ...b, result: r } : b);
     setBets(newBets);
-    saveBets(newBets);
-    setEditingId(null);
-    toast.success("Result updated.");
+    try {
+      await saveBets(newBets);
+      setEditingId(null);
+      toast.success("Result updated.");
+    } catch {
+      toast.error("Failed to update result — check connection.");
+      setEditingId(null);
+      setBets(bets);
+    }
   };
-  const clearAll = () => {
+  const clearAll = async () => {
     if (window.confirm("Clear all bets? This cannot be undone.")) {
+      const oldBets = bets;
       setBets([]);
-      saveBets([]); 
-      toast.info("Bet log cleared.");
+      try {
+        await saveBets([]); 
+        toast.info("Bet log cleared.");
+      } catch {
+        toast.error("Failed to clear bets — check connection.");
+        setBets(oldBets);
+      }
     }
   };
 

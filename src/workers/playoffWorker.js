@@ -81,7 +81,6 @@ self.onmessage = (e) => {
     ];
     cf.forEach(t => counts[t.team].conf++);
     const champ = simSeries(cf[0].elo, cf[1].elo, rng) ? cf[0] : cf[1];
-    counts[champ.team].finals++;
     return champ;
   }
 
@@ -90,6 +89,8 @@ self.onmessage = (e) => {
     const rng = makeLCG(i * 1664525 + 1013904223);
     const eC = simConf(eastSeeds, rng);
     const wC = simConf(westSeeds, rng);
+    counts[eC.team].finals++;
+    counts[wC.team].finals++;
     const champ = simSeries(eC.elo, wC.elo, rng) ? eC : wC;
     counts[champ.team].champ++;
   }

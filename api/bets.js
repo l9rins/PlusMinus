@@ -39,6 +39,7 @@ export default async function handler(req, res) {
   if (req.method === "PUT") {
     const bets = req.body;
     if (!Array.isArray(bets)) return res.status(400).json({ error: "Body must be array" });
+    if (bets.length > 500) return res.status(400).json({ error: "Maximum 500 bets allowed" });
     await kv.set(key, bets);
     return res.status(200).json({ ok: true });
   }
