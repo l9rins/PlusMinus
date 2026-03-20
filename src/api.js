@@ -305,7 +305,6 @@ export function usePlayers() {
 
 // ── Player search (BDL free endpoint) ────────────────────────────
 export function usePlayerSearch(query) {
-    const season = currentSeason();
     const trimmed = query?.trim() ?? "";
     const enabled = trimmed.length >= 2;
 

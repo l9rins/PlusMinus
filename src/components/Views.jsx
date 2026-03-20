@@ -246,15 +246,15 @@ export function Scores() {
                 {g.status === "scheduled" && (
                   <div className="space-y-1">
                     <div className="flex justify-between text-[10px] text-pitch-500">
-                      <span className="font-mono">{g.awayP}%</span>
-                      <span className="font-mono">{g.homeP}%</span>
+                      <span className="font-mono">{g.awayP != null ? `${g.awayP}%` : "—"}</span>
+                      <span className="font-mono">{g.homeP != null ? `${g.homeP}%` : "—"}</span>
                     </div>
                     <div className="h-1.5 rounded-full bg-pitch-700 overflow-hidden relative">
                       <motion.div
                         className="h-full absolute top-0 left-0 rounded-full"
                         style={{ background: awayColor, opacity: 0.8 }}
                         initial={{ width: 0 }}
-                        animate={{ width: `${g.awayP}%` }}
+                        animate={{ width: `${g.awayP ?? 0}%` }}
                         transition={{ duration: 0.8 }}
                       />
                     </div>
