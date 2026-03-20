@@ -18,7 +18,7 @@ import {
 import {
   EAST_STANDINGS, WEST_STANDINGS, PLAYERS, TEAM_NAMES, TEAM_COLORS,
 } from "../data";
-import { useStandings, usePlayers, useLeagueTeamStats, useLeaguePlayerStats } from "../api";
+import { useStandings, useLeagueTeamStats, useLeaguePlayerStats } from "../api";
 import { FreshnessTag, RowSkeleton, ErrorState } from "./ui";
 import { signed, reshapeNBAStats } from "../utils";
 import { TrendingUp, BarChart2, Zap, Award, Info, Star, Trophy } from "lucide-react";
@@ -84,15 +84,14 @@ function computeShotQuality(players = PLAYERS) {
   players.forEach(p => { if (!teamMap[p.team]) teamMap[p.team] = []; teamMap[p.team].push(p); });
   return Object.entries(teamMap).map(([team, pls]) => {
     const avg = k => pls.reduce((s, p) => s + (p[k] ?? 0), 0) / pls.length;
-    const n = (v, max, i) => Math.min(100, Math.max(0, v + teamSeed(team, i + 10) * max * 0.08));
     const radar = [
-      { factor: "Scoring", value: n(Math.min(100, (avg("pts") / 32) * 100), 100, 0) },
-      { factor: "Playmaking", value: n(Math.min(100, (avg("ast") / 11) * 100), 100, 1) },
-      { factor: "Rebounding", value: n(Math.min(100, (avg("reb") / 13) * 100), 100, 2) },
-      { factor: "Efficiency", value: n(Math.min(100, Math.max(0, ((avg("ts") - 50) / 20) * 100)), 100, 3) },
-      { factor: "Offense", value: n(Math.min(100, Math.max(0, ((avg("ortg") - 105) / 25) * 100)), 100, 4) },
-      { factor: "Defense", value: n(Math.min(100, Math.max(0, ((125 - avg("drtg")) / 25) * 100)), 100, 5) },
-    ].map(r => ({ ...r, value: +r.value.toFixed(1) }));
+      { factor: "Scoring",     value: +Math.min(100, (avg("pts") / 32) * 100).toFixed(1) },
+      { factor: "Playmaking",  value: +Math.min(100, (avg("ast") / 11) * 100).toFixed(1) },
+      { factor: "Rebounding",  value: +Math.min(100, (avg("reb") / 13) * 100).toFixed(1) },
+      { factor: "Efficiency",  value: +Math.min(100, Math.max(0, ((avg("ts") - 50) / 20) * 100)).toFixed(1) },
+      { factor: "Offense",     value: +Math.min(100, Math.max(0, ((avg("ortg") - 105) / 25) * 100)).toFixed(1) },
+      { factor: "Defense",     value: +Math.min(100, Math.max(0, ((125 - avg("drtg")) / 25) * 100)).toFixed(1) },
+    ];
     return {
       team, name: TEAM_NAMES[team] || team, color: TEAM_COLORS[team] || "#546480",
       players: pls.length, radar,
@@ -387,9 +386,10 @@ function FourFactorsView({ data }) {
         </table>
       </motion.div>
       <MethodologyNote>
-        eFG% weights three-pointers at 1.5× to reflect their value. TOV% is possessions lost; lower = better.
-        ORB% captures second-chance opportunities. FT Rate (FTA/FGA) reflects aggression. Net Rating = O-RTG − D-RTG per 100 possessions.
-        Values use win rate as base with seeded per-team variance to break linear correlation between factors.
+        eFG% weights three-pointers at 1.5× to reflect their value. TOV% is possessions lost; lower is better.
+        ORB% captures second-chance opportunities. FT Rate (FTA/FGA) reflects aggression.
+        Net Rating = O-RTG − D-RTG per 100 possessions.
+        All values sourced live from the NBA Stats API (leaguedashteamstats, MeasureType=Advanced).
       </MethodologyNote>
     </motion.div>
   );
@@ -573,9 +573,11 @@ function ShotQualityView({ data }) {
         </motion.div>
       </div>
       <MethodologyNote>
-        Profiles are built from one elite player per team. Scoring scales to 32 PPG, Playmaking to 11 APG,
-        Rebounding to 13 RPG, Efficiency uses TS% above 50%, Offense uses O-RTG above 105, Defense uses D-RTG below 125.
-        Seeded noise prevents identical profiles between teams. Click two teams to overlay their polygons.
+        Profiles aggregate all rostered players per team with ≥10 games played.
+        Scoring scales to 32 PPG, Playmaking to 11 APG, Rebounding to 13 RPG,
+        Efficiency uses TS% above 50%, Offense uses O-RTG above 105, Defense uses D-RTG below 125.
+        Stats sourced live from the NBA Stats API (leaguedashplayerstats).
+        Click two teams to overlay their polygons.
       </MethodologyNote>
     </motion.div>
   );
@@ -689,12 +691,11 @@ export default function Analytics() {
     return VALID_TABS.includes(tab) ? tab : "power";
   });
   const { data: standingsData, isLoading, isError, isFetching, refetch, dataUpdatedAt } = useStandings();
-  const { data: playersData } = usePlayers();
   const { data: nbaTeamStats } = useLeagueTeamStats();
   const { data: nbaPlayerStats } = useLeaguePlayerStats();
 
   const fourFactors = useMemo(() => {
-    if (!standingsData || !nbaTeamStats) return [];
+    if (!nbaTeamStats) return [];
     const rows = reshapeNBAStats(nbaTeamStats, "LeagueDashTeamStats");
     
     return rows.map(r => ({
@@ -711,7 +712,7 @@ export default function Analytics() {
       drtg: +r.DEF_RATING.toFixed(1),
       color: TEAM_COLORS[r.TEAM_ABBREVIATION] || "#546480",
     })).sort((a, b) => b.netRtg - a.netRtg);
-  }, [standingsData, nbaTeamStats]);
+  }, [nbaTeamStats]);
 
   const realPlayers = useMemo(() => {
     if (!nbaPlayerStats) return PLAYERS;
