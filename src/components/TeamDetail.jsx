@@ -16,7 +16,7 @@ import {
     Calendar, CheckCircle, XCircle, Clock
 } from "lucide-react";
 import { TEAM_COLORS, TEAM_NAMES, PLAYERS, EAST_STANDINGS, WEST_STANDINGS } from "../data";
-import { useStandings, useTeamSchedule } from "../api";
+import { useStandings, useTeamSchedule, useEnrichedPlayerStats } from "../api";
 import { useTeamTheme } from "../App";
 import { RowSkeleton, ErrorState } from "./ui";
 import { signed } from "../utils";
@@ -142,11 +142,13 @@ export default function TeamDetail() {
         ? currentElo - eloTrajectory[eloTrajectory.length - 4].elo : 0;
 
     // Roster player
-    const starPlayer = useMemo(() =>
-        PLAYERS.filter(p => p.team === teamAbbr)
-            .reduce((a, b) => (a?.per ?? 0) >= (b?.per ?? 0) ? a : b, null),
-        [teamAbbr]
-    );
+    const { data: allPlayers } = useEnrichedPlayerStats();
+
+    const starPlayer = useMemo(() => {
+        const pool = (allPlayers || PLAYERS).filter(p => p.team === teamAbbr);
+        if (!pool.length) return null;
+        return pool.reduce((a, b) => (a?.per ?? a?.pts ?? 0) >= (b?.per ?? b?.pts ?? 0) ? a : b, null);
+    }, [allPlayers, teamAbbr]);
 
     // Schedule splits
     const pastGames = useMemo(() => (schedule || []).filter(g => g.result).reverse(), [schedule]);
