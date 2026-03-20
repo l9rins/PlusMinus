@@ -24,3 +24,5 @@ Thumbs.db
 
 # Vite
 *.local
+.vercel
+.env*.local

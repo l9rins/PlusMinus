@@ -24,8 +24,8 @@ const ALLOWED_ENDPOINTS = [
 
 function cacheTTL(endpoint) {
   if (endpoint === "playergamelog") return 1800;   // 30 min
-  if (endpoint.includes("dashboard")) return 300;  // 5 min — team/player specific
-  return 600;                                        // 10 min — league-wide
+  if (endpoint.includes("dashboard")) return 600;  // 10 min — team/player specific
+  return 1800;                                     // 30 min — league-wide
 }
 
 export default async function handler(req, res) {
@@ -49,7 +49,7 @@ export default async function handler(req, res) {
   try {
     const upstream = await fetch(url, {
       headers: NBA_HEADERS,
-      signal: AbortSignal.timeout(10000),
+      signal: AbortSignal.timeout(7000),
     });
 
     if (!upstream.ok) {
