@@ -158,7 +158,7 @@ export default function Dashboard({ onNavigate }) {
     const standings = useStandings();
     const { data: oddsData } = useOdds();
 
-    const today = new Date().toLocaleDateString("en-US", { weekday: "short", month: "long", day: "numeric", year: "numeric" });
+    const today = new Date().toLocaleDateString("en-US", { weekday: "short", month: "long", day: "numeric", year: "numeric", timeZone: "America/New_York" });
     const rawGameList = games.data || [];
     const gameList = useMemo(() => mergeOddsIntoGames(rawGameList, oddsData) || [], [rawGameList, oddsData]);
     const eastList = standings.data?.east || [];
