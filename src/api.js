@@ -126,6 +126,99 @@ export function useLeaguePlayerStats() {
   });
 }
 
+export function useLeaguePlayerStatsAdvanced() {
+  return useQuery({
+    queryKey: ["nba", "leaguePlayerStatsAdvanced", currentSeason()],
+    queryFn: async ({ signal }) => {
+      const data = await nbaFetch("leaguedashplayerstats", {
+        Season: `${currentSeason() - 1}-${String(currentSeason()).slice(2)}`,
+        SeasonType: "Regular Season",
+        PerMode: "PerGame",
+        MeasureType: "Advanced",
+      }, signal);
+      return data;
+    },
+    staleTime: 1000 * 60 * 10,
+    placeholderData: null,
+    retry: shouldRetry,
+  });
+}
+
+export function useAllPlayers() {
+  return useQuery({
+    queryKey: ["nba", "commonAllPlayers", currentSeason()],
+    queryFn: async ({ signal }) => {
+      const data = await nbaFetch("commonallplayers", {
+        LeagueID: "00",
+        Season: `${currentSeason() - 1}-${String(currentSeason()).slice(2)}`,
+        IsOnlyCurrentSeason: "1",
+      }, signal);
+      return data;
+    },
+    staleTime: 1000 * 60 * 60,
+    placeholderData: null,
+    retry: shouldRetry,
+  });
+}
+
+export function useEnrichedPlayerStats() {
+  const base     = useLeaguePlayerStats();
+  const advanced = useLeaguePlayerStatsAdvanced();
+  const allPlayers = useAllPlayers();
+
+  const data = useMemo(() => {
+    if (!base.data) return null;
+
+    const baseRows = reshapeNBAStats(base.data, "LeagueDashPlayerStats")
+      .filter(r => r.GP >= 10);
+
+    const advMap = {};
+    if (advanced.data) {
+      reshapeNBAStats(advanced.data, "LeagueDashPlayerStats").forEach(r => {
+        advMap[r.PLAYER_ID] = r;
+      });
+    }
+
+    const posMap = {};
+    if (allPlayers.data) {
+      reshapeNBAStats(allPlayers.data, "CommonAllPlayers").forEach(r => {
+        posMap[r.PERSON_ID] = r.POSITION ?? "—";
+      });
+    }
+
+    return baseRows.map(r => {
+      const adv = advMap[r.PLAYER_ID] ?? {};
+      return {
+        id:   r.PLAYER_ID,
+        name: r.PLAYER_NAME,
+        pos:  posMap[r.PLAYER_ID] ?? "—",
+        team: r.TEAM_ABBREVIATION,
+        age:  r.AGE,
+        pts:  +r.PTS.toFixed(1),
+        ast:  +r.AST.toFixed(1),
+        reb:  +r.REB.toFixed(1),
+        ts:   r.TS_PCT   != null ? +(r.TS_PCT   * 100).toFixed(1) : null,
+        per:  adv.PIE    != null ? +adv.PIE.toFixed(1)            : null,
+        ortg: adv.OFF_RATING != null ? +adv.OFF_RATING.toFixed(1) : null,
+        drtg: adv.DEF_RATING != null ? +adv.DEF_RATING.toFixed(1) : null,
+        usg:  adv.USG_PCT != null ? +(adv.USG_PCT * 100).toFixed(1) : null,
+        bpm:  null,
+        vorp: null,
+        form: null,
+      };
+    });
+  }, [base.data, advanced.data, allPlayers.data]);
+
+  return {
+    data,
+    isLoading:    base.isLoading || advanced.isLoading || allPlayers.isLoading,
+    isError:      base.isError,
+    isFetching:   base.isFetching || advanced.isFetching || allPlayers.isFetching,
+    dataUpdatedAt: base.dataUpdatedAt,
+    refetch:      base.refetch,
+  };
+}
+
 // ── Server config ─────────────────────────────────────────────────
 export function useServerConfig() {
     return useQuery({
