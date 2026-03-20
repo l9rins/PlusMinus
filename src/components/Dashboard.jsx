@@ -88,17 +88,14 @@ function MiniStandings({ teams, conf }) {
             </div>
             <div className="space-y-0">
                 {teams.slice(0, 8).map((t, i) => {
-                    const isPlayoff = i < 6; const isPlayIn = i >= 6 && i <= 9;
+                    const isPlayoff = i < 6;
+                    const isPlayIn = i >= 6 && i <= 9;
                     return (
                         <div key={t.team} className={`flex items-center gap-2 px-2 py-1.5 rounded-sm transition-colors hover:bg-pitch-700 cursor-pointer ${i === 6 ? "border-t border-dashed border-pitch-600 mt-1 pt-2.5" : ""}`}>
                             <span className="pm-number text-[10px] text-pitch-600 w-4 flex-shrink-0">{i + 1}</span>
                             <div className="w-1.5 h-1.5 rounded-full flex-shrink-0 opacity-80" style={{ background: TEAM_COLORS[t.team] || "#546480" }} />
                             <TeamLink abbr={t.team} className={`font-display text-sm tracking-wider flex-1 block ${i === 0 ? "text-accent" : isPlayoff ? "text-pitch-200" : "text-pitch-400"}`}>{t.team}</TeamLink>
-                            {t.streak && <span className={`text-[9px] font-mono hidden sm:inline ${
-                              t.streak.startsWith("W") ? "text-win/60"
-                              : t.streak.startsWith("L") ? "text-loss/60"
-                              : "text-pitch-500"
-                            }`}>{t.streak}</span>}
+                            {t.streak && <span className={`text-[9px] font-mono hidden sm:inline ${t.streak.startsWith("W") ? "text-win/60" : t.streak.startsWith("L") ? "text-loss/60" : "text-pitch-500"}`}>{t.streak}</span>}
                             <span className="pm-number text-[10px] text-pitch-400 flex-shrink-0">{t.w}-{t.l}</span>
                             {isPlayIn && <span className="text-[8px] text-draw border border-draw/30 bg-draw/10 px-1 py-0.5 rounded flex-shrink-0">PI</span>}
                         </div>
@@ -129,34 +126,28 @@ function SummaryTile({ label, value, sub, icon: Icon, trend, color, onClick, bad
     );
 }
 
-// ── Fixed KellyTile — uses real odds from the top edge game ──
 function KellyTile({ topEdge, bankroll }) {
-  // Use the actual best available odds, fall back to -110 standard juice
-  const odds = topEdge.bestFavOdds ?? -110;
-  const kelly = kellyBet(topEdge.modelP / 100, odds, bankroll);
-  return (
-    <motion.div variants={tile} className="pm-tile p-4">
-      <div className="flex items-start justify-between mb-2.5">
-        <div className="pm-label">Kelly Bet Size</div>
-        <div className="w-7 h-7 rounded-md bg-pitch-750 border border-pitch-600 flex items-center justify-center">
-          <DollarSign size={13} strokeWidth={1.8} className="text-pitch-400" />
-        </div>
-      </div>
-      <div className="pm-number text-3xl text-pitch-50">{kelly > 0 ? formatCurrency(kelly) : "—"}</div>
-      <div className="flex items-center gap-1.5 mt-2">
-        <Shield size={10} className="text-pitch-500 flex-shrink-0" />
-        <span className="text-[11px] text-pitch-500">
-          ½-Kelly · {topEdge.matchup} · {odds > 0 ? `+${odds}` : odds}
-        </span>
-      </div>
-    </motion.div>
-  );
+    const odds = topEdge.bestFavOdds ?? -110;
+    const kelly = kellyBet(topEdge.modelP / 100, odds, bankroll);
+    return (
+        <motion.div variants={tile} className="pm-tile p-4">
+            <div className="flex items-start justify-between mb-2.5">
+                <div className="pm-label">Kelly Bet Size</div>
+                <div className="w-7 h-7 rounded-md bg-pitch-750 border border-pitch-600 flex items-center justify-center">
+                    <DollarSign size={13} strokeWidth={1.8} className="text-pitch-400" />
+                </div>
+            </div>
+            <div className="pm-number text-3xl text-pitch-50">{kelly > 0 ? formatCurrency(kelly) : "—"}</div>
+            <div className="flex items-center gap-1.5 mt-2">
+                <Shield size={10} className="text-pitch-500 flex-shrink-0" />
+                <span className="text-[11px] text-pitch-500">½-Kelly · {topEdge.matchup} · {odds > 0 ? `+${odds}` : odds}</span>
+            </div>
+        </motion.div>
+    );
 }
-
 
 export default function Dashboard() {
     const navigate = useNavigate();
-    // Games and standings now use ESPN (no key needed) — no hasBdl gate
     const games = useTodayGames();
     const standings = useStandings();
     const { data: oddsData } = useOdds();
@@ -173,41 +164,50 @@ export default function Dashboard() {
 
     const betStats = useMemo(() => {
         if (!bets.length) return { total: 0, wins: 0, losses: 0, pending: 0, pl: 0 };
-        const wins    = bets.filter(b => b.result === "win").length;
-        const losses  = bets.filter(b => b.result === "loss").length;
+        const wins = bets.filter(b => b.result === "win").length;
+        const losses = bets.filter(b => b.result === "loss").length;
         const pending = bets.filter(b => b.result === "pending").length;
-        const pl      = bets.reduce((s, b) => s + calcPL(b.stake, b.odds, b.result), 0);
+        const pl = bets.reduce((s, b) => s + calcPL(b.stake, b.odds, b.result), 0);
         return { total: bets.length, wins, losses, pending, pl };
     }, [bets]);
 
-    const bankroll = Number(lsGet("bankroll")) || DEFAULT_BANKROLL;
+    // FIX: bankroll zero/negative guard.
+    //
+    // Previous: Number(lsGet("bankroll")) || DEFAULT_BANKROLL
+    // Bug: Number(0) is falsy, so a user who intentionally sets bankroll=0
+    // (empty/cleared state) silently gets DEFAULT_BANKROLL instead.
+    // Number("invalid") is NaN which is also falsy — that case was fine.
+    // But Number(-50) is truthy and would pass through as a negative bankroll,
+    // causing kellyBet to return 0 (already guarded there, but defensive here too).
+    //
+    // Fix: explicit isFinite + positive check. Only use DEFAULT_BANKROLL when
+    // the stored value is missing, non-numeric, or non-positive.
+    const storedBankroll = Number(lsGet("bankroll"));
+    const bankroll = Number.isFinite(storedBankroll) && storedBankroll > 0
+        ? storedBankroll
+        : DEFAULT_BANKROLL;
 
-  const topEdge = useMemo(() => {
-    if (oddsData && Object.keys(oddsData).length > 0) {
-      const cards = Object.entries(oddsData).map(([key, o]) => {
-        const [away, home] = key.split("@");
-        // Determine which side is the model's favorite
-        const favIsHome = o.homeP >= o.awayP;
-        const modelP = favIsHome ? o.homeP : o.awayP;
-        // The market's vig-removed implied probability for THAT SAME SIDE
-        const marketP = (favIsHome ? o.consHomeP : o.consAwayP) ?? (favIsHome ? o.homeP : o.awayP);
-        const bestFavOdds = favIsHome ? o.bestHomeOdds : o.bestAwayOdds;
-        return {
-          matchup: `${away} @ ${home}`,
-          fav: favIsHome ? home : away,
-          modelP,
-          impliedP: marketP,   // now actually the market's probability for the same side
-          bestFavOdds,
-          edge: isNaN(modelP - marketP) ? 0 : modelP - marketP,
-        };
-      });
-      return cards.reduce((best, g) => g.edge > best.edge ? g : best,
-        { matchup: "—", fav: "—", modelP: 0, impliedP: 0, bestFavOdds: null, edge: 0 });
-    }
-    // Fallback to static ODDS_GAMES
-    if (!ODDS_GAMES.length) return { matchup: "—", fav: "—", modelP: 0, impliedP: 0, bestFavOdds: null, edge: 0 };
-    return ODDS_GAMES.reduce((best, g) => (g.modelP - g.impliedP) > (best.modelP - best.impliedP) ? g : best);
-  }, [oddsData]);
+    const topEdge = useMemo(() => {
+        if (oddsData && Object.keys(oddsData).length > 0) {
+            const cards = Object.entries(oddsData).map(([key, o]) => {
+                const [away, home] = key.split("@");
+                const favIsHome = o.homeP >= o.awayP;
+                const modelP = favIsHome ? o.homeP : o.awayP;
+                const marketP = (favIsHome ? o.consHomeP : o.consAwayP) ?? (favIsHome ? o.homeP : o.awayP);
+                const bestFavOdds = favIsHome ? o.bestHomeOdds : o.bestAwayOdds;
+                return {
+                    matchup: `${away} @ ${home}`,
+                    fav: favIsHome ? home : away,
+                    modelP, impliedP: marketP, bestFavOdds,
+                    edge: isNaN(modelP - marketP) ? 0 : modelP - marketP,
+                };
+            });
+            return cards.reduce((best, g) => g.edge > best.edge ? g : best,
+                { matchup: "—", fav: "—", modelP: 0, impliedP: 0, bestFavOdds: null, edge: 0 });
+        }
+        if (!ODDS_GAMES.length) return { matchup: "—", fav: "—", modelP: 0, impliedP: 0, bestFavOdds: null, edge: 0 };
+        return ODDS_GAMES.reduce((best, g) => (g.modelP - g.impliedP) > (best.modelP - best.impliedP) ? g : best);
+    }, [oddsData]);
 
     const bestProb = useMemo(() => {
         if (oddsData && Object.keys(oddsData).length > 0) {
@@ -277,7 +277,8 @@ export default function Dashboard() {
                             { label: "Four Factors", path: "/analytics?tab=factors", icon: Activity, color: "text-draw" },
                             { label: "Players", path: "/players", icon: Zap, color: "text-pitch-300" },
                         ].map(item => (
-                            <button key={item.path} onClick={() => navigate(item.path)} className="flex items-center gap-2 px-3 py-2.5 rounded-lg bg-pitch-750 border border-pitch-700 hover:border-pitch-500 hover:bg-pitch-700 transition-all group text-left">
+                            <button key={item.path} onClick={() => navigate(item.path)}
+                                className="flex items-center gap-2 px-3 py-2.5 rounded-lg bg-pitch-750 border border-pitch-700 hover:border-pitch-500 hover:bg-pitch-700 transition-all group text-left">
                                 <item.icon size={13} strokeWidth={1.8} className={`${item.color} flex-shrink-0`} />
                                 <span className="text-[11px] text-pitch-300 group-hover:text-pitch-100 transition-colors font-medium">{item.label}</span>
                             </button>

@@ -20,15 +20,38 @@ export default async function handler(req, res) {
   if (!apiKey) return res.status(500).json({ error: "BDL_API_KEY not configured on server" });
 
   const path = req.query.path;
-  if (!path || typeof path !== "string") return res.status(400).json({ error: "Missing ?path= parameter" });
+  if (!path || typeof path !== "string") {
+    return res.status(400).json({ error: "Missing ?path= parameter" });
+  }
+
+  // FIX: normalize the path through the URL constructor before validating.
+  //
+  // Previous code: ALLOWED_PREFIXES.some(p => path.startsWith(p))
+  // A client could send ?path=/players/../../admin/secret — this passes
+  // startsWith("/players") but when appended to BASE and fetched, the HTTP
+  // client resolves the ../ segments and probes an unintended upstream endpoint
+  // using your BDL API key.
+  //
+  // Fix: parse with a dummy base URL so the browser/Node URL resolver collapses
+  // any ../ or ./ sequences, then validate the fully-normalized pathname.
+  // After normalization, /players/../admin/secret becomes /admin/secret, which
+  // fails the allowlist check and returns 400 before any upstream request is made.
+  let normalizedPath;
+  try {
+    const parsed = new URL(path, "https://dummy.invalid");
+    // Reconstruct path + query from the normalized URL
+    normalizedPath = parsed.pathname + (parsed.search || "");
+  } catch {
+    return res.status(400).json({ error: "Invalid path parameter" });
+  }
 
   const ALLOWED_PREFIXES = ["/games", "/standings", "/players", "/season_averages"];
-  if (!ALLOWED_PREFIXES.some((p) => path.startsWith(p))) {
+  if (!ALLOWED_PREFIXES.some(p => normalizedPath.startsWith(p))) {
     return res.status(400).json({ error: "Path not allowed" });
   }
 
   try {
-    const upstream = await fetch(`${BASE}${path}`, {
+    const upstream = await fetch(`${BASE}${normalizedPath}`, {
       headers: { Authorization: apiKey },
       signal: AbortSignal.timeout(8000),
     });
@@ -49,7 +72,7 @@ export default async function handler(req, res) {
     }
 
     const data = await upstream.json();
-    const ttl = cacheTTL(path);
+    const ttl = cacheTTL(normalizedPath);
 
     res.setHeader("Cache-Control", `s-maxage=${ttl}, stale-while-revalidate=30`);
     res.setHeader("Content-Type", "application/json");

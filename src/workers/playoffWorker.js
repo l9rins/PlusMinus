@@ -16,12 +16,10 @@ function eloWinP(eloA, eloB, home = false) {
   return 1 / (1 + Math.pow(10, -(eloA - eloB + (home ? HOME_BUMP : 0)) / 400));
 }
 
-// Single game (play-in uses this)
 function simGame(eloA, eloB, home, rng) {
   return rng() < eloWinP(eloA, eloB, home);
 }
 
-// Best-of-7 series
 function simSeries(eloA, eloB, rng) {
   let wA = 0, wB = 0, g = 0;
   const home = [true, true, false, false, true, false, true];
@@ -51,16 +49,12 @@ self.onmessage = (e) => {
   const counts = {};
   all.forEach(t => { counts[t.team] = { pi: 0, r1: 0, r2: 0, conf: 0, finals: 0, champ: 0 }; });
 
-  // Play-in: single elimination games (not best-of-7)
   function simPlayIn(seeds, rng) {
     const [s7, s8, s9, s10] = seeds.slice(6, 10);
     [s7, s8, s9, s10].forEach(t => counts[t.team].pi++);
-    // 7 vs 8: winner gets 7 seed
     const seed7 = simGame(s7.elo, s8.elo, true, rng) ? s7 : s8;
     const loser78 = seed7 === s7 ? s8 : s7;
-    // 9 vs 10: winner advances
     const w910 = simGame(s9.elo, s10.elo, true, rng) ? s9 : s10;
-    // Loser of 7v8 vs winner of 9v10: winner gets 8 seed
     const seed8 = simGame(loser78.elo, w910.elo, true, rng) ? loser78 : w910;
     return [seed7, seed8];
   }
@@ -70,7 +64,6 @@ self.onmessage = (e) => {
     const [pi7, pi8] = simPlayIn(seeds, rng);
     const bracket = [...direct, pi7, pi8];
     bracket.forEach(t => counts[t.team].r1++);
-    // R1: 1v8, 4v5, 3v6, 2v7
     const r2 = [[0, 7], [3, 4], [2, 5], [1, 6]].map(([a, b]) =>
       simSeries(bracket[a].elo, bracket[b].elo, rng) ? bracket[a] : bracket[b]
     );
@@ -84,9 +77,19 @@ self.onmessage = (e) => {
     return champ;
   }
 
+  // FIX: initialize the RNG ONCE outside the loop.
+  //
+  // Previous code: const rng = makeLCG(i * 1664525 + 1013904223) inside the loop.
+  // LCGs have well-known sequential dependencies. Re-seeding with a linear function
+  // of i meant the first random draw in every simulation was highly correlated —
+  // the 7v8 play-in game outcome was not truly random but followed a predictable
+  // artifact, skewing play-in probabilities across all 10,000 runs.
+  //
+  // Fix: one RNG seeded from Date.now() (wall-clock entropy). All 10,000 simulations
+  // draw from a single continuous stream, so each draw is independent of the last.
+  const rng = makeLCG(Date.now());
+
   for (let i = 0; i < SIMS; i++) {
-    // Safe 32-bit seed — no large integer precision loss
-    const rng = makeLCG(i * 1664525 + 1013904223);
     const eC = simConf(eastSeeds, rng);
     const wC = simConf(westSeeds, rng);
     counts[eC.team].finals++;

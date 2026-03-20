@@ -1,24 +1,4 @@
-// api/bets/[id].js — Vercel Serverless Function
-//
-// Handles DELETE /api/bets/:id
-//
-// Why a separate file instead of adding DELETE to api/bets.js:
-//   Vercel routes by filename. api/bets.js handles /api/bets (no segment).
-//   api/bets/[id].js handles /api/bets/:id (dynamic segment).
-//   The two files can coexist — Vercel picks the more specific route first.
-//
-// ID contract:
-//   Bet IDs are client-generated strings (nanoid, crypto.randomUUID, or
-//   Date.now().toString()). The server treats them as opaque strings and
-//   never generates them — it just filters by equality.
-//
-// Atomic pattern:
-//   GET bets array → filter out target id → SET back.
-//   Vercel KV has no native array-element delete, so this is the correct
-//   approach. The operation is fast (single round-trip per op on KV) and
-//   safe because Vercel KV GET+SET is serialized per key within a region.
-
-import { handleOptions, setCORSHeaders } from "../_cors.js";
+import { handleOptions, setCORSHeaders } from "./_cors.js";
 import { createClient } from "@vercel/kv";
 import { createClerkClient } from "@clerk/backend";
 
@@ -41,43 +21,88 @@ async function getUserId(req) {
   }
 }
 
+const VALID_RESULTS = new Set(["win", "loss", "push", "pending"]);
+
+// Validate shape — same checks as before
+function isValidBet(bet) {
+  if (!bet || typeof bet !== "object" || Array.isArray(bet)) return false;
+  if (typeof bet.id !== "string" || !bet.id.trim()) return false;
+  if (typeof bet.stake !== "number" || !isFinite(bet.stake) || bet.stake < 0) return false;
+  if (typeof bet.odds !== "number" || !isFinite(bet.odds)) return false;
+  if (!VALID_RESULTS.has(bet.result)) return false;
+  return true;
+}
+
+// FIX: reconstruct each bet from only the known fields before writing to KV.
+//
+// isValidBet() correctly rejected malformed bets, but a valid bet could still
+// carry arbitrary extra keys: { id, stake, odds, result, malicious: "x".repeat(1e7) }.
+// That payload passes validation and gets stored as-is, letting a client exhaust
+// Vercel KV storage quota despite the 500-item array cap.
+//
+// Fix: never trust the incoming object shape. Reconstruct from a known-safe
+// allowlist and cap string lengths. The KV record size stays bounded regardless
+// of what the client sends.
+//
+// Field limits:
+//   id        — 100 chars  (UUID is 36, Date.now() str is 13, plenty of headroom)
+//   matchup   — 50 chars   (e.g. "BOS @ LAL", optional display field)
+//   note      — 200 chars  (optional user note)
+//   book      — 50 chars   (bookmaker name, optional)
+function sanitizeBet(bet) {
+  const s = {
+    id: String(bet.id).slice(0, 100),
+    stake: Number(bet.stake),
+    odds: Number(bet.odds),
+    result: bet.result, // already validated as one of 4 known strings
+  };
+  // Optional display fields — only include if present and valid type
+  if (typeof bet.matchup === "string") s.matchup = bet.matchup.slice(0, 50);
+  if (typeof bet.note === "string") s.note = bet.note.slice(0, 200);
+  if (typeof bet.book === "string") s.book = bet.book.slice(0, 50);
+  if (typeof bet.date === "string") s.date = bet.date.slice(0, 30);
+  if (typeof bet.team === "string") s.team = bet.team.slice(0, 10);
+  return s;
+}
+
 export default async function handler(req, res) {
-  // Allow OPTIONS preflight — _cors.js handles the headers
   if (handleOptions(req, res)) return;
   const origin = req.headers.origin || "";
   setCORSHeaders(res, origin);
 
-  // Only DELETE is handled here; everything else is 405
-  if (req.method !== "DELETE") {
-    res.setHeader("Allow", "DELETE, OPTIONS");
-    return res.status(405).json({ error: "Method not allowed" });
-  }
-
-  // Auth
   const userId = await getUserId(req);
   if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
-  // Extract :id from the URL path — Vercel puts it in req.query.id
-  const betId = req.query.id;
-  if (!betId || typeof betId !== "string" || !betId.trim()) {
-    return res.status(400).json({ error: "Missing or invalid bet id" });
+  const key = `bets:${userId}`;
+
+  if (req.method === "GET") {
+    const bets = await kv.get(key);
+    return res.status(200).json(bets ?? []);
   }
 
-  const kvKey = `bets:${userId}`;
+  if (req.method === "PUT") {
+    const bets = req.body;
 
-  // Read current array
-  const existing = await kv.get(kvKey);
-  const bets = Array.isArray(existing) ? existing : [];
+    if (!Array.isArray(bets)) {
+      return res.status(400).json({ error: "Body must be an array" });
+    }
 
-  // Check the bet actually exists before writing
-  const idx = bets.findIndex(b => b.id === betId);
-  if (idx === -1) {
-    return res.status(404).json({ error: `Bet '${betId}' not found` });
+    if (bets.length > 500) {
+      return res.status(400).json({ error: "Maximum 500 bets allowed" });
+    }
+
+    const invalidIdx = bets.findIndex(b => !isValidBet(b));
+    if (invalidIdx !== -1) {
+      return res.status(400).json({
+        error: `Invalid bet at index ${invalidIdx}. Each bet must have: id (string), stake (number >= 0), odds (number), result (win|loss|push|pending).`,
+      });
+    }
+
+    // FIX: sanitize before write — strips unknown fields and caps string lengths
+    const sanitizedBets = bets.map(sanitizeBet);
+    await kv.set(key, sanitizedBets);
+    return res.status(200).json({ ok: true });
   }
 
-  // Filter it out and persist
-  const updated = bets.filter(b => b.id !== betId);
-  await kv.set(kvKey, updated);
-
-  return res.status(200).json({ ok: true, deleted: betId, remaining: updated.length });
+  return res.status(405).end();
 }
