@@ -571,7 +571,7 @@ export default function Players({ initialQuery = "" }) {
   );
 
   const displayPlayers = isSearchMode
-    ? (searchResults || []).sort((a, b) => b.pts - a.pts)
+    ? (searchResults || [])
     : browsePlayers;
 
   const isLoading = isSearchMode ? (searchLoading && !searchResults) : staticLoading;
