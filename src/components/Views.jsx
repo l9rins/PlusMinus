@@ -12,7 +12,7 @@ import {
 import { TEAM_NAMES, ODDS_GAMES, TEAM_COLORS } from "../data";
 import { useStandings, useTodayGames, useOdds, mergeOddsIntoGames, useBets } from "../api";
 import {
-  calcPL, BET_STORAGE_KEY, lsGet, lsSet,
+  calcPL, lsGet, lsSet,
   formatCurrency, formatPct, kellyBet, DEFAULT_BANKROLL,
   calcROI, breakEven, oddsToImplied,
 } from "../utils";
@@ -856,19 +856,7 @@ export function Betting() {
 // ═══════════════════════════════════════════════════════════════════
 // BET TRACKER
 // ═══════════════════════════════════════════════════════════════════
-const DEMO_BETS = [
-  { id: 1, game: "OKC @ BKN",  type: "Spread",     pick: "OKC -16",   odds: -110, stake: 50,  result: "win"     },
-  { id: 2, game: "GSW @ BOS",  type: "Moneyline",  pick: "BOS ML",    odds: -240, stake: 100, result: "win"     },
-  { id: 3, game: "POR @ IND",  type: "Over/Under", pick: "Over 228",  odds: -112, stake: 40,  result: "loss"    },
-  { id: 4, game: "LAL @ HOU",  type: "Spread",     pick: "HOU -1",    odds: -108, stake: 55,  result: "pending" },
-  { id: 5, game: "MIA @ MIL",  type: "Moneyline",  pick: "MIL ML",    odds: -160, stake: 80,  result: "loss"    },
-].map(b => ({ ...b, isDemo: true }));
 
-function loadBets() {
-  const raw = lsGet(BET_STORAGE_KEY);
-  if (raw === null) return DEMO_BETS;
-  return Array.isArray(raw) ? raw : DEMO_BETS;
-}
 
 function exportBetsCSV(bets) {
   const headers = "Date,Game,Type,Pick,Odds,Stake,Result,P&L,Break-even\n";

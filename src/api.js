@@ -6,8 +6,8 @@
 //   Odds           → The Odds API via /api/odds   (ODDS_API_KEY)
 //   Players        → Static data.js               (BDL paywall bypass)
 //   Search         → BDL /players endpoint        (BDL_API_KEY, free tier)
-
-import { useQuery } from "@tanstack/react-query";
+import { useMemo } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@clerk/clerk-react";
 import {
     EAST_STANDINGS as EAST_FALLBACK,
@@ -15,7 +15,7 @@ import {
     TODAY_GAMES as GAMES_FALLBACK,
     PLAYERS as PLAYERS_FALLBACK,
 } from "./data";
-import { todayStr, currentSeason } from "./utils";
+import { todayStr, currentSeason, reshapeNBAStats } from "./utils";
 
 // ── Typed error ───────────────────────────────────────────────────
 class ApiError extends Error {
@@ -389,8 +389,10 @@ export const queryClientConfig = {
 };
 
 // ── Bets Persistence ─────────────────────────────────────────────
+// ── Bets Persistence ─────────────────────────────────────────────
 export function useBets() {
   const { getToken } = useAuth();
+  const queryClient = useQueryClient();
 
   const query = useQuery({
     queryKey: ["bets"],
@@ -402,7 +404,7 @@ export function useBets() {
       if (!res.ok) throw new Error("Failed to load bets");
       return res.json();
     },
-    staleTime: Infinity, // bets don't go stale — user controls them
+    staleTime: Infinity,
   });
 
   const saveBets = async (bets) => {
@@ -415,8 +417,7 @@ export function useBets() {
       },
       body: JSON.stringify(bets),
     });
-    // Invalidate query so it refetches on next mount
-    query.refetch();
+    queryClient.invalidateQueries({ queryKey: ["bets"] });
   };
 
   return { bets: query.data ?? [], isLoading: query.isLoading, saveBets };
