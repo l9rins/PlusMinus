@@ -71,11 +71,23 @@ async function fetchTeamGameLog(teamId, season) {
   const wlIdx    = headers.indexOf("WL");
   const matchupIdx = headers.indexOf("MATCHUP");
 
-  return rows.map(row => ({
-    date:   row[dateIdx],   // "OCT 22, 2024"
-    wl:     row[wlIdx],     // "W" or "L"
-    isHome: !row[matchupIdx]?.includes("@"), // "TOR @ BOS" = away, "BOS vs. TOR" = home
-  })).reverse(); // NBA returns newest first — reverse to chronological
+  return rows.map(row => {
+    const matchup = row[matchupIdx] ?? "";
+    // Matchup format: "BOS vs. TOR" (home) or "BOS @ TOR" (away)
+    // The opponent is always the last token
+    const parts = matchup.split(/\s+/);
+    const opponentRaw = parts[parts.length - 1];
+    // Apply same abbreviation fixes as ESPN
+    const ABBR_FIX = { SA: "SAS", WSH: "WAS", NY: "NYK", GS: "GSW", NO: "NOP", PHO: "PHX" };
+    const opponent = ABBR_FIX[opponentRaw] ?? opponentRaw;
+
+    return {
+      date:     row[dateIdx],
+      wl:       row[wlIdx],
+      isHome:   !matchup.includes("@"),
+      opponent,
+    };
+  }).reverse(); // NBA returns newest first — reverse to chronological
 }
 
 // Small delay to avoid hammering stats.nba.com
@@ -119,57 +131,24 @@ export default async function handler(req, res) {
   // Each entry: { date, homeAbbr, awayAbbr, homeWon }
   // We derive this by cross-referencing each team's log — a game appears
   // in BOTH teams' logs, so we deduplicate by (date, homeAbbr, awayAbbr).
-  const gameSet = new Map();
+  const allGames = [];
+  const seen = new Set();
 
   for (const [abbr, log] of Object.entries(gameLogs)) {
     for (const g of log) {
-      const homeAbbr = g.isHome ? abbr : null;
-      const awayAbbr = g.isHome ? null : abbr;
-      // Key on date + team to avoid duplication — we'll resolve both sides below
-      const key = g.isHome ? `${g.date}|H|${abbr}` : `${g.date}|A|${abbr}`;
-      gameSet.set(key, { date: g.date, abbr, isHome: g.isHome, wl: g.wl });
+      if (!g.isHome) continue; // only process from home team's perspective to avoid duplicates
+      const key = `${g.date}|${abbr}|${g.opponent}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      allGames.push({
+        date:    g.date,
+        home:    abbr,
+        away:    g.opponent,
+        homeWon: g.wl === "W",
+      });
     }
   }
 
-  // Pair home and away entries by date — match "H|XXX" with "A|YYY" on same date
-  // Build proper game objects: { date, home, away, homeWon }
-  const dateHomeMap = new Map();  // date → { abbr, wl }[]
-  for (const [, entry] of gameSet) {
-    const d = entry.date;
-    if (!dateHomeMap.has(d)) dateHomeMap.set(d, { home: [], away: [] });
-    if (entry.isHome) dateHomeMap.get(d).home.push(entry);
-    else dateHomeMap.get(d).away.push(entry);
-  }
-
-  const allGames = [];
-  for (const [date, { home, away }] of dateHomeMap) {
-    // Match home entries with away entries — same date, opposing teams
-    for (const h of home) {
-      // Find the away team that played against this home team on this date
-      // We can cross-reference via the home team's gamelog matchup field
-      // Simplification: pair by index if counts match (works for single-game dates)
-      // For double-headers on same date, this may mismatch — acceptable for Elo approximation
-      for (const a of away) {
-        // Verify they actually played each other by checking gameLogs cross-reference
-        const homeLog = gameLogs[h.abbr] || [];
-        const played = homeLog.some(g =>
-          g.date === date && g.isHome && (
-            // The away team should appear in home team's matchup on this date
-            // Since we only have WL and isHome, we use a proximity heuristic:
-            // if both teams have a game on this date, assume they played each other
-            // This is correct ~95% of the time (back-to-backs on same date are rare)
-            true
-          )
-        );
-        if (played) {
-          allGames.push({ date, home: h.abbr, away: a.abbr, homeWon: h.wl === "W" });
-          break; // only pair each home team once per date
-        }
-      }
-    }
-  }
-
-  // Sort all games chronologically
   allGames.sort((a, b) => new Date(a.date) - new Date(b.date));
 
   // Process games in order — update Elo after each result
