@@ -204,7 +204,7 @@ function PlayerCard({ player, onCompare, comparePlayer, isComparing, sortKey, is
     { label: "AST", value: Math.min(100, (player.ast / 12) * 100) },
     { label: "REB", value: Math.min(100, (player.reb / 14) * 100) },
     { label: "EFF", value: Math.min(100, Math.max(0, ((player.ts - 48) / 22) * 100)) },
-    { label: "BPM", value: Math.min(100, Math.max(0, ((player.bpm + 5) / 17) * 100)) },
+    { label: "USG", value: Math.min(100, Math.max(0, ((player.usg ?? 0) / 40) * 100)) },
     { label: "PER", value: Math.min(100, (player.per / 35) * 100) },
   ] : null;
 
