@@ -30,7 +30,7 @@ class ApiError extends Error {
 
 // ── Shared retry policy ───────────────────────────────────────────
 const shouldRetry = (count, err) => {
-  if ([401, 429, 503, 504].includes(err?.status)) return false;
+  if ([401, 429, 502, 503, 504].includes(err?.status)) return false;
   return count < 2;
 };
 
@@ -564,7 +564,7 @@ export function useBets() {
     queryKey: ["bets"],
     queryFn: async () => {
       const token = await getToken();
-      if (!token) throw new Error("Not authenticated");
+      if (!token) throw new ApiError("Not authenticated", 401);
       const res = await fetch("/api/bets", {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -577,7 +577,7 @@ export function useBets() {
   const saveMutation = useMutation({
     mutationFn: async (bets) => {
       const token = await getToken();
-      if (!token) throw new Error("Not authenticated");
+      if (!token) throw new ApiError("Not authenticated", 401);
       const res = await fetch("/api/bets", {
         method: "PUT",
         headers: {
@@ -588,7 +588,18 @@ export function useBets() {
       });
       if (!res.ok) throw new Error("Failed to save bets");
     },
-    onSuccess: () => {
+    onMutate: async (bets) => {
+      await queryClient.cancelQueries({ queryKey: ["bets"] });
+      const previous = queryClient.getQueryData(["bets"]);
+      queryClient.setQueryData(["bets"], bets);
+      return { previous };
+    },
+    onError: (_err, _bets, context) => {
+      if (context?.previous !== undefined) {
+        queryClient.setQueryData(["bets"], context.previous);
+      }
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["bets"] });
     },
   });

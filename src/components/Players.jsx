@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Search, SlidersHorizontal, ChevronDown, X, Loader,
@@ -39,7 +39,7 @@ function Trend({ value, baseline }) {
   return d > 0 ? <TrendingUp size={9} className="text-win" /> : <TrendingDown size={9} className="text-loss" />;
 }
 
-function MiniRadar({ values, color, size = 64 }) {
+const MiniRadar = React.memo(function MiniRadar({ values, color, size = 64 }) {
   const n = values.length, cx = size / 2, cy = size / 2, r = size * 0.38;
   const ang = i => (Math.PI * 2 * i) / n - Math.PI / 2;
   const pts = values.map((v, i) => ({ x: cx + Math.cos(ang(i)) * (v.value / 100) * r, y: cy + Math.sin(ang(i)) * (v.value / 100) * r }));
@@ -52,7 +52,7 @@ function MiniRadar({ values, color, size = 64 }) {
       {pts.map((p, i) => <circle key={i} cx={p.x} cy={p.y} r={1.5} fill={color} />)}
     </svg>
   );
-}
+});
 
 function AttrBar({ label, value, max = 100, min = 0, invert = false, isSigned = false, compareValue, compareColor }) {
   const pct = v => {
@@ -272,8 +272,10 @@ export default function Players({ initialQuery = "" }) {
   const handleCompare = useCallback(p => setComparePlayer(prev => prev?.id === p.id ? null : p), []);
 
   const debouncedQuery = useDebounce(query, 350);
-  const isSearchMode = debouncedQuery.trim().length >= 2;
-  const isTyping = query.trim().length >= 2 && query !== debouncedQuery;
+  const trimmedQuery = query.trim();
+  const trimmedDebounced = debouncedQuery.trim();
+  const isSearchMode = trimmedDebounced.length >= 2;
+  const isTyping = trimmedQuery.length >= 2 && query !== debouncedQuery;
 
   useEffect(() => { if (isSearchMode) setComparePlayer(null); }, [isSearchMode]);
 
@@ -342,7 +344,7 @@ export default function Players({ initialQuery = "" }) {
       </div>
 
       <AnimatePresence>
-        {query.trim().length === 1 && (
+        {trimmedQuery.length === 1 && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="text-center py-4 text-pitch-600 text-[11px]">
             Type one more character to search all NBA players…
           </motion.div>
@@ -364,7 +366,7 @@ export default function Players({ initialQuery = "" }) {
         <div className="space-y-2">{Array.from({ length: 8 }).map((_, i) => <TileSkeleton key={i} lines={2} />)}</div>
       ) : displayPlayers.length === 0 && !isFetching ? (
         <EmptyState icon={isSearchMode ? Search : SlidersHorizontal}
-          title={isSearchMode ? `No results for "${debouncedQuery}"` : "No players match"}
+          title={isSearchMode ? `No results for "${trimmedDebounced}"` : "No players match"}
           description={isSearchMode ? "Try a different name, or check for typos." : "Try clearing the position filter."} />
       ) : (
         <div className="space-y-2">
@@ -385,4 +387,4 @@ export default function Players({ initialQuery = "" }) {
       )}
     </motion.div>
   );
-}
+} 

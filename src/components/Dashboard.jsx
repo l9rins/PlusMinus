@@ -91,7 +91,7 @@ function MiniStandings({ teams, conf }) {
                     const isPlayoff = i < 6;
                     const isPlayIn = i >= 6 && i <= 9;
                     return (
-                        <div key={t.team} className={`flex items-center gap-2 px-2 py-1.5 rounded-sm transition-colors hover:bg-pitch-700 cursor-pointer ${i === 6 ? "border-t border-dashed border-pitch-600 mt-1 pt-2.5" : ""}`}>
+                        <div key={`${t.team}-${i}`} className={`flex items-center gap-2 px-2 py-1.5 rounded-sm transition-colors hover:bg-pitch-700 cursor-pointer ${i === 6 ? "border-t border-dashed border-pitch-600 mt-1 pt-2.5" : ""}`}>
                             <span className="pm-number text-[10px] text-pitch-600 w-4 flex-shrink-0">{i + 1}</span>
                             <div className="w-1.5 h-1.5 rounded-full flex-shrink-0 opacity-80" style={{ background: TEAM_COLORS[t.team] || "#546480" }} />
                             <TeamLink abbr={t.team} className={`font-display text-sm tracking-wider flex-1 block ${i === 0 ? "text-accent" : isPlayoff ? "text-pitch-200" : "text-pitch-400"}`}>{t.team}</TeamLink>
