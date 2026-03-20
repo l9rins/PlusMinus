@@ -47,7 +47,8 @@ function updateElo(winnerElo, loserElo) {
 }
 
 // Fetch one team's game log — returns array of { date, wl, isHome }
-async function fetchTeamGameLog(teamId, season) {
+async function fetchTeamGameLog(teamId, season, attempt = 0) {
+  const MAX_ATTEMPTS = 3;
   const qs = new URLSearchParams({
     TeamID:     teamId,
     Season:     season,
@@ -55,39 +56,55 @@ async function fetchTeamGameLog(teamId, season) {
     LeagueID:   "00",
   });
   const url = `${NBA_BASE}/teamgamelog?${qs}`;
-  const res = await fetch(url, {
-    headers: NBA_HEADERS,
-    signal: AbortSignal.timeout(8000),
-  });
-  if (!res.ok) return [];
-  const data = await res.json();
 
-  const resultSet = data?.resultSets?.[0];
-  if (!resultSet) return [];
-  const headers = resultSet.headers;
-  const rows    = resultSet.rowSet;
+  try {
+    const res = await fetch(url, {
+      headers: NBA_HEADERS,
+      signal: AbortSignal.timeout(8000),
+    });
 
-  const dateIdx  = headers.indexOf("GAME_DATE");
-  const wlIdx    = headers.indexOf("WL");
-  const matchupIdx = headers.indexOf("MATCHUP");
+    // 429 rate limit — back off and retry
+    if (res.status === 429) {
+      if (attempt >= MAX_ATTEMPTS) return [];
+      const retryAfter = parseInt(res.headers.get("Retry-After") || "5", 10);
+      await sleep(retryAfter * 1000);
+      return fetchTeamGameLog(teamId, season, attempt + 1);
+    }
 
-  return rows.map(row => {
-    const matchup = row[matchupIdx] ?? "";
-    // Matchup format: "BOS vs. TOR" (home) or "BOS @ TOR" (away)
-    // The opponent is always the last token
-    const parts = matchup.split(/\s+/);
-    const opponentRaw = parts[parts.length - 1];
-    // Apply same abbreviation fixes as ESPN
-    const ABBR_FIX = { SA: "SAS", WSH: "WAS", NY: "NYK", GS: "GSW", NO: "NOP", PHO: "PHX" };
-    const opponent = ABBR_FIX[opponentRaw] ?? opponentRaw;
+    // Other non-ok responses — don't retry, return empty
+    if (!res.ok) return [];
 
-    return {
-      date:     row[dateIdx],
-      wl:       row[wlIdx],
-      isHome:   !matchup.includes("@"),
-      opponent,
-    };
-  }).reverse(); // NBA returns newest first — reverse to chronological
+    const data = await res.json();
+    const resultSet = data?.resultSets?.[0];
+    if (!resultSet) return [];
+    const headers = resultSet.headers;
+    const rows    = resultSet.rowSet;
+
+    const dateIdx    = headers.indexOf("GAME_DATE");
+    const wlIdx      = headers.indexOf("WL");
+    const matchupIdx = headers.indexOf("MATCHUP");
+
+    return rows.map(row => {
+      const matchup    = row[matchupIdx] ?? "";
+      const parts      = matchup.split(/\s+/);
+      const opponentRaw = parts[parts.length - 1];
+      const ABBR_FIX   = { SA: "SAS", WSH: "WAS", NY: "NYK", GS: "GSW", NO: "NOP", PHO: "PHX" };
+      const opponent   = ABBR_FIX[opponentRaw] ?? opponentRaw;
+      return {
+        date:     row[dateIdx],
+        wl:       row[wlIdx],
+        isHome:   !matchup.includes("@"),
+        opponent,
+      };
+    }).reverse();
+
+  } catch (err) {
+    // Timeout or network error — retry with backoff
+    if (attempt >= MAX_ATTEMPTS) return [];
+    const backoff = Math.pow(2, attempt) * 500; // 500ms, 1s, 2s
+    await sleep(backoff);
+    return fetchTeamGameLog(teamId, season, attempt + 1);
+  }
 }
 
 // Small delay to avoid hammering stats.nba.com
@@ -119,12 +136,9 @@ export default async function handler(req, res) {
   // In practice logs are cached at the edge for 1 hour so this only runs ~24 times/day
   const gameLogs = {};
   for (const [teamId, abbr] of teamEntries) {
-    try {
-      gameLogs[abbr] = await fetchTeamGameLog(teamId, season);
-    } catch {
-      gameLogs[abbr] = [];
-    }
-    await sleep(150);
+    gameLogs[abbr] = await fetchTeamGameLog(teamId, season);
+    // 200ms between teams — gives rate limiter room to breathe
+    await sleep(200);
   }
 
   // Build a unified chronological game list for proper Elo update ordering.
@@ -186,8 +200,17 @@ export default async function handler(req, res) {
     trajectory: trajectories[abbr] ?? [],
   })).sort((a, b) => b.elo - a.elo);
 
+  // In the final result build, add a teamsWithData count:
+  const teamsWithData = Object.values(gameLogs).filter(log => log.length > 0).length;
+
   // Cache for 1 hour at the edge — recomputes at most 24 times per day
   res.setHeader("Cache-Control", "s-maxage=3600, stale-while-revalidate=300");
   res.setHeader("Content-Type", "application/json");
-  return res.status(200).json({ season, teams: result, computedAt: new Date().toISOString() });
+  return res.status(200).json({
+    season,
+    teams: result,
+    computedAt: new Date().toISOString(),
+    teamsWithData,          // client can show a warning if < 30
+    partial: teamsWithData < 30,
+  });
 }

@@ -4,8 +4,10 @@
 //   Games          → ESPN free API via /api/espn  (no key)
 //   Team schedule  → ESPN free API via /api/espn  (no key)
 //   Odds           → The Odds API via /api/odds   (ODDS_API_KEY)
-//   Players        → Static data.js               (BDL paywall bypass)
+//   Players        → NBA Stats API via /api/nba   (no key)
 //   Search         → BDL /players endpoint        (BDL_API_KEY, free tier)
+//   Bets           → Vercel KV via /api/bets      (Clerk JWT auth)
+//   Elo            → /api/elo                     (server-side, 1hr cache)
 import { useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@clerk/clerk-react";
