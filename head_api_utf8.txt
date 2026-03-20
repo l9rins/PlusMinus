@@ -1,13 +1,13 @@
-// ─── PlusMinus API Layer ──────────────────────────────────────────
+﻿// ΓöÇΓöÇΓöÇ PlusMinus API Layer ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 // Data sources:
-//   Standings      → ESPN free API via /api/espn  (no key)
-//   Games          → ESPN free API via /api/espn  (no key)
-//   Team schedule  → ESPN free API via /api/espn  (no key)
-//   Odds           → The Odds API via /api/odds   (ODDS_API_KEY)
-//   Players        → NBA Stats API via /api/nba   (no key)
-//   Search         → BDL /players endpoint        (BDL_API_KEY, free tier)
-//   Bets           → Vercel KV via /api/bets      (Clerk JWT auth)
-//   Elo            → /api/elo                     (server-side, 1hr cache)
+//   Standings      ΓåÆ ESPN free API via /api/espn  (no key)
+//   Games          ΓåÆ ESPN free API via /api/espn  (no key)
+//   Team schedule  ΓåÆ ESPN free API via /api/espn  (no key)
+//   Odds           ΓåÆ The Odds API via /api/odds   (ODDS_API_KEY)
+//   Players        ΓåÆ NBA Stats API via /api/nba   (no key)
+//   Search         ΓåÆ BDL /players endpoint        (BDL_API_KEY, free tier)
+//   Bets           ΓåÆ Vercel KV via /api/bets      (Clerk JWT auth)
+//   Elo            ΓåÆ /api/elo                     (server-side, 1hr cache)
 import { useMemo } from "react";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@clerk/clerk-react";
@@ -18,7 +18,7 @@ import {
 } from "./data";
 import { todayStr, currentSeason, reshapeNBAStats } from "./utils";
 
-// ── Typed error ───────────────────────────────────────────────────
+// ΓöÇΓöÇ Typed error ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 class ApiError extends Error {
     constructor(message, status, retryAfter = null) {
         super(message);
@@ -28,14 +28,14 @@ class ApiError extends Error {
     }
 }
 
-// ── Shared retry policy ───────────────────────────────────────────
+// ΓöÇΓöÇ Shared retry policy ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 const shouldRetry = (count, err) => {
   // Don't retry auth failures, rate limits, misconfig, or timeouts
   if ([401, 429, 503, 504].includes(err?.status)) return false;
   return count < 2;
 };
 
-// ── ESPN proxy fetcher ────────────────────────────────────────────
+// ΓöÇΓöÇ ESPN proxy fetcher ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 async function espnFetch(resource, params = {}, signal) {
     const qs = new URLSearchParams({ resource, ...params });
     const res = await fetch(`/api/espn?${qs}`, { signal });
@@ -46,7 +46,7 @@ async function espnFetch(resource, params = {}, signal) {
     return res.json();
 }
 
-// ── BDL proxy fetcher (player search only) ────────────────────────
+// ΓöÇΓöÇ BDL proxy fetcher (player search only) ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 async function bdlFetch(path, signal) {
     const res = await fetch(`/api/bdl?path=${encodeURIComponent(path)}`, { signal });
     if (!res.ok) {
@@ -64,7 +64,7 @@ async function bdlFetch(path, signal) {
     return res.json();
 }
 
-// ── Odds proxy fetcher ────────────────────────────────────────────
+// ΓöÇΓöÇ Odds proxy fetcher ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 async function oddsFetch(signal) {
     const res = await fetch("/api/odds", { signal });
     if (!res.ok) {
@@ -79,7 +79,7 @@ async function oddsFetch(signal) {
     return res.json();
 }
 
-// ── NBA stats proxy fetcher ───────────────────────────────────────
+// ΓöÇΓöÇ NBA stats proxy fetcher ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 async function nbaFetch(endpoint, params = {}, signal) {
   const qs = new URLSearchParams({ endpoint, ...params });
   const res = await fetch(`/api/nba?${qs}`, { signal });
@@ -90,7 +90,7 @@ async function nbaFetch(endpoint, params = {}, signal) {
   return res.json();
 }
 
-// Real team stats — eFG%, TOV%, ORB%, FT Rate, NetRtg, OffRtg, DefRtg
+// Real team stats ΓÇö eFG%, TOV%, ORB%, FT Rate, NetRtg, OffRtg, DefRtg
 export function useLeagueTeamStats() {
   return useQuery({
     queryKey: ["nba", "leagueTeamStats", currentSeason()],
@@ -109,7 +109,7 @@ export function useLeagueTeamStats() {
   });
 }
 
-// Real player stats — PTS, AST, REB, TS%, PER, BPM etc.
+// Real player stats ΓÇö PTS, AST, REB, TS%, PER, BPM etc.
 export function useLeaguePlayerStats() {
   return useQuery({
     queryKey: ["nba", "leaguePlayerStats", currentSeason()],
@@ -183,7 +183,7 @@ export function useEnrichedPlayerStats() {
     const posMap = {};
     if (allPlayers.data) {
       reshapeNBAStats(allPlayers.data, "CommonAllPlayers").forEach(r => {
-        posMap[r.PERSON_ID] = r.POSITION ?? "—";
+        posMap[r.PERSON_ID] = r.POSITION ?? "ΓÇö";
       });
     }
 
@@ -192,7 +192,7 @@ export function useEnrichedPlayerStats() {
       return {
         id:   r.PLAYER_ID,
         name: r.PLAYER_NAME,
-        pos:  posMap[r.PLAYER_ID] ?? "—",
+        pos:  posMap[r.PLAYER_ID] ?? "ΓÇö",
         team: r.TEAM_ABBREVIATION,
         age:  r.AGE,
         pts:  +r.PTS.toFixed(1),
@@ -237,7 +237,7 @@ export function useEloData() {
   });
 }
 
-// ── Server config ─────────────────────────────────────────────────
+// ΓöÇΓöÇ Server config ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 export function usePlayerGameLog(playerId, enabled = false) {
   return useQuery({
     queryKey: ["nba", "playerGameLog", playerId, currentSeason()],
@@ -258,11 +258,11 @@ export function usePlayerGameLog(playerId, enabled = false) {
       const wlIdx = headers.indexOf("WL");
       if (wlIdx === -1) return [];
 
-      // NBA returns newest-first — take first 5, extract WL, reverse to oldest-first
+      // NBA returns newest-first ΓÇö take first 5, extract WL, reverse to oldest-first
       return rows
         .slice(0, 5)
         .map(row => row[wlIdx])   // "W" or "L"
-        .reverse();               // oldest → newest so the strip reads left-to-right
+        .reverse();               // oldest ΓåÆ newest so the strip reads left-to-right
     },
     staleTime: 1000 * 60 * 30,   // 30 min
     enabled: enabled && !!playerId,
@@ -285,7 +285,7 @@ export function useServerConfig() {
     });
 }
 
-// ── Standings (ESPN) ──────────────────────────────────────────────
+// ΓöÇΓöÇ Standings (ESPN) ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 // ESPN shape: data.children[0/1].standings.entries[{team.abbreviation, stats[]}]
 // Records use id fields: "33"=Home, "34"=Road, "901"=L10, name="streak"=streak
 
@@ -299,14 +299,14 @@ function reshapeESPNStandings(data) {
         return entries.map((e) => {
             const abbr = fixAbbr(e.team?.abbreviation ?? "???");
             const sv = (name) => e.stats?.find((s) => s.name === name)?.value ?? 0;
-            const sd = (name) => e.stats?.find((s) => s.name === name)?.displayValue ?? "—";
-            const sid = (id) => e.stats?.find((s) => s.id === id)?.displayValue ?? "—";
+            const sd = (name) => e.stats?.find((s) => s.name === name)?.displayValue ?? "ΓÇö";
+            const sid = (id) => e.stats?.find((s) => s.id === id)?.displayValue ?? "ΓÇö";
             const w = sv("wins");
             const l = sv("losses");
             const pct = w + l > 0 ? +(w / (w + l)).toFixed(3) : 0;
             const gb = sv("gamesBehind");
             const streakV = sv("streak");
-            const streak = streakV > 0 ? `W${streakV}` : streakV < 0 ? `L${Math.abs(streakV)}` : "—";
+            const streak = streakV > 0 ? `W${streakV}` : streakV < 0 ? `L${Math.abs(streakV)}` : "ΓÇö";
             return {
                 team: abbr,
                 w, l, pct,
@@ -337,7 +337,7 @@ export function useStandings() {
     });
 }
 
-// ── Today's games (ESPN scoreboard) ──────────────────────────────
+// ΓöÇΓöÇ Today's games (ESPN scoreboard) ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 function reshapeESPNScoreboard(data) {
     return (data?.events ?? []).map((ev) => {
         const comp = ev.competitions?.[0];
@@ -356,10 +356,10 @@ function reshapeESPNScoreboard(data) {
         const time = status === "final" ? "Final" : detail;
         return {
             id: String(ev.id), away: awayAbbr, home: homeAbbr,
-            awayP: null,   // ← was hardcoded 42
-            homeP: null,   // ← was hardcoded 58
+            awayP: null,   // ΓåÉ was hardcoded 42
+            homeP: null,   // ΓåÉ was hardcoded 58
             time, status, awayScore, homeScore, period,
-            spread: "—", total: "—",
+            spread: "ΓÇö", total: "ΓÇö",
         };
     });
 }
@@ -372,15 +372,15 @@ export function useTodayGames() {
             const data = await espnFetch("scoreboard", { date: today }, signal);
             return reshapeESPNScoreboard(data);
         },
-        staleTime: 1000 * 30,        // 30 seconds
+        staleTime: 1000 * 60,
         refetchInterval: 1000 * 60,
         placeholderData: GAMES_FALLBACK,
         retry: shouldRetry,
     });
 }
 
-// ── Team Schedule (ESPN) ──────────────────────────────────────────
-// Returns up to 82 games for a team — past results + upcoming.
+// ΓöÇΓöÇ Team Schedule (ESPN) ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// Returns up to 82 games for a team ΓÇö past results + upcoming.
 // ESPN shape: { team: {...}, events: [ { id, date, home, away, result, score } ] }
 
 function reshapeTeamSchedule(data, teamAbbr) {
@@ -407,11 +407,11 @@ function reshapeTeamSchedule(data, teamAbbr) {
             result = teamScore > oppScore ? "W" : "L";
         }
 
-        // Date string — "Mar 19" format
+        // Date string ΓÇö "Mar 19" format
         const dateObj = ev.date ? new Date(ev.date) : null;
         const dateStr = dateObj
             ? dateObj.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "America/New_York" })
-            : "—";
+            : "ΓÇö";
 
         return {
             id: String(ev.id),
@@ -441,7 +441,7 @@ export function useTeamSchedule(teamAbbr) {
     });
 }
 
-// ── Odds ──────────────────────────────────────────────────────────
+// ΓöÇΓöÇ Odds ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 export function useOdds() {
     return useQuery({
         queryKey: ["odds", todayStr()],
@@ -478,7 +478,7 @@ export function mergeOddsIntoGames(games, odds) {
 }
 
 
-// ── Player search (BDL free endpoint) ────────────────────────────
+// ΓöÇΓöÇ Player search (BDL free endpoint) ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 export function usePlayerSearch(query) {
     const trimmed = query?.trim() ?? "";
     const enabled = trimmed.length >= 2;
@@ -497,8 +497,8 @@ export function usePlayerSearch(query) {
                 const name = `${p.first_name} ${p.last_name}`.trim();
                 return {
                     id: p.id, name,
-                    pos: p.position || "—",
-                    team: p.team?.abbreviation || "—",
+                    pos: p.position || "ΓÇö",
+                    team: p.team?.abbreviation || "ΓÇö",
                     age: null,
                     per: null, bpm: null, vorp: null,
                     ortg: null, drtg: null, form: null,
@@ -512,7 +512,7 @@ export function usePlayerSearch(query) {
     });
 }
 
-// ── Query client config ───────────────────────────────────────────
+// ΓöÇΓöÇ Query client config ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 export const queryClientConfig = {
     defaultOptions: {
         queries: {
@@ -523,8 +523,8 @@ export const queryClientConfig = {
     },
 };
 
-// ── Bets Persistence ─────────────────────────────────────────────
-// ── Bets Persistence ─────────────────────────────────────────────
+// ΓöÇΓöÇ Bets Persistence ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// ΓöÇΓöÇ Bets Persistence ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 export function useBets() {
   const { getToken } = useAuth();
   const queryClient = useQueryClient();

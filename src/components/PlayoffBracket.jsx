@@ -361,7 +361,7 @@ export default function PlayoffBracket({ simData }) {
                 const rawY = clientY - rect.top - 40;
                 setTooltipPos({
                     x: rawX + 150 > SVG_W ? rawX - 160 : rawX,
-                    y: Math.max(0, rawY),
+                    y: Math.max(0, rawY + 120 > SVG_H ? rawY - 80 : rawY),
                 });
             }
         }
@@ -438,7 +438,7 @@ export default function PlayoffBracket({ simData }) {
                         const rawY = e.clientY - rect.top - 40;
                         setTooltipPos({
                             x: rawX + 150 > SVG_W ? rawX - 160 : rawX,
-                            y: Math.max(0, rawY),
+                            y: Math.max(0, rawY + 120 > SVG_H ? rawY - 80 : rawY),
                         });
                     }
                 }}
