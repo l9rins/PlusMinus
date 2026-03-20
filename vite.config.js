@@ -11,7 +11,7 @@ export default defineConfig({
       // Don't cache API routes — service worker should be network-only for /api
       workbox: {
         navigateFallback: "/index.html",
-        navigateFallbackDenylist: [/^\/api\//],
+        navigateFallbackAllowlist: [/^(?!\/api\/).*/],
         globPatterns: ["**/*.{js,css,html,svg,png,woff2}"],
         runtimeCaching: [
           {
