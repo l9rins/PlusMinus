@@ -1,20 +1,7 @@
 // api/bdl.js — Vercel Serverless Function
 const BASE = "https://api.balldontlie.io/nba/v1";
 
-const ALLOWED_ORIGINS = new Set([
-  "http://localhost:3000",
-  "http://localhost:5173",
-]);
-const VERCEL_PREVIEW_RE = /^https:\/\/[a-zA-Z0-9-]+-[a-zA-Z0-9]+\.vercel\.app$/;
-
-function isAllowedOrigin(origin) {
-  if (!origin) return false;
-  if (ALLOWED_ORIGINS.has(origin)) return true;
-  if (VERCEL_PREVIEW_RE.test(origin)) return true;
-  // Allow your custom production domain — edit this
-  if (origin === "https://plusminus.vercel.app") return true;
-  return false;
-}
+import { setCORSHeaders, handleOptions } from "./_cors.js";
 
 function cacheTTL(path) {
   if (path.startsWith("/games")) return 90;
@@ -23,18 +10,9 @@ function cacheTTL(path) {
 }
 
 export default async function handler(req, res) {
+  if (handleOptions(req, res)) return;
   const origin = req.headers.origin || "";
-  const allowed = isAllowedOrigin(origin);
-
-  // Always set Vary so edge cache doesn't serve wrong CORS headers to other origins
-  res.setHeader("Vary", "Origin");
-
-  if (req.method === "OPTIONS") {
-    if (allowed) res.setHeader("Access-Control-Allow-Origin", origin);
-    res.setHeader("Access-Control-Allow-Methods", "GET,OPTIONS");
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-    return res.status(204).end();
-  }
+  setCORSHeaders(res, origin);
 
   if (req.method !== "GET") return res.status(405).json({ error: "Method not allowed" });
 
@@ -75,7 +53,6 @@ export default async function handler(req, res) {
 
     res.setHeader("Cache-Control", `s-maxage=${ttl}, stale-while-revalidate=30`);
     res.setHeader("Content-Type", "application/json");
-    if (allowed) res.setHeader("Access-Control-Allow-Origin", origin);
 
     return res.status(200).json(data);
   } catch (err) {

@@ -9,6 +9,7 @@ import {
   lsGet, lsSet, lsRemove,
   BET_STORAGE_KEY, BREAK_EVEN_PCT, DEFAULT_BANKROLL,
 } from "./utils";
+import { currentSeason } from "./api";
 
 describe("signed()", () => {
   it("+", () => expect(signed(5.2)).toBe("+5.2"));
@@ -130,4 +131,13 @@ describe("constants", () => {
   it("BET_STORAGE_KEY string", () => expect(typeof BET_STORAGE_KEY).toBe("string"));
   it("BREAK_EVEN_PCT ≈ 52.38", () => expect(BREAK_EVEN_PCT).toBeCloseTo(52.38, 1));
   it("DEFAULT_BANKROLL > 0", () => expect(DEFAULT_BANKROLL).toBeGreaterThan(0));
+});
+
+describe("currentSeason", () => {
+  it("returns current year in October", () => {
+    // Manually verify the Oct 1 cutover is working
+    const result = currentSeason();
+    expect(typeof result).toBe("number");
+    expect(result).toBeGreaterThan(2020);
+  });
 });

@@ -22,7 +22,13 @@ const ESPN_TEAM_IDS = {
     SAC: "23", SAS: "24", TOR: "28", UTA: "26", WAS: "27",
 };
 
+import { setCORSHeaders, handleOptions } from "./_cors.js";
+
 export default async function handler(req, res) {
+    if (handleOptions(req, res)) return;
+    const origin = req.headers.origin || "";
+    setCORSHeaders(res, origin);
+
     if (req.method !== "GET") return res.status(405).json({ error: "Method not allowed" });
 
     const resource = req.query.resource;
@@ -64,7 +70,6 @@ export default async function handler(req, res) {
         const data = await upstream.json();
         res.setHeader("Cache-Control", `s-maxage=${ttl}, stale-while-revalidate=30`);
         res.setHeader("Content-Type", "application/json");
-        res.setHeader("Vary", "Origin"); // ← add this line
         return res.status(200).json(data);
 
     } catch (err) {

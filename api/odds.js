@@ -19,19 +19,7 @@ const TEAM_MAP = {
   "Utah Jazz": "UTA",           "Washington Wizards": "WAS",
 };
 
-const ALLOWED_ORIGINS = new Set([
-  "http://localhost:3000",
-  "http://localhost:5173",
-]);
-const VERCEL_PREVIEW_RE = /^https:\/\/[a-zA-Z0-9-]+-[a-zA-Z0-9]+\.vercel\.app$/;
-
-function isAllowedOrigin(origin) {
-  if (!origin) return false;
-  if (ALLOWED_ORIGINS.has(origin)) return true;
-  if (VERCEL_PREVIEW_RE.test(origin)) return true;
-  if (origin === "https://plusminus.vercel.app") return true;
-  return false;
-}
+import { setCORSHeaders, handleOptions } from "./_cors.js";
 
 function toImplied(american) {
   if (american > 0) return 100 / (american + 100);
@@ -44,16 +32,9 @@ function toDecimal(american) {
 }
 
 export default async function handler(req, res) {
+  if (handleOptions(req, res)) return;
   const origin = req.headers.origin || "";
-  const allowed = isAllowedOrigin(origin);
-
-  res.setHeader("Vary", "Origin");
-
-  if (req.method === "OPTIONS") {
-    if (allowed) res.setHeader("Access-Control-Allow-Origin", origin);
-    res.setHeader("Access-Control-Allow-Methods", "GET,OPTIONS");
-    return res.status(204).end();
-  }
+  setCORSHeaders(res, origin);
 
   if (req.method !== "GET") return res.status(405).end();
 
@@ -141,7 +122,6 @@ export default async function handler(req, res) {
 
     res.setHeader("Cache-Control", "s-maxage=900, stale-while-revalidate=60");
     res.setHeader("Content-Type", "application/json");
-    if (allowed) res.setHeader("Access-Control-Allow-Origin", origin);
 
     return res.status(200).json(result);
   } catch (err) {

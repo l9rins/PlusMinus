@@ -19,8 +19,10 @@ function GameTile({ game }) {
     const isScheduled = game.status === "scheduled";
     const awayColor = TEAM_COLORS[game.away] || "#546480";
     const homeColor = TEAM_COLORS[game.home] || "#546480";
-    const favP = Math.max(game.homeP, game.awayP);
-    const confidence = favP >= 70 ? "high" : favP >= 58 ? "mid" : "low";
+    const favP = Math.max(game.homeP ?? 0, game.awayP ?? 0);
+    const confidence = (game.homeP === null || game.awayP === null)
+        ? "none"
+        : favP >= 70 ? "high" : favP >= 58 ? "mid" : "low";
 
     return (
         <motion.div variants={tile} className="pm-tile p-3 group">
@@ -42,7 +44,9 @@ function GameTile({ game }) {
                     <div className={`font-display text-xl tracking-wider leading-none mb-0.5 ${fav === "away" ? "" : "text-pitch-300"}`} style={{ color: fav === "away" ? awayColor : undefined }}>{game.away}</div>
                     <div className="text-[10px] text-pitch-500 truncate px-1">{TEAM_NAMES[game.away] || game.away}</div>
                     {(isFinal || isLive) ? <motion.div key={game.awayScore} initial={{ scale: 1.1 }} animate={{ scale: 1 }} className="pm-number text-lg mt-1 text-pitch-100">{game.awayScore}</motion.div>
-                        : <div className="pm-number text-sm mt-1 text-pitch-400">{game.awayP}%</div>}
+                        : game.awayP !== null
+                            ? <div className="pm-number text-sm mt-1 text-pitch-400">{game.awayP}%</div>
+                            : <div className="pm-number text-sm mt-1 text-pitch-600">—</div>}
                 </div>
                 <div className="flex flex-col items-center gap-0.5">
                     <div className="text-pitch-600 text-xs font-mono">{isFinal || isLive ? "—" : "vs"}</div>
@@ -52,10 +56,12 @@ function GameTile({ game }) {
                     <div className={`font-display text-xl tracking-wider leading-none mb-0.5 ${fav === "home" ? "" : "text-pitch-300"}`} style={{ color: fav === "home" ? homeColor : undefined }}>{game.home}</div>
                     <div className="text-[10px] text-pitch-500 truncate px-1">{TEAM_NAMES[game.home] || game.home}</div>
                     {(isFinal || isLive) ? <motion.div key={game.homeScore} initial={{ scale: 1.1 }} animate={{ scale: 1 }} className="pm-number text-lg mt-1 text-pitch-100">{game.homeScore}</motion.div>
-                        : <div className="pm-number text-sm mt-1 text-pitch-400">{game.homeP}%</div>}
+                        : game.homeP !== null
+                            ? <div className="pm-number text-sm mt-1 text-pitch-400">{game.homeP}%</div>
+                            : <div className="pm-number text-sm mt-1 text-pitch-600">—</div>}
                 </div>
             </div>
-            {isScheduled && (
+            {isScheduled && game.awayP !== null && (
                 <div className="mb-2.5">
                     <div className="flex justify-between text-[9px] text-pitch-600 mb-1"><span>{game.away}</span><span>{game.home}</span></div>
                     <div className="h-1.5 rounded-full bg-pitch-700 overflow-hidden relative">

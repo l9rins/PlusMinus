@@ -78,7 +78,7 @@ async function oddsFetch(signal) {
 }
 
 // ── Season logic ──────────────────────────────────────────────────
-function currentSeason() {
+export function currentSeason() {
   const now = new Date();
   const year = now.getFullYear();
   const month = now.getMonth() + 1;
