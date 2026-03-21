@@ -263,3 +263,30 @@ export function reshapeNBAStats(data, setName = null) {
     Object.fromEntries(headers.map((h, i) => [h, row[i]]))
   );
 }
+
+// ── Unit system helpers ───────────────────────────────────────────
+
+export const DEFAULT_UNIT_PCT = 0.01;  // 1% of bankroll = 1 unit
+
+// Get unit size in dollars from stored bankroll + unit % preference
+export function getUnitSize(bankroll) {
+  const pct = Number(lsGet("pm_unit_pct")) || DEFAULT_UNIT_PCT;
+  return +(bankroll * pct).toFixed(2);
+}
+
+// Convert a dollar stake to units given a unit size
+export function stakeToUnits(stake, unitSize) {
+  if (!unitSize || unitSize <= 0) return null;
+  return +(stake / unitSize).toFixed(2);
+}
+
+// Convert units to dollars
+export function unitsToDollars(units, unitSize) {
+  return +(units * unitSize).toFixed(2);
+}
+
+// P/L in units
+export function plInUnits(pl, unitSize) {
+  if (!unitSize || unitSize <= 0) return null;
+  return +(pl / unitSize).toFixed(2);
+}

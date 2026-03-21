@@ -304,12 +304,76 @@ export function useServerConfig() {
     queryKey: ["serverConfig"],
     queryFn: async () => {
       const res = await fetch("/api/config");
-      if (!res.ok) return { hasBdl: false, hasOdds: false };
+      if (!res.ok) return { hasBdl: false, hasOdds: false, oddsCredits: null };
       return res.json();
     },
-    staleTime: 1000 * 60 * 60,
-    placeholderData: { hasBdl: false, hasOdds: false },
+    // Reduced from 60min to 5min so credit count stays reasonably fresh
+    staleTime: 1000 * 60 * 5,
+    placeholderData: { hasBdl: false, hasOdds: false, oddsCredits: null },
     retry: false,
+  });
+}
+
+// ── Player prop history — last N games vs current line ─────────
+const MARKET_TO_STAT = {
+  player_points:        ["PTS"],
+  player_rebounds:      ["REB"],
+  player_assists:       ["AST"],
+  player_threes:        ["FG3M"],
+  player_blocks_steals: ["BLK", "STL"], // summed
+};
+
+export function usePlayerPropHistory(playerId, market, line, n = 10) {
+  const statKeys = MARKET_TO_STAT[market] ?? ["PTS"];
+
+  return useQuery({
+    queryKey: ["nba", "propHistory", playerId, market, n, currentSeason()],
+    queryFn: async ({ signal }) => {
+      const data = await nbaFetch("playergamelog", {
+        PlayerID: playerId,
+        Season: `${currentSeason() - 1}-${String(currentSeason()).slice(2)}`,
+        SeasonType: "Regular Season",
+        LeagueID: "00",
+      }, signal);
+
+      const resultSet = data?.resultSets?.[0];
+      if (!resultSet) return null;
+
+      const headers = resultSet.headers;
+      const rows    = resultSet.rowSet.slice(0, n);
+
+      // Resolve column indices for this market's stats
+      const statIdxs = statKeys.map(k => headers.indexOf(k)).filter(i => i !== -1);
+      const dateIdx  = headers.indexOf("GAME_DATE");
+      const matchIdx = headers.indexOf("MATCHUP");
+      const wlIdx    = headers.indexOf("WL");
+
+      if (!statIdxs.length) return null;
+
+      const games = rows.map(row => {
+        const value = +statIdxs.reduce((sum, i) => sum + (Number(row[i]) || 0), 0).toFixed(1);
+        return {
+          date:    row[dateIdx]  ?? "",
+          matchup: row[matchIdx] ?? "",
+          wl:      row[wlIdx]    ?? "",
+          value,
+          hit:     line != null ? value > line : null,
+        };
+      }).reverse(); // chronological order
+
+      const values   = games.map(g => g.value);
+      const avg      = values.length ? +(values.reduce((a, b) => a + b, 0) / values.length).toFixed(1) : null;
+      const last5    = values.slice(-5);
+      const last5Avg = last5.length ? +(last5.reduce((a, b) => a + b, 0) / last5.length).toFixed(1) : null;
+      const hits     = games.filter(g => g.hit).length;
+      const hitRate  = games.length ? +(hits / games.length) : null;
+
+      return { games, avg, last5Avg, hitRate, hits, total: games.length };
+    },
+    staleTime: 1000 * 60 * 30,
+    enabled:   !!playerId && !!market,
+    placeholderData: null,
+    retry: shouldRetry,
   });
 }
 
