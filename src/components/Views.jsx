@@ -7,7 +7,7 @@ import {
 import {
   ArrowUpDown, Download, Trash2, Plus, ChevronUp, ChevronDown,
   TrendingUp, Shield, DollarSign, Target, X, Info,
-  Zap, ExternalLink, AlertTriangle, CheckCircle, Loader, Activity, Layers,
+  Zap, ExternalLink, AlertTriangle, CheckCircle, Loader, Activity, Layers, PlayCircle, Clock,
 } from "lucide-react";
 import { TEAM_NAMES, ODDS_GAMES, TEAM_COLORS } from "../data";
 import { useStandings, useTodayGames, useOdds, mergeOddsIntoGames, useBets, usePlayerProps } from "../api";
@@ -889,10 +889,13 @@ function fmtOdds(n) {
 // Shows today's prop markets, grouped by game → player → market.
 // "Bet this" button pre-fills the add-bet form below.
 function PropsBrowser({ onAddPropBet, bankroll }) {
-  const { data: propsData, isLoading, isError } = usePlayerProps();
+  const { data: propsResult, isLoading, isError } = usePlayerProps();
+  const propsData = propsResult?.games ?? null;
+  const lineMoves = propsResult?.moves ?? [];
   const [selectedGame, setSelectedGame] = useState(null);
   const [selectedMarket, setSelectedMarket] = useState("player_points");
   const [expandedPlayer, setExpandedPlayer] = useState(null);
+  const [playerSearch, setPlayerSearch] = useState("");
 
   const games = useMemo(() => {
     if (!propsData) return [];
@@ -907,14 +910,16 @@ function PropsBrowser({ onAddPropBet, bankroll }) {
   const currentGame = games.find(g => g.key === selectedGame);
   const players = useMemo(() => {
     if (!currentGame) return [];
+    const q = playerSearch.trim().toLowerCase();
     return Object.values(currentGame.players)
       .filter(p => p.markets[selectedMarket])
+      .filter(p => !q || p.name.toLowerCase().includes(q))
       .sort((a, b) => {
         const la = a.markets[selectedMarket]?.line ?? 0;
         const lb = b.markets[selectedMarket]?.line ?? 0;
         return lb - la;
       });
-  }, [currentGame, selectedMarket]);
+  }, [currentGame, selectedMarket, playerSearch]);
 
   if (isLoading) {
     return (
@@ -944,7 +949,7 @@ function PropsBrowser({ onAddPropBet, bankroll }) {
         {games.map(g => (
           <button
             key={g.key}
-            onClick={() => { setSelectedGame(g.key); setExpandedPlayer(null); }}
+            onClick={() => { setSelectedGame(g.key); setExpandedPlayer(null); setPlayerSearch(""); }}
             className={`px-2.5 py-1 rounded text-[10px] font-mono font-medium transition-all
               ${selectedGame === g.key
                 ? "bg-accent/15 text-accent border border-accent/30"
@@ -960,7 +965,7 @@ function PropsBrowser({ onAddPropBet, bankroll }) {
         {MARKET_KEYS.map(mk => (
           <button
             key={mk}
-            onClick={() => { setSelectedMarket(mk); setExpandedPlayer(null); }}
+            onClick={() => { setSelectedMarket(mk); setExpandedPlayer(null); setPlayerSearch(""); }}
             className={`px-2.5 py-1 rounded text-[10px] font-medium transition-all
               ${selectedMarket === mk
                 ? "bg-pitch-700 text-pitch-100 border border-pitch-500"
@@ -970,6 +975,51 @@ function PropsBrowser({ onAddPropBet, bankroll }) {
           </button>
         ))}
       </div>
+
+      {/* Line movement alerts */}
+      {lineMoves.length > 0 && (
+        <div className="space-y-1">
+          <div className="pm-label text-[9px]">Line movement</div>
+          {lineMoves
+            .filter(m => !selectedGame || m.gameKey === selectedGame)
+            .slice(0, 5)
+            .map((m, i) => (
+              <div key={i}
+                className="flex items-center justify-between px-2.5 py-1.5 rounded
+                  bg-draw/8 border border-draw/20 text-[10px]">
+                <span className="text-pitch-300 font-medium truncate">{m.playerName}</span>
+                <div className="flex items-center gap-2 flex-shrink-0 font-mono">
+                  <span className="text-pitch-500">{MARKET_LABELS[m.market]}</span>
+                  <span className="text-pitch-500 line-through">{m.prevLine}</span>
+                  <span className={m.direction === "up" ? "text-win" : "text-loss"}>
+                    {m.direction === "up" ? "▲" : "▼"} {m.newLine}
+                  </span>
+                </div>
+              </div>
+            ))}
+        </div>
+      )}
+
+      {/* Player search — only shown when enough players to warrant it */}
+      {currentGame && Object.keys(currentGame.players).length > 8 && (
+        <div className="relative">
+          <input
+            className="pm-input w-full pl-7 text-[11px]"
+            placeholder="Search players…"
+            value={playerSearch}
+            onChange={e => { setPlayerSearch(e.target.value); setExpandedPlayer(null); }}
+          />
+          <Target size={11} className="absolute left-2 top-1/2 -translate-y-1/2 text-pitch-600 pointer-events-none" />
+          {playerSearch && (
+            <button
+              onClick={() => setPlayerSearch("")}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-pitch-600 hover:text-pitch-400"
+            >
+              <X size={11} />
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Player rows */}
       {players.length === 0 ? (
@@ -1226,6 +1276,18 @@ export function BetTracker() {
       propBets:   propBets.length,
       propWins:   propSettled.filter(b => b.result === "win").length,
       propTotal:  propSettled.length,
+      propByMarket: (() => {
+        const map = {};
+        (bets || [])
+          .filter(b => b.type === "prop" && b.result !== "pending")
+          .forEach(b => {
+            if (!map[b.market]) map[b.market] = { wins: 0, total: 0, pl: 0 };
+            map[b.market].total++;
+            if (b.result === "win") map[b.market].wins++;
+            map[b.market].pl += calcPL(b.odds, b.stake, b.result);
+          });
+        return map;
+      })(),
     };
   }, [bets]);
 
@@ -1445,6 +1507,56 @@ export function BetTracker() {
                 </ResponsiveContainer>
               </div>
             )}
+
+            {/* ── Prop performance by market ─────────────────────── */}
+            {stats && stats.propBets > 0 && (() => {
+              const byMarket = {};
+              (bets || [])
+                .filter(b => b.type === "prop" && b.result !== "pending")
+                .forEach(b => {
+                  if (!byMarket[b.market]) byMarket[b.market] = { wins: 0, total: 0, pl: 0 };
+                  byMarket[b.market].total++;
+                  if (b.result === "win") byMarket[b.market].wins++;
+                  byMarket[b.market].pl += calcPL(b.odds, b.stake, b.result);
+                });
+              const rows = Object.entries(byMarket)
+                .map(([market, s]) => ({ market, ...s, winRate: s.total > 0 ? s.wins / s.total : 0 }))
+                .sort((a, b) => b.winRate - a.winRate);
+              if (!rows.length) return null;
+              return (
+                <div className="pm-card p-3">
+                  <div className="pm-label mb-2">Prop performance by market</div>
+                  <div className="space-y-1.5">
+                    {rows.map(r => (
+                      <div key={r.market} className="flex items-center gap-3">
+                        <span className="text-[10px] text-pitch-400 w-24 flex-shrink-0">
+                          {MARKET_LABELS[r.market] ?? r.market}
+                        </span>
+                        {/* Win rate bar */}
+                        <div className="flex-1 h-1.5 rounded-full bg-pitch-700 overflow-hidden">
+                          <motion.div
+                            className="h-full rounded-full bg-accent"
+                            initial={{ width: 0 }}
+                            animate={{ width: `${r.winRate * 100}%` }}
+                            transition={{ duration: 0.6 }}
+                          />
+                        </div>
+                        <span className="font-mono text-[10px] text-pitch-300 w-8 text-right flex-shrink-0">
+                          {formatPct(r.winRate)}
+                        </span>
+                        <span className={`font-mono text-[10px] w-14 text-right flex-shrink-0
+                          ${r.pl >= 0 ? "text-win" : "text-loss"}`}>
+                          {r.pl >= 0 ? "+" : ""}{formatCurrency(r.pl)}
+                        </span>
+                        <span className="text-[9px] text-pitch-600 w-8 text-right flex-shrink-0">
+                          {r.wins}/{r.total}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* ── Add bet button + form anchor ──────────────── */}
             <div id="bet-form-anchor">
@@ -1756,7 +1868,15 @@ export function BetTracker() {
                               </span>
                             </span>
                           ) : (
-                            <span className="text-[11px] font-medium text-pitch-200">
+                            <span className="text-[11px] font-medium" style={{
+                              color: bet.team && TEAM_COLORS[bet.team] ? TEAM_COLORS[bet.team] : undefined,
+                            }}>
+                              {bet.team && TEAM_COLORS[bet.team] && (
+                                <span
+                                  className="inline-block w-1.5 h-1.5 rounded-full mr-1.5 flex-shrink-0 align-middle"
+                                  style={{ background: TEAM_COLORS[bet.team] }}
+                                />
+                              )}
                               {bet.matchup || bet.team || "—"}
                             </span>
                           )}
@@ -1845,3 +1965,398 @@ export function BetTracker() {
   );
 }
 
+// ═══════════════════════════════════════════════════════════════════
+// PATCH 2 — Historical Performance Dashboard
+// ═══════════════════════════════════════════════════════════════════
+
+export function HistoricalDashboard() {
+  const { bets, isLoading } = useBets();
+
+  // ── Monthly P/L buckets ──────────────────────────────────────
+  const monthlyData = useMemo(() => {
+    if (!bets?.length) return [];
+    const map = {};
+    for (const b of bets) {
+      if (!b.date || b.result === "pending") continue;
+      const month = b.date.slice(0, 7); // "2025-03"
+      if (!map[month]) map[month] = { month, pl: 0, staked: 0, wins: 0, total: 0 };
+      map[month].pl     += calcPL(b.odds, b.stake, b.result);
+      map[month].staked += b.stake ?? 0;
+      map[month].total++;
+      if (b.result === "win") map[month].wins++;
+    }
+    return Object.values(map)
+      .sort((a, b) => a.month.localeCompare(b.month))
+      .map(m => ({
+        ...m,
+        pl:      +m.pl.toFixed(2),
+        roi:     m.staked > 0 ? +((m.pl / m.staked) * 100).toFixed(1) : 0,
+        winRate: m.total > 0  ? +(m.wins / m.total * 100).toFixed(1)  : 0,
+        label:   new Date(m.month + "-02").toLocaleDateString("en-US", { month: "short", year: "2-digit" }),
+      }));
+  }, [bets]);
+
+  // ── ROI trend (cumulative) ───────────────────────────────────
+  const roiTrend = useMemo(() => {
+    let cumPL = 0, cumStaked = 0;
+    return monthlyData.map(m => {
+      cumPL     += m.pl;
+      cumStaked += m.staked;
+      return {
+        label:  m.label,
+        cumROI: cumStaked > 0 ? +((cumPL / cumStaked) * 100).toFixed(1) : 0,
+      };
+    });
+  }, [monthlyData]);
+
+  // ── Streak tracker ───────────────────────────────────────────
+  const streakData = useMemo(() => {
+    if (!bets?.length) return { current: 0, type: null, best: 0, worst: 0 };
+    const settled = [...bets]
+      .filter(b => b.result === "win" || b.result === "loss")
+      .sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+
+    let cur = 0, curType = null, best = 0, worst = 0;
+    for (const b of settled) {
+      if (curType === b.result) {
+        cur++;
+      } else {
+        if (curType === "win") best = Math.max(best, cur);
+        if (curType === "loss") worst = Math.max(worst, cur);
+        cur = 1; curType = b.result;
+      }
+    }
+    if (curType === "win") best = Math.max(best, cur);
+    if (curType === "loss") worst = Math.max(worst, cur);
+
+    return { current: cur, type: curType, best, worst };
+  }, [bets]);
+
+  // ── Best/worst books ─────────────────────────────────────────
+  const bookStats = useMemo(() => {
+    if (!bets?.length) return [];
+    const map = {};
+    for (const b of bets) {
+      if (!b.book || b.result === "pending") continue;
+      if (!map[b.book]) map[b.book] = { book: b.book, wins: 0, total: 0, pl: 0 };
+      map[b.book].total++;
+      if (b.result === "win") map[b.book].wins++;
+      map[b.book].pl += calcPL(b.odds, b.stake, b.result);
+    }
+    return Object.values(map)
+      .filter(b => b.total >= 3)
+      .map(b => ({ ...b, pl: +b.pl.toFixed(2), winRate: +(b.wins / b.total * 100).toFixed(1) }))
+      .sort((a, b) => b.pl - a.pl);
+  }, [bets]);
+
+  if (isLoading) {
+    return (
+      <div className="space-y-3">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="h-32 rounded-lg bg-pitch-800 animate-pulse" />
+        ))}
+      </div>
+    );
+  }
+
+  if (!bets?.length) {
+    return (
+      <EmptyState
+        title="No bet history yet"
+        description="Log some bets in the Bet Tracker to see your performance over time."
+        icon={TrendingUp}
+      />
+    );
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0 }}
+      className="space-y-4"
+    >
+      {/* ── Streak + best/worst ─────────────────────────────── */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        {[
+          {
+            label: "Current streak",
+            value: streakData.current ? `${streakData.current}${streakData.type === "win" ? "W" : "L"}` : "—",
+            color: streakData.type === "win" ? "text-win" : streakData.type === "loss" ? "text-loss" : "text-pitch-400",
+          },
+          { label: "Best win streak",  value: streakData.best  ? `${streakData.best}W`  : "—", color: "text-win" },
+          { label: "Worst skid",       value: streakData.worst ? `${streakData.worst}L` : "—", color: "text-loss" },
+          { label: "Months tracked",   value: monthlyData.length, color: "text-pitch-200" },
+        ].map(s => (
+          <div key={s.label} className="pm-tile p-3">
+            <div className="pm-label mb-1">{s.label}</div>
+            <div className={`pm-number text-xl ${s.color}`}>{s.value}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* ── Monthly P/L bar chart ────────────────────────────── */}
+      {monthlyData.length > 0 && (
+        <div className="pm-card p-4">
+          <div className="pm-label mb-3">Monthly P/L</div>
+          <ResponsiveContainer width="100%" height={160}>
+            <BarChart data={monthlyData} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
+              <XAxis dataKey="label" tick={{ fontSize: 10, fill: "#546480" }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 10, fill: "#546480" }} axisLine={false} tickLine={false}
+                tickFormatter={v => `$${v}`} width={42} />
+              <Tooltip
+                {...tooltipStyle}
+                formatter={(v, n) => [
+                  n === "pl" ? formatCurrency(v) : `${v}%`,
+                  n === "pl" ? "P/L" : "Win Rate",
+                ]}
+              />
+              <ReferenceLine y={0} stroke="#2e3a50" />
+              <Bar dataKey="pl" radius={[3, 3, 0, 0]} maxBarSize={32}>
+                {monthlyData.map((m, i) => (
+                  <Cell key={i} fill={m.pl >= 0 ? "#00d4aa" : "#ff4d6d"} opacity={0.85} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+
+      {/* ── Cumulative ROI trend ─────────────────────────────── */}
+      {roiTrend.length > 1 && (
+        <div className="pm-card p-4">
+          <div className="pm-label mb-3">Cumulative ROI %</div>
+          <ResponsiveContainer width="100%" height={120}>
+            <AreaChart data={roiTrend} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
+              <defs>
+                <linearGradient id="roiGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%"  stopColor="#00d4aa" stopOpacity={0.2} />
+                  <stop offset="95%" stopColor="#00d4aa" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <XAxis dataKey="label" tick={{ fontSize: 10, fill: "#546480" }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 10, fill: "#546480" }} axisLine={false} tickLine={false}
+                tickFormatter={v => `${v}%`} width={36} />
+              <Tooltip {...tooltipStyle} formatter={v => [`${v}%`, "ROI"]} />
+              <ReferenceLine y={0} stroke="#2e3a50" strokeDasharray="3 3" />
+              <Area type="monotone" dataKey="cumROI"
+                stroke="#00d4aa" strokeWidth={1.5} fill="url(#roiGrad)" />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+
+      {/* ── Best/worst books ─────────────────────────────────── */}
+      {bookStats.length > 0 && (
+        <div className="pm-card p-4">
+          <div className="pm-label mb-3">Performance by book</div>
+          <div className="space-y-2">
+            {bookStats.map(b => (
+              <div key={b.book} className="flex items-center gap-3">
+                <span className="text-[11px] text-pitch-300 w-24 flex-shrink-0">
+                  {BOOK_LABELS[b.book] || b.book}
+                </span>
+                <div className="flex-1 h-1.5 rounded-full bg-pitch-700 overflow-hidden">
+                  <motion.div
+                    className="h-full rounded-full"
+                    style={{ background: b.pl >= 0 ? "#00d4aa" : "#ff4d6d" }}
+                    initial={{ width: 0 }}
+                    animate={{ width: `${Math.min(Math.abs(b.winRate), 100)}%` }}
+                    transition={{ duration: 0.6 }}
+                  />
+                </div>
+                <span className="font-mono text-[10px] text-pitch-400 w-10 text-right flex-shrink-0">
+                  {b.winRate}%
+                </span>
+                <span className={`font-mono text-[10px] w-14 text-right flex-shrink-0
+                  ${b.pl >= 0 ? "text-win" : "text-loss"}`}>
+                  {b.pl >= 0 ? "+" : ""}{formatCurrency(b.pl)}
+                </span>
+                <span className="text-[9px] text-pitch-600 w-10 text-right flex-shrink-0">
+                  {b.wins}/{b.total}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </motion.div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// PATCH 3 — Live Play-by-Play Feed
+// ═══════════════════════════════════════════════════════════════════
+
+export function PlayByPlay({ gameId, gameLabel }) {
+  const [plays, setPlays] = useState([]);
+  const [gameInfo, setGameInfo] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isError, setIsError] = useState(false);
+  const intervalRef = useRef(null);
+
+  const fetchPlays = useCallback(async () => {
+    if (!gameId) return;
+    try {
+      const res = await fetch(
+        `https://site.api.espn.com/apis/site/v2/sports/basketball/nba/summary?event=${gameId}`,
+        { signal: AbortSignal.timeout(8000) }
+      );
+      if (!res.ok) throw new Error(`ESPN ${res.status}`);
+      const data = await res.json();
+
+      // Game info
+      const comp = data.header?.competitions?.[0];
+      const home = comp?.competitors?.find(c => c.homeAway === "home");
+      const away = comp?.competitors?.find(c => c.homeAway === "away");
+      setGameInfo({
+        homeTeam:  home?.team?.abbreviation ?? "HOME",
+        awayTeam:  away?.team?.abbreviation ?? "AWAY",
+        homeScore: home?.score ?? "—",
+        awayScore: away?.score ?? "—",
+        status:    data.header?.competitions?.[0]?.status?.type?.shortDetail ?? "",
+        period:    data.header?.competitions?.[0]?.status?.period ?? 0,
+        clock:     data.header?.competitions?.[0]?.status?.displayClock ?? "",
+      });
+
+      // Play-by-play — last 25 plays across all periods, newest first
+      const allPlays = [];
+      for (const period of data.plays ?? []) {
+        // ESPN returns plays as flat array with period field
+        allPlays.push(period);
+      }
+      // Also check data.playByPlay if present
+      const pbpSource = data.playByPlay?.plays ?? data.plays ?? [];
+      const recent = [...pbpSource]
+        .reverse()
+        .slice(0, 40)
+        .map((p, i) => ({
+          id:          p.id ?? i,
+          period:      p.period?.number ?? p.periodNumber ?? "—",
+          clock:       p.clock?.displayValue ?? p.displayClock ?? "—",
+          text:        p.text ?? p.description ?? "—",
+          homeScore:   p.homeScore ?? null,
+          awayScore:   p.awayScore ?? null,
+          scoringPlay: p.scoringPlay ?? false,
+          type:        p.type?.text ?? "",
+        }));
+
+      setPlays(recent);
+      setIsLoading(false);
+      setIsError(false);
+    } catch {
+      setIsError(true);
+      setIsLoading(false);
+    }
+  }, [gameId]);
+
+  useEffect(() => {
+    if (!gameId) return;
+    setIsLoading(true);
+    fetchPlays();
+
+    // Poll every 30s — only worth it for live games
+    intervalRef.current = setInterval(fetchPlays, 30_000);
+    return () => clearInterval(intervalRef.current);
+  }, [gameId, fetchPlays]);
+
+  if (!gameId) {
+    return (
+      <EmptyState
+        title="Select a live game"
+        description="Play-by-play is available for games in progress."
+        icon={PlayCircle}
+      />
+    );
+  }
+
+  if (isError) return <ErrorState message="Couldn't load play-by-play." onRetry={fetchPlays} type="network" />;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0 }}
+      className="space-y-3"
+    >
+      {/* Scoreboard header */}
+      {gameInfo && (
+        <div className="pm-tile p-4 flex items-center justify-between">
+          <div className="text-center flex-1">
+            <div className="font-display text-3xl tracking-widest"
+              style={{ color: TEAM_COLORS[gameInfo.awayTeam] || "#546480" }}>
+              {gameInfo.awayTeam}
+            </div>
+            <div className="pm-number text-2xl mt-1">{gameInfo.awayScore}</div>
+          </div>
+
+          <div className="text-center px-4">
+            <div className="text-[10px] text-pitch-500 font-mono">{gameInfo.status}</div>
+            {gameInfo.period > 0 && (
+              <div className="text-[11px] text-pitch-400 mt-0.5 flex items-center gap-1 justify-center">
+                <Clock size={9} />
+                {gameInfo.clock} · Q{gameInfo.period}
+              </div>
+            )}
+          </div>
+
+          <div className="text-center flex-1">
+            <div className="font-display text-3xl tracking-widest"
+              style={{ color: TEAM_COLORS[gameInfo.homeTeam] || "#546480" }}>
+              {gameInfo.homeTeam}
+            </div>
+            <div className="pm-number text-2xl mt-1">{gameInfo.homeScore}</div>
+          </div>
+        </div>
+      )}
+
+      {/* Play feed */}
+      <div className="pm-card divide-y divide-pitch-700">
+        {isLoading ? (
+          Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} className="px-4 py-3 flex gap-3">
+              <div className="w-10 h-3 rounded bg-pitch-750 animate-pulse flex-shrink-0" />
+              <div className="flex-1 h-3 rounded bg-pitch-750 animate-pulse" />
+            </div>
+          ))
+        ) : plays.length === 0 ? (
+          <div className="px-4 py-6 text-center text-[11px] text-pitch-500">
+            No plays available yet.
+          </div>
+        ) : (
+          <motion.div variants={container} initial="hidden" animate="show">
+            {plays.map(play => (
+              <motion.div
+                key={play.id}
+                variants={item}
+                className={`flex items-start gap-3 px-4 py-2.5 transition-colors
+                  ${play.scoringPlay ? "bg-win/5 border-l-2 border-win/40" : ""}`}
+              >
+                {/* Clock */}
+                <div className="flex-shrink-0 text-right w-16">
+                  <div className="font-mono text-[10px] text-pitch-500">{play.clock}</div>
+                  <div className="font-mono text-[9px] text-pitch-700">Q{play.period}</div>
+                </div>
+
+                {/* Play text */}
+                <div className="flex-1 min-w-0">
+                  <div className={`text-[11px] leading-relaxed
+                    ${play.scoringPlay ? "text-pitch-100 font-medium" : "text-pitch-400"}`}>
+                    {play.text}
+                  </div>
+                </div>
+
+                {/* Score at time of play */}
+                {play.scoringPlay && play.awayScore != null && (
+                  <div className="flex-shrink-0 font-mono text-[10px] text-win">
+                    {play.awayScore}–{play.homeScore}
+                  </div>
+                )}
+              </motion.div>
+            ))}
+          </motion.div>
+        )}
+      </div>
+    </motion.div>
+  );
+}

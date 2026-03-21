@@ -474,10 +474,16 @@ export function usePlayerProps(gameKey = null) {
   return useQuery({
     queryKey: ["props", gameKey ?? "all"],
     queryFn: ({ signal }) => propsFetch(gameKey, signal),
-    staleTime: 1000 * 60 * 10,   // 10 min — props update slowly intraday
+    staleTime: 1000 * 60 * 10,
     placeholderData: null,
     retry: shouldRetry,
     enabled: true,
+    select: (data) => {
+      if (!data) return data;
+      // Hoist _moves out of the game map so consumers can read it cleanly
+      const { _moves = [], ...games } = data;
+      return { games, moves: _moves };
+    },
   });
 }
 

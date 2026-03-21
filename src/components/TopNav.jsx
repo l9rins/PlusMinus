@@ -5,7 +5,7 @@ import {
   LayoutDashboard, Users, BarChart3, Target,
   TrendingUp, Activity, ChevronDown, Search, Bell,
   Settings, X, Menu, Zap, ChevronRight, Sun, Moon,
-  GitCompare,  // ← NEW icon for Compare tab
+  GitCompare, BarChart2, PlayCircle, // ← NEW icon for Compare tab
 } from "lucide-react";
 import { UserButton } from "@clerk/clerk-react";
 import { useTodayGames, useOdds } from "../api";
@@ -59,6 +59,8 @@ const NAV_ITEMS = [
       { label: "Win probability", path: "/compare", desc: "Home court advantage included" },
     ],
   },
+  { label: "History",   icon: BarChart2,  path: "/history", sub: null },
+  { label: "Live Feed", icon: PlayCircle, path: "/pbp",     sub: null },
 ];
 
 // ── Sub-dropdown ──────────────────────────────────────────────────
@@ -176,7 +178,7 @@ function MobileDrawer({ open, onClose, activePath, onNavigate }) {
             <div className="px-4 py-3 border-t border-pitch-700">
               <div className="pm-label mb-2">Keyboard shortcuts</div>
               <div className="grid grid-cols-2 gap-1">
-                {[["D", "Dashboard"], ["S", "Scores"], ["L", "Standings"], ["P", "Players"], ["B", "Betting"], ["A", "Analytics"], ["C", "Compare"]].map(([k, t]) => (
+                {[["D", "Dashboard"], ["S", "Scores"], ["L", "Live Feed"], ["P", "Players"], ["B", "Betting"], ["T", "Tracker"], ["A", "Analytics"], ["C", "Compare"], ["H", "History"]].map(([k, t]) => (
                   <div key={k} className="flex items-center gap-2 text-[10px] text-pitch-500">
                     <kbd className="bg-pitch-700 border border-pitch-600 rounded px-1.5 py-0.5
                                     font-mono text-pitch-300">{k}</kbd>

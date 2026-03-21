@@ -60,6 +60,11 @@ const TEAM_MAP = {
 };
 
 import { setCORSHeaders, handleOptions } from "./_cors.js";
+import { createClient } from "@vercel/kv";
+const kv = createClient({
+  url:   process.env.KV_REST_API_URL,
+  token: process.env.KV_REST_API_TOKEN,
+});
 
 function toDecimal(american) {
     const n = Number(american);
@@ -219,10 +224,48 @@ export default async function handler(req, res) {
             }));
         }
 
+        // ── Line movement detection ───────────────────────────────────────
+        // Module-level cache survives warm Lambda invocations.
+        // On each fresh fetch we diff every player/market line against the
+        // previous snapshot and annotate moves of >=0.5 points.
+        if (!handler._prevSnapshot) handler._prevSnapshot = {};
+
+        const moves = [];
+        for (const [gameKey, game] of Object.entries(result)) {
+            const prev = handler._prevSnapshot[gameKey];
+            if (!prev) continue;
+            for (const [playerId, player] of Object.entries(game.players)) {
+                const prevPlayer = prev.players?.[playerId];
+                if (!prevPlayer) continue;
+                for (const [market, m] of Object.entries(player.markets)) {
+                    const prevLine = prevPlayer.markets?.[market]?.line;
+                    if (prevLine == null || m.line == null) continue;
+                    const delta = +(m.line - prevLine).toFixed(1);
+                    if (Math.abs(delta) >= 0.5) {
+                        moves.push({
+                            gameKey, playerId, playerName: player.name,
+                            market, prevLine, newLine: m.line, delta,
+                            direction: delta > 0 ? "up" : "down",
+                        });
+                    }
+                }
+            }
+        }
+
+        // Persist to KV so api/notify.js can diff across Lambda invocations.
+        // Fire-and-forget — don't await, don't let KV failure block the response.
+        Promise.all([
+          kv.set("props_snapshot:prev",   handler._prevSnapshot, { ex: 7200 }),
+          kv.set("props_snapshot:latest", result,                { ex: 7200 }),
+        ]).catch(err => console.warn("[api/props] KV snapshot write failed:", err));
+
+        // Update in-memory snapshot for same-Lambda subsequent calls
+        handler._prevSnapshot = result;
+
         // Cache for 10 minutes — props move slowly intraday
         res.setHeader("Cache-Control", "s-maxage=600, stale-while-revalidate=60");
         res.setHeader("Content-Type", "application/json");
-        return res.status(200).json(result);
+        return res.status(200).json({ ...result, _moves: moves });
 
     } catch (err) {
         if (err.name === "TimeoutError") {

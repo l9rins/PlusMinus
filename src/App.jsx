@@ -10,6 +10,8 @@ import TopNav from "./components/TopNav";
 import { ToastContainer } from "./components/ui";
 import { TEAM_COLORS } from "./data";
 import { invalidateErroredQueries } from "./api";
+import { useNotifications } from "./hooks/useNotifications";
+import { HistoricalDashboard, PlayByPlay } from "./components/Views";
 
 // ── Lazy route components ─────────────────────────────────────────
 const Dashboard = lazy(() => import("./components/Dashboard"));
@@ -51,17 +53,21 @@ const ROUTE_META = {
   "/tracker": { title: "Bet Tracker", tab: "tracker" },
   "/analytics": { title: "Analytics", tab: "analytics" },
   "/compare": { title: "Compare", tab: "compare" },
+  "/history": { title: "History", tab: "history" },
+  "/pbp": { title: "Live Feed", tab: "pbp" },
 };
 
 const SHORTCUT_ROUTES = {
-  d: "/", s: "/scores", l: "/standings", p: "/players",
+  d: "/", s: "/scores", l: "/pbp", p: "/players",
   b: "/betting", t: "/tracker", a: "/analytics", c: "/compare",
+  h: "/history",
 };
 
 const TAB_ROUTES = {
   dashboard: "/", scores: "/scores", standings: "/standings",
   players: "/players", betting: "/betting", tracker: "/tracker",
   analytics: "/analytics", compare: "/compare",
+  history: "/history", pbp: "/pbp",
 };
 
 // ── Page skeleton ─────────────────────────────────────────────────
@@ -136,6 +142,7 @@ class ErrorBoundary extends Component {
 
 // ── Inner app ─────────────────────────────────────────────────────
 function AppInner() {
+  useNotifications();
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient(); // passed to ErrorBoundary
@@ -213,6 +220,8 @@ function AppInner() {
                     <Route path="/analytics" element={<Analytics />} />
                     <Route path="/compare" element={<HeadToHead />} />
                     <Route path="/team/:abbr" element={<TeamDetail />} />
+                    <Route path="/history" element={<HistoricalDashboard />} />
+                    <Route path="/pbp" element={<PlayByPlay />} />
                     <Route path="*" element={<Navigate to="/" replace />} />
                   </Routes>
                 </Suspense>
