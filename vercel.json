@@ -9,6 +9,10 @@
       "destination": "/api/props"
     },
     {
+      "source": "/api/log",
+      "destination": "/api/log"
+    },
+    {
       "source": "/api/(.*)",
       "destination": "/api/$1"
     },

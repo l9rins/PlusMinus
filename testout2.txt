@@ -1,0 +1,20 @@
+
+[7m[1m[36m RUN [39m[22m[27m [36mv1.6.1[39m [90mC:/Users/Mark Lorenz/Desktop/PlusMinus[39m
+
+ [33m❯[39m src/utils.test.js [2m ([22m[2m126 tests[22m [2m|[22m [31m5 failed[39m[2m)[22m[90m 256[2mms[22m[39m
+[31m   [33m❯[31m src/utils.test.js[2m > [22mProp history hit rate math[2m > [22m7/10 over → 0.7 hit rate[39m
+[31m     → expected 0.5 to be close to 0.6, received difference is 0.09999999999999998, but expected 0.05[39m
+[31m   [33m❯[31m src/utils.test.js[2m > [22mProp history hit rate math[2m > [22mavg computes correctly[39m
+[31m     → expected 20 to be '20.0' // Object.is equality[39m
+[31m   [33m❯[31m src/utils.test.js[2m > [22mProp history hit rate math[2m > [22mlast5Avg uses only last 5 elements[39m
+[31m     → expected 30 to be '30.0' // Object.is equality[39m
+[31m   [33m❯[31m src/utils.test.js[2m > [22mformatShortDate(dateStr)[2m > [22mformats ISO date to readable string[39m
+[31m     → expected 'Jan 14' to contain '15'[39m
+[31m   [33m❯[31m src/utils.test.js[2m > [22mimpliedToOdds()[2m > [22m0.5 → +100[39m
+[31m     → expected '-100' to be '+100' // Object.is equality[39m
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m5 failed[39m[22m[2m | [22m[1m[32m121 passed[39m[22m[90m (126)[39m
+[2m   Start at [22m 19:34:29
+[2m   Duration [22m 5.72s[2m (transform 212ms, setup 1ms, collect 161ms, tests 256ms, environment 3.18s, prepare 879ms)[22m
+

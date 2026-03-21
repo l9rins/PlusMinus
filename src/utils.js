@@ -48,7 +48,7 @@ export const oddsToImplied = (american) => {
 
 export const impliedToOdds = (p) => {
   if (p <= 0 || p >= 1) return "—";
-  if (p >= 0.5) return `-${Math.round((p / (1 - p)) * 100)}`;
+  if (p > 0.5) return `-${Math.round((p / (1 - p)) * 100)}`;
   return `+${Math.round(((1 - p) / p) * 100)}`;
 };
 

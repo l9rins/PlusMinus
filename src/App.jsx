@@ -9,7 +9,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import TopNav from "./components/TopNav";
 import { ToastContainer } from "./components/ui";
 import { TEAM_COLORS } from "./data";
-import { invalidateErroredQueries } from "./api";
+import { invalidateErroredQueries, logError } from "./api";
 import { useNotifications } from "./hooks/useNotifications";
 import { HistoricalDashboard, PlayByPlay } from "./components/Views";
 
@@ -106,6 +106,7 @@ class ErrorBoundary extends Component {
 
   componentDidCatch(e, info) {
     console.error("[PlusMinus]", e, info);
+    logError(e, `ErrorBoundary:${info.componentStack?.split("\n")[1]?.trim() ?? "unknown"}`);
   }
 
   handleRetry = () => {

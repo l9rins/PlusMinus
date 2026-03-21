@@ -18,6 +18,29 @@ import {
 } from "./data";
 import { todayStr, currentSeason, reshapeNBAStats } from "./utils";
 
+// ── Error telemetry ────────────────────────────────────────────────
+// Call logError() from ErrorBoundary and unhandledrejection handler.
+// Fire-and-forget — never throws, never blocks.
+
+export async function logError(err, context = "unknown") {
+  try {
+    await fetch("/api/log", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        level:   "error",
+        message: err?.message ?? String(err),
+        stack:   err?.stack?.slice(0, 500) ?? "",
+        context,
+        url:     window.location.pathname,
+        build:   import.meta.env.VITE_GIT_SHA ?? "dev",
+      }),
+    });
+  } catch {
+    // telemetry must never throw — silent fail
+  }
+}
+
 // ── Typed error ───────────────────────────────────────────────────
 class ApiError extends Error {
   constructor(message, status, retryAfter = null) {

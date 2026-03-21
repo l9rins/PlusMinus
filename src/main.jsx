@@ -5,8 +5,12 @@ import { ClerkProvider } from "@clerk/clerk-react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import App from "./App.jsx";
 import "./index.css";
-import { queryClientConfig } from "./api.js";
+import { queryClientConfig, logError } from "./api.js";
 import { registerSW } from "virtual:pwa-register";
+
+window.addEventListener("unhandledrejection", (event) => {
+  logError(event.reason, "unhandledrejection");
+});
 
 const queryClient = new QueryClient(queryClientConfig);
 const PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
