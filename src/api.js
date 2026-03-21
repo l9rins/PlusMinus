@@ -78,6 +78,22 @@ async function oddsFetch(signal) {
   return res.json();
 }
 
+// ── Props proxy fetcher ───────────────────────────────────────────
+async function propsFetch(gameKey = null, signal) {
+  const qs = gameKey ? `?gameKey=${encodeURIComponent(gameKey)}` : "";
+  const res = await fetch(`/api/props${qs}`, { signal });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    if (res.status === 401) throw new ApiError("Invalid Odds API key", 401);
+    if (res.status === 429) throw new ApiError("Props API rate limited", 429);
+    if (res.status === 500 && body.error?.includes("not configured")) {
+      throw new ApiError("ODDS_API_KEY not configured on server", 503);
+    }
+    throw new ApiError(body.error || `Props proxy ${res.status}`, res.status);
+  }
+  return res.json();
+}
+
 // ── NBA stats proxy fetcher ───────────────────────────────────────
 async function nbaFetch(endpoint, params = {}, signal) {
   const qs = new URLSearchParams({ endpoint, ...params });
@@ -451,6 +467,17 @@ export function useOdds() {
     refetchInterval: 1000 * 60 * 15,
     retry: shouldRetry,
     placeholderData: {},
+  });
+}
+
+export function usePlayerProps(gameKey = null) {
+  return useQuery({
+    queryKey: ["props", gameKey ?? "all"],
+    queryFn: ({ signal }) => propsFetch(gameKey, signal),
+    staleTime: 1000 * 60 * 10,   // 10 min — props update slowly intraday
+    placeholderData: null,
+    retry: shouldRetry,
+    enabled: true,
   });
 }
 
