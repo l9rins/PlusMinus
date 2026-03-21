@@ -897,7 +897,7 @@ const RESULT_OPTIONS = [
 ];
 
 export function BetTracker() {
-  const { bets: savedBets, isLoading: betsLoading, saveBets, isSaving, saveError } = useBets();
+  const { bets: savedBets, isLoading: betsLoading, saveBets, isSaving, saveError, isDeleting, deleteBet } = useBets();
   const [bets,         setBets]         = useState([]);
   const [form,         setForm]         = useState({
     game: "", type: "Moneyline", pick: "", odds: "", stake: "", result: "pending",
@@ -910,6 +910,15 @@ export function BetTracker() {
   useEffect(() => {
     if (savedBets.length > 0 || !betsLoading) setBets(savedBets);
   }, [savedBets, betsLoading]);
+
+  const handleDelete = async (id) => {
+    try {
+      await deleteBet(id);
+      toast.success("Bet deleted");
+    } catch {
+      toast.error("Couldn't delete bet");
+    }
+  };
 
   const addBet = useCallback(async () => {
     const { game, pick, odds, stake } = form;
@@ -1220,7 +1229,7 @@ export function BetTracker() {
                     initial={{ opacity: 0, y: -4 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, x: -20 }}
-                    className="border-b border-pitch-700 hover:bg-pitch-780 transition-colors"
+                    className="border-b border-pitch-700 hover:bg-pitch-780 transition-colors group"
                   >
                     <td className="px-3 py-2.5 font-medium text-pitch-100 max-w-[140px] truncate">{b.game}</td>
                     <td className="px-3 py-2.5 text-pitch-400 text-[11px]">{b.type}</td>
@@ -1269,9 +1278,14 @@ export function BetTracker() {
                         className="text-[10px] text-pitch-600 hover:text-accent transition-colors p-0.5 rounded px-1.5" title="Edit bet">
                         Edit
                       </button>
-                      <button onClick={() => deleteBet(b.id)}
-                        className="text-pitch-600 hover:text-loss transition-colors p-0.5 rounded" title="Delete bet">
-                        <X size={13} strokeWidth={1.8} />
+                      <button
+                        onClick={() => handleDelete(b.id)}
+                        disabled={isDeleting}
+                        aria-label="Delete bet"
+                        className="pm-btn-danger p-1.5 opacity-0 group-hover:opacity-100 transition-opacity ml-1"
+                        title="Delete bet"
+                      >
+                        <Trash2 size={11} strokeWidth={1.8} />
                       </button>
                     </td>
                   </motion.tr>
