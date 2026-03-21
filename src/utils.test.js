@@ -26,6 +26,8 @@ describe("oddsToDecimal()", () => {
   it("-110", () => expect(oddsToDecimal(-110)).toBeCloseTo(1.909, 2));
   it("+150", () => expect(oddsToDecimal(150)).toBeCloseTo(2.5, 3));
   it("-200", () => expect(oddsToDecimal(-200)).toBeCloseTo(1.5, 3));
+  it("0 → 1 (zero-division guard)", () => expect(oddsToDecimal(0)).toBe(1));
+  it("NaN → 1", () => expect(oddsToDecimal(NaN)).toBe(1));
 });
 
 describe("oddsToImplied()", () => {
@@ -64,6 +66,7 @@ describe("kellyBet(winProb, american, bankroll)", () => {
   it("DEFAULT_BANKROLL when omitted", () => {
     expect(kellyBet(0.6, -110)).toBe(kellyBet(0.6, -110, DEFAULT_BANKROLL));
   });
+  it("american=0 (b=0 guard) → 0", () => expect(kellyBet(0.6, 0, 1000)).toBe(0));
 });
 
 // calcPL(stake, odds, result) — ORDER MATCHES ALL CALLERS
