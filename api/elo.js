@@ -1,5 +1,34 @@
 import { handleOptions, setCORSHeaders } from "./_cors.js";
 import { createClient } from "@vercel/kv";
+import { EAST_STANDINGS, WEST_STANDINGS } from "../src/data.js";
+
+function makeLCG(seed) {
+  let s = (seed ^ 0xdeadbeef) >>> 0;
+  return () => {
+    s = Math.imul(1664525, s) + 1013904223 >>> 0;
+    return s / 4294967296;
+  };
+}
+
+const SIMS = 10_000;
+const HOME_BUMP = 35;
+
+function eloWinP(eloA, eloB, home = false) {
+  return 1 / (1 + Math.pow(10, -(eloA - eloB + (home ? HOME_BUMP : 0)) / 400));
+}
+
+function simGame(eloA, eloB, home, rng) {
+  return rng() < eloWinP(eloA, eloB, home);
+}
+
+function simSeries(eloA, eloB, rng) {
+  let wA = 0, wB = 0, g = 0;
+  const home = [true, true, false, false, true, false, true];
+  while (wA < 4 && wB < 4) {
+    rng() < eloWinP(eloA, eloB, home[g++]) ? wA++ : wB++;
+  }
+  return wA === 4;
+}
 
 const kv = createClient({
   url: process.env.KV_REST_API_URL,
@@ -8,11 +37,9 @@ const kv = createClient({
 
 const NBA_BASE = "https://stats.nba.com/stats";
 const NBA_HEADERS = {
-  "User-Agent": "Mozilla/5.0 (compatible; PlusMinus/1.0)",
+  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
   "Referer":    "https://www.nba.com/",
   "Accept":     "application/json",
-  "Accept-Language": "en-US,en;q=0.9",
-  "Origin":     "https://www.nba.com",
 };
 
 // All 30 NBA team IDs → abbreviation mapping
@@ -142,17 +169,21 @@ export default async function handler(req, res) {
   if (req.method !== "GET") return res.status(405).end();
 
   const season = currentSeasonStr();
+  const CACHE_KEY = `elo:${season}`;
   
-  try {
-    const CACHE_KEY = `elo:${season}`;
-    const cached = await kv.get(CACHE_KEY);
-    if (cached) {
-      res.setHeader("Cache-Control", "s-maxage=3600, stale-while-revalidate=300");
-      res.setHeader("Content-Type", "application/json");
-      return res.status(200).json(cached);
+  if (req.query.rebuild !== "true") {
+    try {
+      const cached = await kv.get(CACHE_KEY);
+      if (cached) {
+        res.setHeader("Cache-Control", "s-maxage=3600, stale-while-revalidate=300");
+        res.setHeader("Content-Type", "application/json");
+        return res.status(200).json(cached);
+      }
+      return res.status(503).json({ error: "Elo data is computing. Please try again later." });
+    } catch (e) {
+      console.error("KV cache skip:", e);
+      return res.status(503).json({ error: "Storage error" });
     }
-  } catch (e) {
-    console.error("KV cache skip:", e);
   }
 
   const teamEntries = Object.entries(TEAM_IDS); // 30 teams
@@ -224,7 +255,78 @@ export default async function handler(req, res) {
     elo:        Math.round(eloMap[abbr] ?? 1500),
     games:      gameCounters[abbr] ?? 0,
     trajectory: trajectories[abbr] ?? [],
+    finalsPct:  0,
+    champPct:   0,
   })).sort((a, b) => b.elo - a.elo);
+
+  const stringToHash = JSON.stringify(EAST_STANDINGS) + JSON.stringify(WEST_STANDINGS);
+  let hash = 0;
+  for (let i = 0; i < stringToHash.length; i++) hash = Math.imul(31, hash) + stringToHash.charCodeAt(i) | 0;
+
+  const safeEloData = result;
+
+  const buildSeeds = conf => conf.slice(0, 10).map((t, i) => {
+    const ed = safeEloData.find(x => x.team === t.team);
+    return {
+      team:  t.team,
+      elo:   ed?.elo ?? Math.round(1500 + (t.pct - 0.5) * 400),
+    };
+  });
+
+  const eastSeeds = buildSeeds(EAST_STANDINGS);
+  const westSeeds = buildSeeds(WEST_STANDINGS);
+  const counts = {};
+  [...eastSeeds, ...westSeeds].forEach(t => { counts[t.team] = { pi: 0, r1: 0, r2: 0, conf: 0, finals: 0, champ: 0 }; });
+
+  function simPlayIn(seeds, rng) {
+    const [s7, s8, s9, s10] = seeds.slice(6, 10);
+    [s7, s8, s9, s10].forEach(t => counts[t.team].pi++);
+    const seed7   = simGame(s7.elo, s8.elo, true, rng)        ? s7 : s8;
+    const loser78 = seed7 === s7 ? s8 : s7;
+    const w910    = simGame(s9.elo, s10.elo, true, rng)        ? s9 : s10;
+    const seed8   = simGame(loser78.elo, w910.elo, true, rng)  ? loser78 : w910;
+    return [seed7, seed8];
+  }
+
+  function simConf(seeds, rng) {
+    const direct = seeds.slice(0, 6);
+    const [pi7, pi8] = simPlayIn(seeds, rng);
+    const bracket = [...direct, pi7, pi8];
+    bracket.forEach(t => counts[t.team].r1++);
+    const r2 = [[0, 7], [3, 4], [2, 5], [1, 6]].map(([a, b]) =>
+      simSeries(bracket[a].elo, bracket[b].elo, rng) ? bracket[a] : bracket[b]
+    );
+    r2.forEach(t => counts[t.team].r2++);
+    const cf = [
+      simSeries(r2[0].elo, r2[1].elo, rng) ? r2[0] : r2[1],
+      simSeries(r2[2].elo, r2[3].elo, rng) ? r2[2] : r2[3],
+    ];
+    cf.forEach(t => counts[t.team].conf++);
+    return simSeries(cf[0].elo, cf[1].elo, rng) ? cf[0] : cf[1];
+  }
+
+  const rng = makeLCG(hash);
+
+  for (let i = 0; i < SIMS; i++) {
+    const eC = simConf(eastSeeds, rng);
+    const wC = simConf(westSeeds, rng);
+    counts[eC.team].finals++;
+    counts[wC.team].finals++;
+    const champ = simSeries(eC.elo, wC.elo, rng) ? eC : wC;
+    counts[champ.team].champ++;
+  }
+
+  result.forEach(t => {
+    const c = counts[t.team];
+    if (c) {
+      t.playInPct = +(c.pi     / SIMS * 100).toFixed(1);
+      t.r1Pct     = +(c.r1     / SIMS * 100).toFixed(1);
+      t.r2Pct     = +(c.r2     / SIMS * 100).toFixed(1);
+      t.confPct   = +(c.conf   / SIMS * 100).toFixed(1);
+      t.finalsPct = +(c.finals / SIMS * 100).toFixed(1);
+      t.champPct  = +(c.champ  / SIMS * 100).toFixed(1);
+    }
+  });
 
   // In the final result build, add a teamsWithData count:
   const teamsWithData = Object.values(gameLogs).filter(log => log.length > 0).length;

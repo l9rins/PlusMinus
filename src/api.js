@@ -21,7 +21,7 @@
 //
 // All previously documented fixes (Fix 4–6, 13, 16, 26 etc.) are retained.
 
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { useAuth, useUser } from "@clerk/clerk-react";
 import {
@@ -263,32 +263,40 @@ export function useEloData() {
   });
 }
 
+export const playerGameLogQueryConfig = (playerId) => ({
+  queryKey: ["nba", "playerGameLog", playerId],
+  queryFn: async ({ signal }) => {
+    const season = currentSeason();
+    const data = await nbaFetch("playergamelog", {
+      PlayerID:   playerId,
+      Season:     `${season - 1}-${String(season).slice(2)}`,
+      SeasonType: "Regular Season",
+      LeagueID:   "00",
+      LastNGames: "5",
+    }, signal);
+
+    const resultSet = data?.resultSets?.[0];
+    if (!resultSet) return [];
+    const headers = resultSet.headers;
+    const rows    = resultSet.rowSet;
+    const wlIdx   = headers.indexOf("WL");
+    if (wlIdx === -1) return [];
+
+    return rows.slice(0, 5).map(row => row[wlIdx]).reverse();
+  },
+  staleTime: 1000 * 60 * 30,
+  retry: shouldRetry,
+});
+
+export function prefetchPlayerGameLog(queryClient, playerId) {
+  return queryClient.prefetchQuery(playerGameLogQueryConfig(playerId));
+}
+
 export function usePlayerGameLog(playerId, enabled = false) {
   return useQuery({
-    queryKey: ["nba", "playerGameLog", playerId],
-    queryFn: async ({ signal }) => {
-      const season = currentSeason();
-      const data = await nbaFetch("playergamelog", {
-        PlayerID:   playerId,
-        Season:     `${season - 1}-${String(season).slice(2)}`,
-        SeasonType: "Regular Season",
-        LeagueID:   "00",
-        LastNGames: "5",
-      }, signal);
-
-      const resultSet = data?.resultSets?.[0];
-      if (!resultSet) return [];
-      const headers = resultSet.headers;
-      const rows    = resultSet.rowSet;
-      const wlIdx   = headers.indexOf("WL");
-      if (wlIdx === -1) return [];
-
-      return rows.slice(0, 5).map(row => row[wlIdx]).reverse();
-    },
-    staleTime: 1000 * 60 * 30,
+    ...playerGameLogQueryConfig(playerId),
     enabled:   enabled && !!playerId,
     placeholderData: null,
-    retry: shouldRetry,
   });
 }
 
@@ -390,11 +398,9 @@ export function useTodayGames() {
     },
     staleTime: 1000 * 30,
     refetchInterval: (query) => {
-      const games     = query.state.data;
-      if (!Array.isArray(games) || games.length === 0) return 1000 * 60 * 10;
-      const liveCount = games.filter(g => g.status === "live").length;
-      if (liveCount > 0) return 1000 * 30;
-      return 1000 * 60 * 2;
+      const data = query.state.data;
+      const hasLive = Array.isArray(data) && data.some(g => g.status === 'live');
+      return hasLive ? 30_000 : 300_000;
     },
     placeholderData: GAMES_FALLBACK,
     retry: shouldRetry,
@@ -558,18 +564,28 @@ export function useBets() {
   const { user }     = useUser();
   const userId       = user?.id ?? null;
   const queryClient  = useQueryClient();
+  const tokenRef     = useRef(null);
+
+  const getCachedToken = async (opts) => {
+    if (tokenRef.current && !opts?.skipCache) return tokenRef.current;
+    const token = await getToken(opts);
+    tokenRef.current = token;
+    return token;
+  };
 
   const query = useQuery({
     // FIX G1: userId scopes the cache entry to this specific Clerk user.
     queryKey: ["bets", userId],
     queryFn: async () => {
-      const token = await getToken();
+      const token = await getCachedToken();
       if (!token) throw new ApiError("Not authenticated", 401);
       const res = await fetch("/api/bets", {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) throw new Error("Failed to load bets");
-      return res.json();
+      const data = await res.json();
+      if (Array.isArray(data)) return data;
+      return [...(data.active || []), ...(data.archive || [])];
     },
     staleTime: Infinity,
     gcTime:    Infinity,
@@ -577,7 +593,7 @@ export function useBets() {
     enabled: !!userId,
     retry: async (count, err) => {
       if (err?.status === 401 && count === 0) {
-        try { await getToken({ skipCache: true }); return true; } catch { return false; }
+        try { await getCachedToken({ skipCache: true }); return true; } catch { return false; }
       }
       return false;
     },
@@ -585,7 +601,7 @@ export function useBets() {
 
   const saveMutation = useMutation({
     mutationFn: async (bets) => {
-      const token = await getToken();
+      const token = await getCachedToken();
       if (!token) throw new ApiError("Not authenticated", 401);
       const res = await fetch("/api/bets", {
         method: "PUT",
@@ -615,7 +631,7 @@ export function useBets() {
 
   const deleteMutation = useMutation({
     mutationFn: async (betId) => {
-      const token = await getToken();
+      const token = await getCachedToken();
       if (!token) throw new Error("Not authenticated");
       const res = await fetch(`/api/bets/${encodeURIComponent(betId)}`, {
         method: "DELETE",

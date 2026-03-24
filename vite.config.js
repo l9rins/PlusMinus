@@ -42,7 +42,16 @@ export default defineConfig({
         navigateFallbackAllowlist: [/^(?!\/api\/).*/],
         // FIX 14: json added so manifest.json is precached for offline use.
         globPatterns: ["**/*.{js,css,html,svg,png,json}"],
+        globIgnores: ["**/assets/charts-*.js", "**/assets/animation-*.js"],
         runtimeCaching: [
+          {
+            urlPattern: /\/assets\/(charts|animation)-.*\.js$/,
+            handler: "CacheFirst",
+            options: {
+              cacheName: "heavy-chunks",
+              expiration: { maxEntries: 5 },
+            },
+          },
           {
             urlPattern: /^https:\/\/site\.api\.espn\.com/,
             handler: "NetworkFirst",

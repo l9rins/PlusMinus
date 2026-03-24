@@ -1,4 +1,5 @@
-import React from "react";
+import React, { Suspense } from "react";
+import { Loader } from "lucide-react";
 import ReactDOM from "react-dom/client";
 import { inject } from "@vercel/analytics";
 import { ClerkProvider } from "@clerk/clerk-react";
@@ -34,11 +35,19 @@ if (!PUBLISHABLE_KEY) throw new Error("Missing VITE_CLERK_PUBLISHABLE_KEY");
 const rootEl = document.getElementById("root");
 if (!rootEl) throw new Error("[PlusMinus] #root not found in index.html");
 
+const ClerkLoadingFallback = () => (
+  <div className="min-h-screen bg-pitch-900 flex items-center justify-center">
+    <Loader className="animate-spin text-accent" />
+  </div>
+);
+
 ReactDOM.createRoot(rootEl).render(
   <React.StrictMode>
     <ClerkProvider publishableKey={PUBLISHABLE_KEY}>
       <QueryClientProvider client={queryClient}>
-        <App />
+        <Suspense fallback={<ClerkLoadingFallback />}>
+          <App />
+        </Suspense>
       </QueryClientProvider>
     </ClerkProvider>
   </React.StrictMode>
