@@ -5,7 +5,7 @@ import {
   LayoutDashboard, Users, BarChart3, Target,
   TrendingUp, Activity, ChevronDown, Search, Bell,
   Settings, X, Menu, Zap, ChevronRight, Sun, Moon,
-  GitCompare, BarChart2, PlayCircle, // ← NEW icon for Compare tab
+  GitCompare, BarChart2,
 } from "lucide-react";
 import { UserButton } from "@clerk/clerk-react";
 import { useTodayGames, useOdds } from "../api";
@@ -59,8 +59,8 @@ const NAV_ITEMS = [
       { label: "Win probability", path: "/compare", desc: "Home court advantage included" },
     ],
   },
-  { label: "History",   icon: BarChart2,  path: "/history", sub: null },
-  { label: "Live Feed", icon: PlayCircle, path: "/pbp",     sub: null },
+  // { label: "History",   icon: BarChart2,  path: "/history", sub: null },  // coming soon
+  // { label: "Live Feed", icon: PlayCircle, path: "/pbp",     sub: null },  // coming soon
 ];
 
 // ── Sub-dropdown ──────────────────────────────────────────────────

@@ -13,6 +13,7 @@
 
 import { useEffect, useRef, useCallback } from "react";
 import { useAuth } from "@clerk/clerk-react";
+import { useNavigate } from "react-router-dom";
 
 const POLL_INTERVAL_MS = 60_000;   // 60 s when focused
 const BLUR_INTERVAL_MS = 300_000;  // 5 min when blurred
@@ -20,6 +21,7 @@ const NOTIF_PERMISSION_KEY = "pm_notif_asked";
 
 export function useNotifications() {
     const { getToken, isSignedIn } = useAuth();
+    const navigate = useNavigate();
     const timerRef = useRef(null);
     const shownTags = useRef(new Set());   // dedup within session
     const isFocused = useRef(true);
@@ -61,7 +63,7 @@ export function useNotifications() {
                 if (n.data?.url) {
                     notif.onclick = () => {
                         window.focus();
-                        window.location.hash = n.data.url === "/" ? "" : n.data.url.replace(/^\//, "#/");
+                        navigate(n.data.url);
                         notif.close();
                     };
                 }

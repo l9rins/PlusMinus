@@ -228,7 +228,13 @@ export default async function handler(req, res) {
         // Module-level cache survives warm Lambda invocations.
         // On each fresh fetch we diff every player/market line against the
         // previous snapshot and annotate moves of >=0.5 points.
-        if (!handler._prevSnapshot) handler._prevSnapshot = {};
+        if (!handler._prevSnapshot) {
+            try {
+                handler._prevSnapshot = (await kv.get("props_snapshot:latest")) ?? {};
+            } catch {
+                handler._prevSnapshot = {};
+            }
+        }
 
         const moves = [];
         for (const [gameKey, game] of Object.entries(result)) {

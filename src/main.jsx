@@ -88,7 +88,7 @@ if (registerSW) {
         // Wait until no save is in-flight (queryClient mutation cache is empty)
         const checkAndReload = () => {
           const mutations = queryClient.getMutationCache().getAll();
-          const saving = mutations.some(m => m.state.status === "loading");
+          const saving = mutations.some(m => m.state.status === "pending");
           if (!saving) {
             window.location.reload();
           } else {
