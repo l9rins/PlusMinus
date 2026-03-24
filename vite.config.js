@@ -25,6 +25,9 @@ import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
 
 export default defineConfig({
+  worker: {
+    format: "es",
+  },
   plugins: [
     react(),
     VitePWA({
@@ -57,7 +60,6 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
-        format: "es",
         manualChunks: {
           vendor:    ["react", "react-dom", "react-router-dom", "lucide-react"],
           // FIX 21: react-query gets its own chunk instead of bloating
