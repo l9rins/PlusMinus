@@ -654,3 +654,41 @@ export function useBets() {
     deleteBet:   deleteMutation.mutateAsync,
   };
 }
+
+// ── Player Props (props API) ──────────────────────────────────────
+export function usePlayerProps(gameId, enabled = false) {
+  return useQuery({
+    queryKey: ["playerProps", gameId],
+    queryFn: async ({ signal }) => {
+      const res = await fetch(`/api/props?gameId=${encodeURIComponent(gameId)}`, { signal });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new ApiError(body.error || `Props proxy ${res.status}`, res.status);
+      }
+      return res.json();
+    },
+    staleTime: 1000 * 60 * 10,
+    enabled: enabled && !!gameId,
+    placeholderData: null,
+    retry: shouldRetry,
+  });
+}
+
+export function usePlayerPropHistory(playerId, market, enabled = false) {
+  return useQuery({
+    queryKey: ["playerPropHistory", playerId, market],
+    queryFn: async ({ signal }) => {
+      const qs = new URLSearchParams({ playerId, market });
+      const res = await fetch(`/api/props?${qs}`, { signal });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new ApiError(body.error || `Props history ${res.status}`, res.status);
+      }
+      return res.json();
+    },
+    staleTime: 1000 * 60 * 30,
+    enabled: enabled && !!playerId && !!market,
+    placeholderData: null,
+    retry: shouldRetry,
+  });
+}
