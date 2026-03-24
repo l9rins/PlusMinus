@@ -234,8 +234,6 @@ export function reshapeNBAStats(data, setName = null) {
 }
 
 // ── Unit-based betting helpers ────────────────────────────────────
-// 1 unit = getUnitSize(bankroll). Default bankroll = DEFAULT_BANKROLL.
-
 export const getUnitSize = (bankroll = DEFAULT_BANKROLL) =>
   +(bankroll / 100).toFixed(2);
 
@@ -248,9 +246,7 @@ export const stakeToUnits = (stake, bankroll = DEFAULT_BANKROLL) => {
 export const unitsToDollars = (units, bankroll = DEFAULT_BANKROLL) =>
   +(Number(units) * getUnitSize(bankroll)).toFixed(2);
 
-export const plInUnits = (stake, american, result, bankroll = DEFAULT_BANKROLL) => {
-  const dollarPL = calcPL(stake, american, result);
-  const unit     = getUnitSize(bankroll);
-  if (!unit) return 0;
-  return +(dollarPL / unit).toFixed(2);
+export const plInUnits = (pl, unitSize) => {
+  if (!unitSize || !isFinite(pl)) return null;
+  return +(Number(pl) / unitSize).toFixed(2);
 };

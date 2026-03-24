@@ -674,11 +674,12 @@ export function usePlayerProps(gameId, enabled = false) {
   });
 }
 
-export function usePlayerPropHistory(playerId, market, enabled = false) {
+export function usePlayerPropHistory(playerId, market, line, limit = 10) {
+  const enabled = !!playerId && !!market;
   return useQuery({
-    queryKey: ["playerPropHistory", playerId, market],
+    queryKey: ["playerPropHistory", playerId, market, line, limit],
     queryFn: async ({ signal }) => {
-      const qs = new URLSearchParams({ playerId, market });
+      const qs = new URLSearchParams({ playerId, market, ...(line != null && { line }), limit });
       const res = await fetch(`/api/props?${qs}`, { signal });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
