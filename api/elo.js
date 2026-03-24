@@ -200,18 +200,15 @@ export default async function handler(req, res) {
     const awayElo = eloMap[game.away] ?? 1500;
 
     // Apply home court advantage to win probability only
-    const homeEloAdj = homeElo + HOME_ADV;
-    const { winner: newWinner, loser: newLoser } = updateElo(
-      game.homeWon ? homeEloAdj : awayElo,
-      game.homeWon ? awayElo    : homeEloAdj,
-    );
+    const expHome = winProb(homeElo + HOME_ADV, awayElo);
+    const expAway = 1 - expHome;
 
     if (game.homeWon) {
-      eloMap[game.home] = newWinner;
-      eloMap[game.away] = newLoser;
+      eloMap[game.home] = +(homeElo + K * (1 - expHome)).toFixed(2);
+      eloMap[game.away] = +(awayElo + K * (0 - expAway)).toFixed(2);
     } else {
-      eloMap[game.away] = newWinner;
-      eloMap[game.home] = newLoser;
+      eloMap[game.home] = +(homeElo + K * (0 - expHome)).toFixed(2);
+      eloMap[game.away] = +(awayElo + K * (1 - expAway)).toFixed(2);
     }
 
     // Record trajectory point for both teams

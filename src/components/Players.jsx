@@ -94,7 +94,7 @@ function PlayerCard({ player, onCompare, comparePlayer, isComparing, sortKey, is
   const initials = player.name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
   const hasAdv = player.per != null;
   const hasStat = player.pts > 0 || player.ast > 0 || player.reb > 0;
-  const { data: gameLogForm, isFetching: formFetching } = usePlayerGameLog(player.id, expanded && hasAdv);
+  const { data: gameLogForm, isFetching: formFetching } = usePlayerGameLog(player.id, expanded);
 
   const radar = hasAdv ? [
     { label: "SCR", value: Math.min(100, (player.pts / 35) * 100) },
@@ -285,7 +285,11 @@ export default function Players({ initialQuery = "" }) {
   // FIX: [...filtered] spread before sort prevents React Query cache mutation
   const browsePlayers = useMemo(() => {
     const filtered = (staticPlayers || []).filter(p => !pos || p.pos === pos);
-    return [...filtered].sort((a, b) => (b[sortKey] ?? -Infinity) - (a[sortKey] ?? -Infinity));
+    return [...filtered].sort((a, b) => {
+      const av = a[sortKey] ?? -1;
+      const bv = b[sortKey] ?? -1;
+      return bv - av;
+    });
   }, [staticPlayers, pos, sortKey]);
 
   const displayPlayers = isSearchMode ? (searchResults || []) : browsePlayers;
