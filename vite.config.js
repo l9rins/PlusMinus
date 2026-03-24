@@ -33,7 +33,7 @@ export default defineConfig({
         navigateFallback: "/index.html",
         navigateFallbackAllowlist: [/^(?!\/api\/).*/],
         // FIX 14: json added so manifest.json is precached for offline use.
-        globPatterns: ["**/*.{js,css,html,svg,png,json,woff2}"],
+        globPatterns: ["**/*.{js,css,html,svg,png,json}"],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/site\.api\.espn\.com/,
@@ -57,6 +57,7 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
+        format: "es",
         manualChunks: {
           vendor:    ["react", "react-dom", "react-router-dom", "lucide-react"],
           // FIX 21: react-query gets its own chunk instead of bloating
