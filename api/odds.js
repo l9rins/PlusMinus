@@ -33,6 +33,12 @@ const TEAM_MAP = {
 };
 
 import { setCORSHeaders, handleOptions } from "./_cors.js";
+import { createClient } from "@vercel/kv";
+
+const kv = createClient({
+  url: process.env.KV_REST_API_URL,
+  token: process.env.KV_REST_API_TOKEN,
+});
 
 // FIX: guard against zero / non-numeric input (mirrors the fix in utils.js)
 function toImplied(american) {
@@ -74,6 +80,9 @@ export default async function handler(req, res) {
     const upstream = await fetch(url, { signal: AbortSignal.timeout(8000) });
 
     if (!upstream.ok) {
+      console.warn(`[api/odds] Upstream error ${upstream.status}, trying cache fallback`);
+      const cached = await kv.get("odds_cache");
+      if (cached) return res.status(200).json({ data: cached, stale: true });
       return res.status(upstream.status).json({ error: `Odds API ${upstream.status}` });
     }
 
@@ -147,15 +156,24 @@ export default async function handler(req, res) {
 
     res.setHeader("Cache-Control", "s-maxage=900, stale-while-revalidate=60");
     res.setHeader("Content-Type", "application/json");
+    
+    await kv.set("odds_cache", result);
 
-    return res.status(200).json(result);
+    return res.status(200).json({ data: result });
   } catch (err) {
     if (err.name === "TimeoutError") {
-      // FIX: was returning 504, which shouldRetry() skips, poisoning the cache
-      // for 15 minutes. 503 is retried up to 2 times so users recover faster.
+      console.warn("[api/odds] Upstream timeout, trying cache fallback");
+      try {
+        const cached = await kv.get("odds_cache");
+        if (cached) return res.status(200).json({ data: cached, stale: true });
+      } catch (e) {}
       return res.status(503).json({ error: "Odds API timed out — retrying" });
     }
     console.error("[api/odds] Error:", err);
+    try {
+      const cached = await kv.get("odds_cache");
+      if (cached) return res.status(200).json({ data: cached, stale: true });
+    } catch (e) {}
     return res.status(502).json({ error: err.message });
   }
 }

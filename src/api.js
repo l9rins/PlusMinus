@@ -468,8 +468,9 @@ export function useOdds() {
   });
 }
 
-export function mergeOddsIntoGames(games, odds) {
-  if (!games || !odds) return games ?? [];
+export function mergeOddsIntoGames(games, oddsPayload) {
+  if (!games || !oddsPayload) return games ?? [];
+  const odds = oddsPayload.data || oddsPayload; // handle wrapper
   return games.map((g) => {
     if (g.status !== "scheduled") return g;
     const match = odds[`${g.away}@${g.home}`];

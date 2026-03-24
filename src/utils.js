@@ -250,3 +250,9 @@ export const plInUnits = (pl, unitSize) => {
   if (!unitSize || !isFinite(pl)) return null;
   return +(Number(pl) / unitSize).toFixed(2);
 };
+
+// ── Elo ──────────────────────────────────────────────────────────
+export function eloWinProb(eloA, eloB, isAHome = false) {
+  const diff = eloA - eloB + (isAHome ? 35 : 0);
+  return 1 / (1 + Math.pow(10, -diff / 400));
+}

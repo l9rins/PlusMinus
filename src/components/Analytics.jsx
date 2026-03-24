@@ -20,7 +20,7 @@ import {
 } from "../data";
 import { useStandings, useLeagueTeamStats, useEnrichedPlayerStats, useEloData } from "../api";
 import { FreshnessTag, RowSkeleton, ErrorState } from "./ui";
-import { signed, reshapeNBAStats } from "../utils";
+import { signed, reshapeNBAStats, lsGet, lsSet } from "../utils";
 import { TrendingUp, BarChart2, Zap, Award, Info, Star, Trophy } from "lucide-react";
 import PlayoffBracket from "./PlayoffBracket";
 
@@ -683,8 +683,14 @@ export default function Analytics() {
   const VALID_TABS = ["power", "factors", "elo", "quality", "playoff"];
   const [activeTab, setActiveTab] = useState(() => {
     const tab = searchParams.get("tab");
-    return VALID_TABS.includes(tab) ? tab : "power";
+    if (VALID_TABS.includes(tab)) return tab;
+    return lsGet("analytics_tab") || "power";
   });
+
+  const handleTab = (t) => {
+    setActiveTab(t);
+    lsSet("analytics_tab", t);
+  };
   const { data: standingsData, isLoading, isError, isFetching, refetch, dataUpdatedAt } = useStandings();
   const { data: nbaTeamStats } = useLeagueTeamStats();
   const { data: enrichedPlayers } = useEnrichedPlayerStats();
@@ -785,7 +791,7 @@ export default function Analytics() {
           {TABS.map(t => {
             const Icon = t.icon;
             return (
-              <button key={t.id} onClick={() => setActiveTab(t.id)}
+              <button key={t.id} onClick={() => handleTab(t.id)}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all
                   ${activeTab === t.id
                     ? "bg-accent/15 text-accent border border-accent/30"

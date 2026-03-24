@@ -7,6 +7,8 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { AlertCircle, RefreshCw, Wifi, Key, Clock } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ReferenceLine } from "recharts";
+import { oddsToImplied } from "../utils";
 
 // ── Team Link ───────────────────────────────────────────────────
 // FIX: was a <span> — not keyboard-navigable and invisible to screen readers.
@@ -376,6 +378,74 @@ export function Tooltip({ content, children, placement = "top" }) {
                     </motion.div>
                 )}
             </AnimatePresence>
+        </div>
+    );
+}
+
+// ── Calibration Curve ─────────────────────────────────────────────
+export function CalibrationCurve({ bets }) {
+    const buckets = [
+        { label: "0-2%",   min: 0,  max: 2,   wins: 0, total: 0, expSum: 0 },
+        { label: "2-5%",   min: 2,  max: 5,   wins: 0, total: 0, expSum: 0 },
+        { label: "5-10%",  min: 5,  max: 10,  wins: 0, total: 0, expSum: 0 },
+        { label: "10%+",   min: 10, max: 100, wins: 0, total: 0, expSum: 0 },
+    ];
+
+    (bets || []).forEach(b => {
+        if (b.result === "pending") return;
+        
+        // Use b.edge if available, otherwise assume 0
+        const edge = b.edge || 0;
+        const bucket = buckets.find(bk => edge >= bk.min && edge < bk.max) || buckets[0];
+        
+        const implied = (oddsToImplied(b.odds || -110)) * 100;
+        const expected = implied + edge;
+        
+        bucket.total += 1;
+        bucket.expSum += expected;
+        if (b.result === "win") bucket.wins += 1;
+        // push counts as half win for calibration purposes, or omit. We'll omit pushes for purity.
+    });
+
+    const data = buckets.map(bk => {
+        if (bk.total === 0) return { bucket: bk.label, exp: 0, act: 0, total: 0 };
+        return {
+            bucket: bk.label,
+            total: bk.total,
+            exp: +(bk.expSum / bk.total).toFixed(1),
+            act: +((bk.wins / bk.total) * 100).toFixed(1),
+        };
+    }).filter(bk => bk.total > 0);
+
+    if (data.length === 0) {
+        return <div className="text-[10px] text-pitch-500 p-4 pm-card text-center">Not enough data for calibration curve.</div>;
+    }
+
+    return (
+        <div className="pm-card p-4">
+            <div className="pm-label mb-1">Model Calibration</div>
+            <div className="text-[10px] text-pitch-600 mb-4">Expected Win % vs Actual Win %, bucketed by edge</div>
+            <div style={{ height: 200 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#1e2a38" />
+                        <XAxis dataKey="bucket" tick={{ fill: "#546480", fontSize: 10 }} tickLine={false} axisLine={false} />
+                        <YAxis tick={{ fill: "#546480", fontSize: 10 }} tickFormatter={v => `${v}%`} tickLine={false} axisLine={false} />
+                        <RechartsTooltip 
+                            contentStyle={{ background: "rgba(18,22,33,0.95)", border: "1px solid #2e3a50", borderRadius: 8, fontSize: 11 }}
+                            itemStyle={{ color: "#c8d5e8" }}
+                            formatter={(v, name) => [`${v}%`, name === "exp" ? "Expected" : "Actual"]} 
+                            labelStyle={{ color: "#7d91ab" }}
+                        />
+                        <Line type="monotone" dataKey="exp" stroke="#546480" strokeWidth={2} dot={{ fill: "#546480" }} name="exp" />
+                        <Line type="monotone" dataKey="act" stroke="#10b981" strokeWidth={2} dot={{ fill: "#10b981" }} name="act" />
+                    </LineChart>
+                </ResponsiveContainer>
+            </div>
+            <div className="flex justify-center gap-4 mt-3 text-[10px]">
+                <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-pitch-500"></div><span className="text-pitch-400">Expected</span></div>
+                <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-win"></div><span className="text-pitch-400">Actual</span></div>
+            </div>
         </div>
     );
 }

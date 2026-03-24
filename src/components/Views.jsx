@@ -15,10 +15,10 @@ import { useStandings, useTodayGames, useOdds, mergeOddsIntoGames, useBets, useP
 import {
   calcPL, lsGet, lsSet,
   formatCurrency, formatPct, kellyBet, DEFAULT_BANKROLL,
-  calcROI, breakEven, oddsToImplied,
+  calcROI, breakEven, oddsToDecimal, oddsToImplied, eloWinProb,
   stakeToUnits, plInUnits, getUnitSize, unitsToDollars, reshapeNBAStats,
 } from "../utils";
-import { TileSkeleton, RowSkeleton, ErrorState, FreshnessTag, EmptyState, useToast, TeamLink } from "./ui";
+import { TileSkeleton, RowSkeleton, ErrorState, FreshnessTag, EmptyState, useToast, TeamLink, CalibrationCurve } from "./ui";
 
 // ── Shared animation + tooltip config ────────────────────────────
 const container = { hidden: {}, show: { transition: { staggerChildren: 0.035 } } };
@@ -49,11 +49,53 @@ const BOOK_LABELS = {
 };
 
 // ═══════════════════════════════════════════════════════════════════
+function ArbCalculator({ game }) {
+  const [stakeStr, setStakeStr] = useState("100");
+  const stake = Number(stakeStr) || 0;
+  
+  const awayDec = oddsToDecimal(game.bestAwayOdds);
+  const homeDec = oddsToDecimal(game.bestHomeOdds);
+  
+  const invSum = (1 / awayDec) + (1 / homeDec);
+  if (invSum >= 1 || stake <= 0) return null; // Defensive, not arb or invalid
+  
+  const awayStake = stake / (awayDec * invSum);
+  const homeStake = stake / (homeDec * invSum);
+  const guaranteedProfit = (stake / invSum) - stake;
+  
+  return (
+    <div className="mt-3 px-3 py-2 rounded-md bg-win/8 border border-win/20">
+      <div className="flex items-center gap-2 mb-2">
+        <Zap size={13} className="text-win flex-shrink-0" />
+        <div className="text-[10px] text-win font-semibold">Arbitrage Calculator</div>
+      </div>
+      <div className="flex items-center gap-2 mb-2">
+        <label className="text-[10px] text-pitch-300">Total Stake $</label>
+        <input type="number" value={stakeStr} onChange={e => setStakeStr(e.target.value)} 
+          className="pm-input w-20 py-1 text-[11px] text-right bg-pitch-900 border-win/30" />
+      </div>
+      <div className="grid grid-cols-2 gap-2 text-[10px] text-pitch-200">
+        <div>Bet <span className="font-mono text-pitch-50">${awayStake.toFixed(2)}</span> on {game.away}</div>
+        <div>Bet <span className="font-mono text-pitch-50">${homeStake.toFixed(2)}</span> on {game.home}</div>
+      </div>
+      <div className="mt-1 text-[10px] text-win pb-1">
+        Guaranteed Profit: <span className="font-mono font-bold">+${guaranteedProfit.toFixed(2)}</span>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════
 // SCORES
 // ═══════════════════════════════════════════════════════════════════
 export function Scores() {
   const [selected, setSelected] = useState(null);
-  const [filter, setFilter]     = useState("all");
+  const [filter, setFilter] = useState(() => lsGet("scores_filter") || "all");
+
+  const handleFilter = (f) => {
+    setFilter(f);
+    lsSet("scores_filter", f);
+  };
   const { data: rawGames, isLoading, isError, isFetching, refetch, dataUpdatedAt } = useTodayGames();
   const { data: oddsData } = useOdds();
   const games = useMemo(() => mergeOddsIntoGames(rawGames, oddsData) || [], [rawGames, oddsData]);
@@ -64,8 +106,20 @@ export function Scores() {
   });
 
   const filtered = useMemo(() => {
-    if (filter === "all") return games;
-    return games.filter(g => g.status === filter);
+    const list = filter === "all" ? games : games.filter(g => g.status === filter);
+    return list.map(g => {
+      const fav = (g.homeP === null || g.awayP === null) ? null : g.homeP >= g.awayP ? "home" : "away";
+      return {
+        ...g,
+        fav,
+        isFinal: g.status === "final",
+        isLive: g.status === "live",
+        awayColor: TEAM_COLORS[g.away] || "#546480",
+        homeColor: TEAM_COLORS[g.home] || "#546480",
+        awayName: TEAM_NAMES[g.away] || g.away,
+        homeName: TEAM_NAMES[g.home] || g.home,
+      };
+    });
   }, [games, filter]);
 
   const counts = useMemo(() => ({
@@ -82,7 +136,10 @@ export function Scores() {
           <div className="pm-label">{today}</div>
           <div className="text-[11px] text-pitch-500 mt-0.5">{games.length} games</div>
         </div>
-        <FreshnessTag isFetching={isFetching} dataUpdatedAt={dataUpdatedAt} />
+        <div className="flex items-center gap-2">
+          {oddsData?.stale && <span className="text-[9px] text-draw/70 hidden sm:inline-block border border-draw/30 bg-draw/10 px-1.5 py-0.5 rounded cursor-help">Stale Odds</span>}
+          <FreshnessTag isFetching={isFetching} dataUpdatedAt={dataUpdatedAt} />
+        </div>
       </div>
 
       {/* Filter tabs */}
@@ -95,7 +152,7 @@ export function Scores() {
         ].map(f => (
           <button
             key={f.id}
-            onClick={() => setFilter(f.id)}
+            onClick={() => handleFilter(f.id)}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-medium transition-all
               ${filter === f.id
                 ? "bg-accent/15 text-accent border border-accent/30"
@@ -130,13 +187,7 @@ export function Scores() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {filtered.map(g => {
-            const fav = (g.homeP === null || g.awayP === null) ? null : g.homeP >= g.awayP ? "home" : "away";
             const isSelected = selected === g.id;
-            const isFinal    = g.status === "final";
-            const isLive     = g.status === "live";
-            const awayColor  = TEAM_COLORS[g.away] || "#546480";
-            const homeColor  = TEAM_COLORS[g.home] || "#546480";
-
             return (
               <motion.div
                 key={g.id}
@@ -149,10 +200,10 @@ export function Scores() {
                 <div className="flex justify-between items-center mb-3">
                   <span className="pm-label">{g.time}</span>
                   <div className="flex items-center gap-1.5">
-                    {isFinal && (
+                    {g.isFinal && (
                       <span className="pm-badge bg-pitch-700 text-pitch-400 border border-pitch-600">Final</span>
                     )}
-                    {isLive && (
+                    {g.isLive && (
                       <span className="pm-badge bg-win/10 text-win border border-win/20 flex items-center gap-1">
                         <span className="w-1.5 h-1.5 rounded-full bg-win animate-live-pulse inline-block" />
                         {g.period ? `Q${g.period}` : "Live"}
@@ -171,20 +222,19 @@ export function Scores() {
                   </div>
                 </div>
 
-                {/* Teams */}
                 <div className="flex items-center gap-3 mb-3">
                   <div className="flex-1">
                     <TeamLink abbr={g.away}
                       className={`font-display text-2xl tracking-widest leading-none block
-                        ${fav === "away" ? "" : "text-pitch-400"}`}
-                      style={{ color: fav === "away" && fav !== null ? awayColor : undefined }}
+                        ${g.fav === "away" ? "" : "text-pitch-400"}`}
+                      style={{ color: g.fav === "away" && g.fav !== null ? g.awayColor : undefined }}
                     >
                       {g.away}
                     </TeamLink>
                     <div className="text-[10px] text-pitch-500 mt-0.5 truncate">
-                      {TEAM_NAMES[g.away] || g.away}
+                      {g.awayName}
                     </div>
-                    {(isFinal || isLive) && (
+                    {(g.isFinal || g.isLive) && (
                       <motion.div key={g.awayScore} initial={{ scale: 1.08 }} animate={{ scale: 1 }}
                         className="pm-number text-xl mt-1 text-pitch-100">
                         {g.awayScore}
@@ -205,7 +255,7 @@ export function Scores() {
 
                   <div className="text-center flex-shrink-0">
                     <div className="text-[10px] text-pitch-600 font-mono">
-                      {isFinal || isLive ? "—" : "vs"}
+                      {g.isFinal || g.isLive ? "—" : "vs"}
                     </div>
                     {g.total !== "—" && (
                       <div className="text-[9px] text-pitch-600 mt-0.5">O/U {g.total}</div>
@@ -218,15 +268,15 @@ export function Scores() {
                   <div className="flex-1 text-right">
                     <TeamLink abbr={g.home}
                       className={`font-display text-2xl tracking-widest leading-none block
-                        ${fav === "home" ? "" : "text-pitch-400"}`}
-                      style={{ color: fav === "home" && fav !== null ? homeColor : undefined }}
+                        ${g.fav === "home" ? "" : "text-pitch-400"}`}
+                      style={{ color: g.fav === "home" && g.fav !== null ? g.homeColor : undefined }}
                     >
                       {g.home}
                     </TeamLink>
                     <div className="text-[10px] text-pitch-500 mt-0.5 truncate text-right">
-                      {TEAM_NAMES[g.home] || g.home}
+                      {g.homeName}
                     </div>
-                    {(isFinal || isLive) && (
+                    {(g.isFinal || g.isLive) && (
                       <motion.div key={g.homeScore} initial={{ scale: 1.08 }} animate={{ scale: 1 }}
                         className="pm-number text-xl mt-1 text-pitch-100 text-right">
                         {g.homeScore}
@@ -255,7 +305,7 @@ export function Scores() {
                     <div className="h-1.5 rounded-full bg-pitch-700 overflow-hidden relative">
                       <motion.div
                         className="h-full absolute top-0 left-0 rounded-full"
-                        style={{ background: awayColor, opacity: 0.8 }}
+                        style={{ background: g.awayColor, opacity: 0.8 }}
                         initial={{ width: 0 }}
                         animate={{ width: `${g.awayP ?? 0}%` }}
                         transition={{ duration: 0.8 }}
@@ -318,18 +368,8 @@ export function Scores() {
                           </div>
                         )}
 
-                        {/* Arbitrage alert */}
-                        {g.isArb && (
-                          <div className="mt-2.5 px-3 py-2 rounded-md bg-win/8 border border-win/20 flex items-start gap-2">
-                            <Zap size={11} className="text-win flex-shrink-0 mt-0.5" />
-                            <div className="text-[10px] text-win leading-relaxed">
-                              <span className="font-semibold">Arbitrage opportunity!</span>
-                              {" "}Best lines across books guarantee{" "}
-                              <span className="font-mono font-semibold">+{g.arbPct}%</span>
-                              {" "}profit regardless of outcome.
-                            </div>
-                          </div>
-                        )}
+                        {/* Arbitrage */}
+                        {g.isArb && <ArbCalculator game={g} />}
                       </div>
                     </motion.div>
                   )}
@@ -347,18 +387,32 @@ export function Scores() {
 // STANDINGS
 // ═══════════════════════════════════════════════════════════════════
 export function Standings() {
-  const [conf, setConf]       = useState("east");
+  const [conf, setConf]       = useState(() => lsGet("standings_conf") || "east");
   const [sortKey, setSortKey] = useState("pct");
   const [sortDir, setSortDir] = useState("desc");
   const { data, isLoading, isError, isFetching, refetch, dataUpdatedAt } = useStandings();
 
+  const handleConf = (c) => {
+    setConf(c);
+    lsSet("standings_conf", c);
+  };
+
   const rawTeams = conf === "east" ? (data?.east || []) : (data?.west || []);
 
-  const teams = useMemo(() => {
-    return [...rawTeams].sort((a, b) => {
+  const enhancedTeams = useMemo(() => {
+    const list = [...rawTeams].sort((a, b) => {
       const av = a[sortKey] ?? 0;
       const bv = b[sortKey] ?? 0;
       return sortDir === "desc" ? bv - av : av - bv;
+    });
+    return list.map(t => {
+      const origRank = rawTeams.findIndex(rt => rt.team === t.team);
+      const isPlayIn  = origRank >= 6 && origRank <= 9;
+      const isFirst   = origRank === 0;
+      const isPlayoff = origRank < 6;
+      return {
+        ...t, origRank, isPlayIn, isFirst, isPlayoff, color: TEAM_COLORS[t.team] || "#546480"
+      };
     });
   }, [rawTeams, sortKey, sortDir]);
 
@@ -392,7 +446,7 @@ export function Standings() {
       <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
         <div className="flex gap-1.5">
           {[["east", "Eastern"], ["west", "Western"]].map(([id, label]) => (
-            <button key={id} onClick={() => setConf(id)}
+            <button key={id} onClick={() => handleConf(id)}
               className={`pm-tab ${conf === id ? "active" : ""}`}>
               {label} Conference
             </button>
@@ -428,12 +482,7 @@ export function Standings() {
                 </tr>
               </thead>
               <tbody>
-                {teams.map((t, i) => {
-                  const origRank = rawTeams.findIndex(rt => rt.team === t.team);
-                  const isPlayIn  = origRank >= 6 && origRank <= 9;
-                  const isFirst   = origRank === 0;
-                  const isPlayoff = origRank < 6;
-
+                {enhancedTeams.map((t, i) => {
                   return (
                     <motion.tr
                       key={t.team}
@@ -441,18 +490,18 @@ export function Standings() {
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: i * 0.015 }}
                       className={`border-b border-pitch-700 hover:bg-pitch-750 transition-colors
-                        ${origRank === 6 ? "border-t-2 border-t-accent/30" : ""}`}
+                        ${t.origRank === 6 ? "border-t-2 border-t-accent/30" : ""}`}
                     >
-                      <td className="px-3 py-2.5 font-mono text-[11px] text-pitch-600">{origRank + 1}</td>
+                      <td className="px-3 py-2.5 font-mono text-[11px] text-pitch-600">{t.origRank + 1}</td>
                       <td className="px-3 py-2.5">
                         <div className="flex items-center gap-2">
                           <div className="w-2 h-2 rounded-full flex-shrink-0"
-                            style={{ background: TEAM_COLORS[t.team] || "#546480" }} />
+                            style={{ background: t.color }} />
                           <TeamLink abbr={t.team} className={`font-display text-base tracking-wider block
-                            ${isFirst ? "text-accent" : isPlayoff ? "text-pitch-200" : "text-pitch-400"}`}>
+                            ${t.isFirst ? "text-accent" : t.isPlayoff ? "text-pitch-200" : "text-pitch-400"}`}>
                             {t.team}
                           </TeamLink>
-                          {isPlayIn && (
+                          {t.isPlayIn && (
                             <span className="text-[9px] text-draw border border-draw/30
                                              bg-draw/10 px-1.5 py-0.5 rounded">
                               play-in
@@ -512,6 +561,7 @@ export function Betting() {
   const { data: rawGames }    = useTodayGames();
   const { data: oddsData, isFetching: oddsFetching, dataUpdatedAt: oddsUpdatedAt } = useOdds();
   const { data: standingsData, isFetching: standingsFetching } = useStandings();
+  const { data: eloApiData } = useEloData();
 
   const [bankroll, setBankrollState] = useState(() => Number(lsGet("bankroll")) || DEFAULT_BANKROLL);
   useEffect(() => {
@@ -532,21 +582,30 @@ export function Betting() {
     if (!oddsData || !standingsData || !rawGames) return null;
 
     const allTeams  = [...(standingsData.east || []), ...(standingsData.west || [])];
-    const teamPct   = {};
-    allTeams.forEach(t => { teamPct[t.team] = { pct: t.pct, games: t.w + t.l }; });
+    const elos = {};
+    allTeams.forEach(t => { 
+      const apiEntry = eloApiData?.teams?.find(e => e.team === t.team);
+      // Fallback elo if API fails, mirrors Analytics.jsx logic
+      elos[t.team] = apiEntry ? apiEntry.elo : Math.round(1500 + (t.pct - 0.5) * 600);
+    });
 
+    const rawOddsData = oddsData?.data || oddsData;
     const edges = [];
     for (const game of (rawGames || []).filter(g => g.status === "scheduled")) {
       const key  = `${game.away}@${game.home}`;
-      const odds = oddsData[key];
+      const odds = rawOddsData && rawOddsData[key];
       if (!odds) continue;
 
       const fav       = odds.homeP >= odds.awayP ? game.home : game.away;
       const dog       = fav === game.home ? game.away : game.home;
       const impliedP  = Math.max(odds.homeP, odds.awayP);
-      const favStats  = teamPct[fav];
-      const modelP    = (favStats?.games ?? 0) >= 10
-        ? +(favStats.pct * 100).toFixed(1) : null;
+      
+      const homeElo   = elos[game.home] || 1500;
+      const awayElo   = elos[game.away] || 1500;
+      const homeWinP  = eloWinProb(awayElo, homeElo, true) * 100;
+      const awayWinP  = eloWinProb(homeElo, awayElo, false) * 100;
+      
+      const modelP    = fav === game.home ? homeWinP : awayWinP;
       const diff      = modelP !== null ? +(modelP - impliedP).toFixed(1) : null;
       const edge      = diff !== null ? (diff >= 10 ? "high" : diff >= 5 ? "mid" : "low") : "none";
       const favOdds   = (fav === game.home ? odds.bestHomeOdds : odds.bestAwayOdds) ?? -110;
@@ -620,7 +679,10 @@ export function Betting() {
             </div>
           )}
         </div>
-        <FreshnessTag isFetching={oddsFetching || standingsFetching} dataUpdatedAt={oddsUpdatedAt} />
+        <div className="flex items-center gap-2">
+            {oddsData?.stale && <span className="text-[9px] text-draw/70 hidden sm:inline-block border border-draw/30 bg-draw/10 px-1.5 py-0.5 rounded cursor-help" title="Using cached odds.">Stale Odds</span>}
+            <FreshnessTag isFetching={oddsFetching || standingsFetching} dataUpdatedAt={oddsUpdatedAt} />
+        </div>
       </div>
 
       {/* API key banner */}
@@ -654,15 +716,8 @@ export function Betting() {
 
           return (
             <motion.div key={g.matchup + idx} variants={item} className="pm-tile p-4">
-              {/* Arb banner */}
-              {g.isArb && (
-                <div className="mb-3 px-2.5 py-2 rounded-md bg-win/10 border border-win/25 flex items-center gap-2">
-                  <Zap size={11} className="text-win flex-shrink-0" />
-                  <span className="text-[10px] text-win font-medium">
-                    Arbitrage: guaranteed +{g.arbPct}% across books
-                  </span>
-                </div>
-              )}
+              {/* Arb Calculator */}
+              {g.isArb && <ArbCalculator game={g} />}
 
               {/* Card header */}
               <div className="flex items-start justify-between mb-3">
@@ -1767,6 +1822,9 @@ export function BetTracker() {
                 </div>
               );
             })()}
+
+            {/* ── Calibration Curve ──────────────────────────── */}
+            <CalibrationCurve bets={bets} />
 
             {/* ── Bankroll curve ─────────────────────────────── */}
             <UnitSettings bankroll={bankroll} />

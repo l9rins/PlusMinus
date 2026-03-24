@@ -9,19 +9,10 @@ import {
 } from "lucide-react";
 import { TEAM_COLORS, TEAM_NAMES } from "../data";
 import { useEnrichedPlayerStats, usePlayerSearch, usePlayerGameLog, prefetchPlayerGameLog } from "../api";
-import { signed, netRatingTier } from "../utils";
+import { signed, netRatingTier, debounce } from "../utils";
 import { TileSkeleton, ErrorState, EmptyState } from "./ui";
 
 const POSITIONS = ["", "PG", "SG", "SF", "PF", "C"];
-
-function useDebounce(value, delay = 350) {
-  const [d, setD] = useState(value);
-  useEffect(() => {
-    const t = setTimeout(() => setD(value), delay);
-    return () => clearTimeout(t);
-  }, [value, delay]);
-  return d;
-}
 
 function TierBadge({ per }) {
   if (per == null) return null;
@@ -266,6 +257,7 @@ function CompareBanner({ player, onClear }) {
 }
 
 export default function Players({ initialQuery = "" }) {
+  const [localQuery, setLocalQuery] = useState(initialQuery);
   const [query, setQuery] = useState(initialQuery);
   const [pos, setPos] = useState("");
   const [sortKey, setSortKey] = useState("pts");
@@ -273,21 +265,26 @@ export default function Players({ initialQuery = "" }) {
   const [focusedIdx, setFocusedIdx] = useState(-1);
   const inputRef = useRef(null);
 
-  useEffect(() => { setQuery(initialQuery); }, [initialQuery]);
+  const debouncedSetQuery = useMemo(() => debounce(setQuery, 200), []);
+
+  useEffect(() => { 
+    setLocalQuery(initialQuery); 
+    setQuery(initialQuery); 
+  }, [initialQuery]);
+  
   useEffect(() => { const t = setTimeout(() => inputRef.current?.focus(), 120); return () => clearTimeout(t); }, []);
 
   const handleCompare = useCallback(p => setComparePlayer(prev => prev?.id === p.id ? null : p), []);
 
-  const debouncedQuery = useDebounce(query, 350);
-  const trimmedQuery = query.trim();
-  const trimmedDebounced = debouncedQuery.trim();
+  const trimmedQuery = localQuery.trim();
+  const trimmedDebounced = query.trim();
   const isSearchMode = trimmedDebounced.length >= 2;
-  const isTyping = trimmedQuery.length >= 2 && query !== debouncedQuery;
+  const isTyping = trimmedQuery.length >= 2 && localQuery !== query;
 
   useEffect(() => { if (isSearchMode) setComparePlayer(null); }, [isSearchMode]);
 
   const { data: staticPlayers, isLoading: staticLoading, isError: staticError, isFetching: staticFetching, dataUpdatedAt, refetch } = useEnrichedPlayerStats();
-  const { data: searchResults, isLoading: searchLoading, isFetching: searchFetching, isError: searchError, refetch: searchRefetch } = usePlayerSearch(debouncedQuery);
+  const { data: searchResults, isLoading: searchLoading, isFetching: searchFetching, isError: searchError, refetch: searchRefetch } = usePlayerSearch(query);
 
   // FIX: [...filtered] spread before sort prevents React Query cache mutation
   const browsePlayers = useMemo(() => {
@@ -327,10 +324,10 @@ export default function Players({ initialQuery = "" }) {
           {isFetching
             ? <Loader size={13} strokeWidth={1.8} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-accent animate-spin" />
             : <Search size={13} strokeWidth={1.8} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-pitch-500" />}
-          <input ref={inputRef} value={query} onChange={e => { setQuery(e.target.value); setFocusedIdx(-1); }}
+          <input ref={inputRef} value={localQuery} onChange={e => { setLocalQuery(e.target.value); debouncedSetQuery(e.target.value); setFocusedIdx(-1); }}
             placeholder={isSearchMode ? "Searching all NBA players…" : "Search player…"}
             aria-label="Search players" className="pm-input w-full pl-8 pr-8" />
-          {query && <button onClick={() => { setQuery(""); inputRef.current?.focus(); }} aria-label="Clear search"
+          {localQuery && <button onClick={() => { setLocalQuery(""); setQuery(""); inputRef.current?.focus(); }} aria-label="Clear search"
             className="absolute right-2.5 top-1/2 -translate-y-1/2 text-pitch-500 hover:text-pitch-300 transition-colors"><X size={12} /></button>}
         </div>
 
