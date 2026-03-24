@@ -2,15 +2,7 @@
   "rewrites": [
     {
       "source": "/api/bets/:id",
-      "destination": "/api/bets/[id]"
-    },
-    {
-      "source": "/api/props",
-      "destination": "/api/props"
-    },
-    {
-      "source": "/api/log",
-      "destination": "/api/log"
+      "destination": "/api/bets?id=:id"
     },
     {
       "source": "/api/(.*)",
@@ -25,22 +17,22 @@
     {
       "source": "/assets/(.*)",
       "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=31536000, immutable"
-        }
+        { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
       ]
     },
     {
       "source": "/api/(.*)",
       "headers": [
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "X-Frame-Options",        "value": "DENY" }
+      ]
+    },
+    {
+      "source": "/(.*)",
+      "headers": [
         {
-          "key": "X-Content-Type-Options",
-          "value": "nosniff"
-        },
-        {
-          "key": "X-Frame-Options",
-          "value": "DENY"
+          "key": "Content-Security-Policy",
+          "value": "default-src 'self'; script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline'; connect-src 'self' https://*.clerk.accounts.dev https://clerk.*.lcl.dev https://api.the-odds-api.com https://site.api.espn.com https://stats.nba.com https://api.balldontlie.io; img-src 'self' data: https:; frame-src https://challenges.cloudflare.com"
         }
       ]
     }

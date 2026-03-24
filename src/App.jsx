@@ -9,65 +9,87 @@ import { useQueryClient } from "@tanstack/react-query";
 import TopNav from "./components/TopNav";
 import { ToastContainer } from "./components/ui";
 import { TEAM_COLORS } from "./data";
-import { invalidateErroredQueries, logError } from "./api";
-import { useNotifications } from "./hooks/useNotifications";
-import { HistoricalDashboard, PlayByPlay } from "./components/Views";
+import { invalidateErroredQueries } from "./api";
 
 // ── Lazy route components ─────────────────────────────────────────
-const Dashboard = lazy(() => import("./components/Dashboard"));
-const Players = lazy(() => import("./components/Players"));
-const Analytics = lazy(() => import("./components/Analytics"));
+const Dashboard  = lazy(() => import("./components/Dashboard"));
+const Players    = lazy(() => import("./components/Players"));
+const Analytics  = lazy(() => import("./components/Analytics"));
 const TeamDetail = lazy(() => import("./components/TeamDetail"));
 const HeadToHead = lazy(() => import("./components/HeadToHead"));
-const Scores = lazy(() => import("./components/Views").then(m => ({ default: m.Scores })));
-const Standings = lazy(() => import("./components/Views").then(m => ({ default: m.Standings })));
-const Betting = lazy(() => import("./components/Views").then(m => ({ default: m.Betting })));
+const Scores     = lazy(() => import("./components/Views").then(m => ({ default: m.Scores })));
+const Standings  = lazy(() => import("./components/Views").then(m => ({ default: m.Standings })));
+const Betting    = lazy(() => import("./components/Views").then(m => ({ default: m.Betting })));
 const BetTracker = lazy(() => import("./components/Views").then(m => ({ default: m.BetTracker })));
 
 // ── Dynamic team theming ──────────────────────────────────────────
+// FIX G3a: Restore the *original* CSS variable values on unmount instead
+// of hardcoding "#00d4aa" and "0,212,170".
+//
+// Before: cleanup always reset to the literal teal hex. If the default
+// accent color in index.css or tailwind.config.js is ever changed, navigating
+// away from any team page would flash the wrong legacy teal for one frame.
+//
+// After: read the current --theme-accent and --theme-accent-rgb from the
+// computed style BEFORE overwriting them, then restore exactly those values.
+// If no team color applies (bad abbr, unknown team), we skip the write
+// entirely so there's nothing to restore.
 export function useTeamTheme(teamAbbr) {
   useEffect(() => {
     const color = (teamAbbr && TEAM_COLORS[teamAbbr]) ? TEAM_COLORS[teamAbbr] : null;
-    if (color) {
-      document.documentElement.style.setProperty("--theme-accent", color);
-      const hex = color.replace("#", "");
-      const r = parseInt(hex.substring(0, 2), 16);
-      const g = parseInt(hex.substring(2, 4), 16);
-      const b = parseInt(hex.substring(4, 6), 16);
-      document.documentElement.style.setProperty("--theme-accent-rgb", `${r},${g},${b}`);
-    }
+    if (!color) return; // nothing written — no cleanup needed
+
+    // Capture originals before overwriting
+    const root         = document.documentElement;
+    const origAccent   = root.style.getPropertyValue("--theme-accent")     || "";
+    const origAccentRgb = root.style.getPropertyValue("--theme-accent-rgb") || "";
+
+    root.style.setProperty("--theme-accent", color);
+    const hex = color.replace("#", "");
+    const r   = parseInt(hex.substring(0, 2), 16);
+    const g   = parseInt(hex.substring(2, 4), 16);
+    const b   = parseInt(hex.substring(4, 6), 16);
+    root.style.setProperty("--theme-accent-rgb", `${r},${g},${b}`);
+
     return () => {
-      document.documentElement.style.setProperty("--theme-accent", "#00d4aa");
-      document.documentElement.style.setProperty("--theme-accent-rgb", "0,212,170");
+      // Restore whatever was set before this hook ran.
+      // If the property had no inline style (controlled by CSS), removing it
+      // lets the CSS cascade take over again — which is the correct behaviour.
+      if (origAccent) {
+        root.style.setProperty("--theme-accent", origAccent);
+      } else {
+        root.style.removeProperty("--theme-accent");
+      }
+      if (origAccentRgb) {
+        root.style.setProperty("--theme-accent-rgb", origAccentRgb);
+      } else {
+        root.style.removeProperty("--theme-accent-rgb");
+      }
     };
   }, [teamAbbr]);
 }
 
 // ── Route metadata ────────────────────────────────────────────────
 const ROUTE_META = {
-  "/": { title: "Dashboard", tab: "dashboard" },
-  "/scores": { title: "Scores", tab: "scores" },
-  "/standings": { title: "Standings", tab: "standings" },
-  "/players": { title: "Players", tab: "players" },
-  "/betting": { title: "Betting", tab: "betting" },
-  "/tracker": { title: "Bet Tracker", tab: "tracker" },
-  "/analytics": { title: "Analytics", tab: "analytics" },
-  "/compare": { title: "Compare", tab: "compare" },
-  "/history": { title: "History", tab: "history" },
-  "/pbp": { title: "Live Feed", tab: "pbp" },
+  "/":          { title: "Dashboard",   tab: "dashboard"  },
+  "/scores":    { title: "Scores",      tab: "scores"     },
+  "/standings": { title: "Standings",   tab: "standings"  },
+  "/players":   { title: "Players",     tab: "players"    },
+  "/betting":   { title: "Betting",     tab: "betting"    },
+  "/tracker":   { title: "Bet Tracker", tab: "tracker"    },
+  "/analytics": { title: "Analytics",   tab: "analytics"  },
+  "/compare":   { title: "Compare",     tab: "compare"    },
 };
 
 const SHORTCUT_ROUTES = {
-  d: "/", s: "/scores", l: "/pbp", p: "/players",
+  d: "/", s: "/scores", l: "/standings", p: "/players",
   b: "/betting", t: "/tracker", a: "/analytics", c: "/compare",
-  h: "/history",
 };
 
 const TAB_ROUTES = {
   dashboard: "/", scores: "/scores", standings: "/standings",
   players: "/players", betting: "/betting", tracker: "/tracker",
   analytics: "/analytics", compare: "/compare",
-  history: "/history", pbp: "/pbp",
 };
 
 // ── Page skeleton ─────────────────────────────────────────────────
@@ -83,21 +105,23 @@ function PageSkeleton() {
 }
 
 // ── Error boundary ────────────────────────────────────────────────
-// FIX: now accepts a `queryClient` prop and calls
-// invalidateErroredQueries(queryClient) on retry.
+// FIX G3b: clearTimeout in componentWillUnmount prevents setState on an
+// unmounted component.
 //
-// Gemini suggested queryClient.clear() which nukes ALL cached data —
-// standings, games, odds, players — forcing a full re-fetch of everything.
-// That's worse than the original problem for most error scenarios.
+// Before: handleRetry used setTimeout(() => setState(...), 400). If the
+// user navigated away during the 400 ms window (unmounting the ErrorBoundary),
+// the timeout still fired and called setState on an unmounted class component.
+// React 18 suppresses the console warning for class components but the
+// callback still ran, creating a subtle memory leak and potential stale
+// closure executing against a detached component tree.
 //
-// invalidateErroredQueries (defined in src/api.js) only marks queries
-// that are already in an error state as stale. Healthy cached data
-// (standings loaded fine, etc.) is left completely untouched.
-// On the next render after setState the stale errored queries re-fetch.
+// After: the timer ID is stored in this._retryTimer so componentWillUnmount
+// can cancel it before it fires.
 class ErrorBoundary extends Component {
   constructor(props) {
     super(props);
-    this.state = { hasError: false, error: null, retrying: false };
+    this.state       = { hasError: false, error: null, retrying: false };
+    this._retryTimer = null; // FIX G3b: stored so we can cancel on unmount
   }
 
   static getDerivedStateFromError(error) {
@@ -106,14 +130,23 @@ class ErrorBoundary extends Component {
 
   componentDidCatch(e, info) {
     console.error("[PlusMinus]", e, info);
-    logError(e, `ErrorBoundary:${info.componentStack?.split("\n")[1]?.trim() ?? "unknown"}`);
+  }
+
+  // FIX G3b: cancel any pending retry timer when the boundary unmounts.
+  componentWillUnmount() {
+    if (this._retryTimer !== null) {
+      clearTimeout(this._retryTimer);
+      this._retryTimer = null;
+    }
   }
 
   handleRetry = () => {
     this.setState({ retrying: true });
-    // Invalidate only errored queries — leave healthy cache alone
     invalidateErroredQueries(this.props.queryClient);
-    setTimeout(() => {
+
+    // FIX G3b: store the ID so componentWillUnmount can cancel it.
+    this._retryTimer = setTimeout(() => {
+      this._retryTimer = null;
       this.setState({ hasError: false, error: null, retrying: false });
     }, 400);
   };
@@ -143,10 +176,9 @@ class ErrorBoundary extends Component {
 
 // ── Inner app ─────────────────────────────────────────────────────
 function AppInner() {
-  useNotifications();
-  const navigate = useNavigate();
-  const location = useLocation();
-  const queryClient = useQueryClient(); // passed to ErrorBoundary
+  const navigate    = useNavigate();
+  const location    = useLocation();
+  const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
@@ -212,18 +244,16 @@ function AppInner() {
               <ErrorBoundary queryClient={queryClient}>
                 <Suspense fallback={<PageSkeleton />}>
                   <Routes>
-                    <Route path="/" element={<Dashboard onNavigate={handleTabChange} />} />
-                    <Route path="/scores" element={<Scores />} />
-                    <Route path="/standings" element={<Standings />} />
-                    <Route path="/players" element={<Players initialQuery={searchQuery} />} />
-                    <Route path="/betting" element={<Betting />} />
-                    <Route path="/tracker" element={<BetTracker />} />
-                    <Route path="/analytics" element={<Analytics />} />
-                    <Route path="/compare" element={<HeadToHead />} />
+                    <Route path="/"           element={<Dashboard onNavigate={handleTabChange} />} />
+                    <Route path="/scores"     element={<Scores />} />
+                    <Route path="/standings"  element={<Standings />} />
+                    <Route path="/players"    element={<Players initialQuery={searchQuery} />} />
+                    <Route path="/betting"    element={<Betting />} />
+                    <Route path="/tracker"    element={<BetTracker />} />
+                    <Route path="/analytics"  element={<Analytics />} />
+                    <Route path="/compare"    element={<HeadToHead />} />
                     <Route path="/team/:abbr" element={<TeamDetail />} />
-                    <Route path="/history" element={<HistoricalDashboard />} />
-                    <Route path="/pbp" element={<PlayByPlay />} />
-                    <Route path="*" element={<Navigate to="/" replace />} />
+                    <Route path="*"           element={<Navigate to="/" replace />} />
                   </Routes>
                 </Suspense>
               </ErrorBoundary>

@@ -7,7 +7,7 @@ import {
 import {
   ArrowUpDown, Download, Trash2, Plus, ChevronUp, ChevronDown,
   TrendingUp, Shield, DollarSign, Target, X, Info,
-  Zap, ExternalLink, AlertTriangle, CheckCircle, Loader, Activity, Layers, PlayCircle, Clock,
+  Zap, ExternalLink, AlertTriangle, AlertCircle, CheckCircle, Loader, Activity, Layers, PlayCircle, Clock,
   Settings, Layers3,
 } from "lucide-react";
 import { TEAM_NAMES, ODDS_GAMES, TEAM_COLORS } from "../data";
@@ -1458,7 +1458,7 @@ function OddsCreditsWidget() {
 // ── BetTracker (unified game + prop bets) ────────────────────────
 export function BetTracker() {
   const toast    = useToast();
-  const { bets, isLoading, isSaving, isDeleting, saveBets, deleteBet } = useBets();
+  const { bets, isLoading, isSaving, isDeleting, saveBets, deleteBet: serverDeleteBet } = useBets();
 
   // ── tracker sub-tab: "log" | "props"
   const [trackerTab, setTrackerTab] = useState("log");
@@ -1642,7 +1642,7 @@ export function BetTracker() {
   };
 
   const handleDelete = (id) => {
-    deleteBet(id, {
+    serverDeleteBet(id, {
       onSuccess: () => toast.success("Bet removed."),
       onError:   () => toast.error("Couldn't delete bet."),
     });
