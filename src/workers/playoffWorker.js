@@ -63,9 +63,10 @@ function simSeries(eloA, eloB, rng) {
 
 self.onmessage = (e) => {
   const { standings, eloData } = e.data;
+  const safeEloData = Array.isArray(eloData) ? eloData : [];
 
   const buildSeeds = conf => conf.slice(0, 10).map((t, i) => {
-    const ed = eloData.find(x => x.team === t.team);
+    const ed = safeEloData.find(x => x.team === t.team);
     return {
       team:  t.team,
       name:  TEAM_NAMES[t.team] || t.team,

@@ -519,6 +519,8 @@ export const queryClientConfig = {
     queries: {
       staleTime: 1000 * 60 * 5,
       retry: shouldRetry,
+      retryDelay: (attempt, err) =>
+        err?.retryAfter ? err.retryAfter * 1000 : Math.min(1000 * 2 ** attempt, 30000),
       throwOnError: false,
     },
   },
