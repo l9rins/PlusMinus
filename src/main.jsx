@@ -14,6 +14,10 @@ import { queryClientConfig } from "./api.js";
 // stack and confuses debugging.
 let registerSW = null;
 if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.addEventListener("message", (e) => {
+    if (e.data?.type === "NAVIGATE") window.location.href = e.data.url;
+  });
+
   try {
     // Dynamic import so the PWA register module is only evaluated in SW-capable envs.
     ({ registerSW } = await import("virtual:pwa-register"));
