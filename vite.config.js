@@ -27,6 +27,11 @@ import { VitePWA } from "vite-plugin-pwa";
 export default defineConfig({
   worker: {
     format: "es",
+    rollupOptions: {
+      output: {
+        format: "es",
+      },
+    },
   },
   plugins: [
     react(),
@@ -58,6 +63,7 @@ export default defineConfig({
 
   // ── Build & Bundle Splitting ─────────────────────────────────────
   build: {
+    target: "es2022",
     rollupOptions: {
       output: {
         manualChunks: {
