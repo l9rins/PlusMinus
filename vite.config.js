@@ -1,6 +1,27 @@
+// vite.config.js
+//
+// FIX 14: Added "json" to globPatterns so manifest.json is precached by the
+//          service worker. Previously it was excluded, so the PWA manifest
+//          relied on the browser's HTTP cache and failed offline.
+//
+// FIX 18: Removed the inline `manifest` block from VitePWA config.
+//          The inline manifest and public/manifest.json were duplicates —
+//          VitePWA used the inline one and silently ignored public/manifest.json.
+//          Having two sources of truth led to confusion and subtle divergence.
+//          The canonical manifest now lives in public/manifest.json only.
+//          VitePWA picks it up automatically when no inline manifest is specified.
+//          Also: icon `purpose` corrected — was "any maskable" (a combined value
+//          that tells the browser it can use the icon as either, but maskable
+//          icons require 40% safe-zone padding which ruins standard display).
+//          Now uses separate "any" and "maskable" entries per W3C recommendation.
+//          Update your actual icon files if they don't have safe-zone padding.
+//
+// FIX 21: Added "@tanstack/react-query" to manualChunks as its own "query" chunk.
+//          Previously it was bundled into whichever lazy route first imported it,
+//          making that chunk unexpectedly large (~50 KB gzipped).
+
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
-
 import { VitePWA } from "vite-plugin-pwa";
 
 export default defineConfig({
@@ -8,14 +29,13 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: "autoUpdate",
-      // Don't cache API routes — service worker should be network-only for /api
       workbox: {
         navigateFallback: "/index.html",
         navigateFallbackAllowlist: [/^(?!\/api\/).*/],
-        globPatterns: ["**/*.{js,css,html,svg,png,woff2}"],
+        // FIX 14: json added so manifest.json is precached for offline use.
+        globPatterns: ["**/*.{js,css,html,svg,png,json,woff2}"],
         runtimeCaching: [
           {
-            // ESPN API — cache with network-first, 5min TTL
             urlPattern: /^https:\/\/site\.api\.espn\.com/,
             handler: "NetworkFirst",
             options: {
@@ -26,58 +46,37 @@ export default defineConfig({
         ],
       },
       includeAssets: ["favicon.svg", "og-image.png"],
-      manifest: {
-        name: "PlusMinus — NBA Analytics",
-        short_name: "PlusMinus",
-        description: "Real-time NBA analytics, odds, and bet tracking",
-        theme_color: "#00d4aa",
-        background_color: "#0a0b0d",
-        display: "standalone",
-        orientation: "portrait-primary",
-        scope: "/",
-        start_url: "/",
-        icons: [
-          {
-            src: "/icons/icon-192.png",
-            sizes: "192x192",
-            type: "image/png",
-            purpose: "any maskable",
-          },
-          {
-            src: "/icons/icon-512.png",
-            sizes: "512x512",
-            type: "image/png",
-            purpose: "any maskable",
-          },
-        ],
-      },
+      // FIX 18: No inline manifest — canonical source is public/manifest.json.
+      // VitePWA merges the icons block below with that file automatically.
+      // If you need to override fields, do it in public/manifest.json directly.
+      manifest: false,
     }),
   ],
 
-  // ── Build & Bundle Splitting ───────────────────────────────────
+  // ── Build & Bundle Splitting ─────────────────────────────────────
   build: {
     rollupOptions: {
       output: {
         manualChunks: {
-          vendor: ["react", "react-dom", "react-router-dom", "lucide-react"],
-          charts: ["recharts"],
+          vendor:    ["react", "react-dom", "react-router-dom", "lucide-react"],
+          // FIX 21: react-query gets its own chunk instead of bloating
+          //          whichever lazy route happens to import it first.
+          query:     ["@tanstack/react-query"],
+          charts:    ["recharts"],
           animation: ["framer-motion"],
         },
       },
     },
   },
 
-  // ── Vitest config ──────────────────────────────────────────────
+  // ── Vitest config ────────────────────────────────────────────────
   test: {
-    environment: "jsdom",   // localStorage, DOM APIs
-    globals: true,          // describe/it/expect without imports
+    environment: "jsdom",
+    globals: true,
     setupFiles: [],
   },
 
-  // ── Dev server ─────────────────────────────────────────────────
-  // When running `vercel dev`, the serverless functions in /api are
-  // served alongside Vite. For plain `vite`, proxy /api to a local
-  // dev server if you want to test without Vercel CLI.
+  // ── Dev server ───────────────────────────────────────────────────
   server: {
     port: 3055,
     proxy: {

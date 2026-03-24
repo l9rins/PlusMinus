@@ -102,7 +102,7 @@ export default async function handler(req, res) {
         awayLines.push({ book: bm.key, odds: awayOut.price, implied: toImplied(awayOut.price) });
       }
 
-      if (!homeLines.length) continue;
+      if (!homeLines.length || !awayLines.length) continue;
 
       const bestHome = homeLines.reduce((a, b) => toDecimal(a.odds) > toDecimal(b.odds) ? a : b);
       const bestAway = awayLines.reduce((a, b) => toDecimal(a.odds) > toDecimal(b.odds) ? a : b);

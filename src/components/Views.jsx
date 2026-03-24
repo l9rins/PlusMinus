@@ -7,14 +7,16 @@ import {
 import {
   ArrowUpDown, Download, Trash2, Plus, ChevronUp, ChevronDown,
   TrendingUp, Shield, DollarSign, Target, X, Info,
-  Zap, ExternalLink, AlertTriangle, CheckCircle, Loader,
+  Zap, ExternalLink, AlertTriangle, AlertCircle, CheckCircle, Loader, Activity, Layers, PlayCircle, Clock,
+  Settings, Layers3,
 } from "lucide-react";
 import { TEAM_NAMES, ODDS_GAMES, TEAM_COLORS } from "../data";
-import { useStandings, useTodayGames, useOdds, mergeOddsIntoGames, useBets } from "../api";
+import { useStandings, useTodayGames, useOdds, mergeOddsIntoGames, useBets, usePlayerProps, usePlayerPropHistory, useServerConfig, useAllPlayers } from "../api";
 import {
   calcPL, lsGet, lsSet,
   formatCurrency, formatPct, kellyBet, DEFAULT_BANKROLL,
   calcROI, breakEven, oddsToImplied,
+  stakeToUnits, plInUnits, getUnitSize, unitsToDollars, reshapeNBAStats,
 } from "../utils";
 import { TileSkeleton, RowSkeleton, ErrorState, FreshnessTag, EmptyState, useToast, TeamLink } from "./ui";
 
@@ -869,511 +871,1809 @@ export function Betting() {
 // ═══════════════════════════════════════════════════════════════════
 
 
-function exportBetsCSV(bets) {
-  const headers = "Date,Game,Type,Pick,Odds,Stake,Result,P&L,Break-even\n";
-  const rows = bets.map(b => {
-    const pl   = calcPL(b.stake, b.odds, b.result);
-    const be   = (breakEven(b.odds) * 100).toFixed(1);
-    const date = b.id > 1e12 ? new Date(b.id).toLocaleDateString("en-US") : "";
-    return `"${date}","${b.game}","${b.type}","${b.pick}",${b.odds},${b.stake},${b.result},${
-      b.result === "pending" ? "" : pl.toFixed(2)},${be}%`;
-  }).join("\n");
+const MARKET_LABELS = {
+  player_points:        "Points",
+  player_rebounds:      "Rebounds",
+  player_assists:       "Assists",
+  player_threes:        "3-Pointers",
+  player_blocks_steals: "Blks+Stls",
+};
 
-  const blob = new Blob([headers + rows], { type: "text/csv;charset=utf-8;" });
-  const url  = URL.createObjectURL(blob);
-  const a    = document.createElement("a");
-  a.href     = url;
-  a.download = `plusminus-bets-${new Date().toISOString().split("T")[0]}.csv`;
-  document.body.appendChild(a); a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+const MARKET_KEYS = Object.keys(MARKET_LABELS);
+
+// Signed american odds formatter  e.g. -110, +145
+function fmtOdds(n) {
+  if (n == null || !isFinite(n)) return "—";
+  return n > 0 ? `+${n}` : `${n}`;
 }
 
-const RESULT_OPTIONS = [
-  { value: "win",     label: "WIN",     cls: "bg-win/10  text-win  border-win/20"   },
-  { value: "loss",    label: "LOSS",    cls: "bg-loss/10 text-loss border-loss/20"  },
-  { value: "push",    label: "PUSH",    cls: "bg-draw/10 text-draw border-draw/20"  },
-  { value: "pending", label: "PENDING", cls: "bg-pitch-750 text-pitch-500 border-pitch-600" },
-];
+// ── PropsBrowser ─────────────────────────────────────────────────
+// Shows today's prop markets, grouped by game → player → market.
+// "Bet this" button pre-fills the add-bet form below.
+function PropsBrowser({ onAddPropBet, bankroll }) {
+  const { data: propsResult, isLoading, isError } = usePlayerProps();
+  const { data: allPlayersData } = useAllPlayers();
+  const nameToId = useMemo(() => {
+    if (!allPlayersData) return {};
+    const map = {};
+    reshapeNBAStats(allPlayersData, "CommonAllPlayers").forEach(r => {
+      if (r.DISPLAY_FIRST_LAST) map[r.DISPLAY_FIRST_LAST.toLowerCase()] = r.PERSON_ID;
+    });
+    return map;
+  }, [allPlayersData]);
 
-export function BetTracker() {
-  const { bets: savedBets, isLoading: betsLoading, saveBets, isSaving, saveError, isDeleting, deleteBet } = useBets();
-  const [bets,         setBets]         = useState([]);
-  const [form,         setForm]         = useState({
-    game: "", type: "Moneyline", pick: "", odds: "", stake: "", result: "pending",
-  });
-  const [formError,    setFormError]    = useState("");
-  const [editingId,    setEditingId]    = useState(null);
-  const [filterResult, setFilterResult] = useState("all");
-  const toast = useToast();
+  const propsData = propsResult?.games ?? null;
+  const lineMoves = propsResult?.moves ?? [];
+  const [selectedGame, setSelectedGame] = useState(null);
+  const [selectedMarket, setSelectedMarket] = useState("player_points");
+  const [expandedPlayer, setExpandedPlayer] = useState(null);
+  const [playerSearch, setPlayerSearch] = useState("");
 
+  const games = useMemo(() => {
+    if (!propsData) return [];
+    return Object.entries(propsData).map(([key, g]) => ({ key, ...g }));
+  }, [propsData]);
+
+  // Auto-select first game
   useEffect(() => {
-    if (savedBets.length > 0 || !betsLoading) setBets(savedBets);
-  }, [savedBets, betsLoading]);
+    if (games.length > 0 && !selectedGame) setSelectedGame(games[0].key);
+  }, [games, selectedGame]);
 
-  const handleDelete = async (id) => {
-    try {
-      await deleteBet(id);
-      toast.success("Bet deleted");
-    } catch {
-      toast.error("Couldn't delete bet");
-    }
-  };
+  const currentGame = games.find(g => g.key === selectedGame);
+  const players = useMemo(() => {
+    if (!currentGame) return [];
+    const q = playerSearch.trim().toLowerCase();
+    return Object.values(currentGame.players)
+      .filter(p => p.markets[selectedMarket])
+      .filter(p => !q || p.name.toLowerCase().includes(q))
+      .sort((a, b) => {
+        const la = a.markets[selectedMarket]?.line ?? 0;
+        const lb = b.markets[selectedMarket]?.line ?? 0;
+        return lb - la;
+      });
+  }, [currentGame, selectedMarket, playerSearch]);
 
-  const addBet = useCallback(async () => {
-    const { game, pick, odds, stake } = form;
-    if (!game.trim() || !pick.trim() || !odds || !stake) {
-      setFormError("Game, Pick, Odds, and Stake are required."); return;
-    }
-    const oddsNum = parseFloat(odds);
-    if (isNaN(oddsNum) || oddsNum === 0) {
-      setFormError("Odds must be a valid number (e.g. -110 or +150)."); return;
-    }
-    if (parseFloat(stake) <= 0) {
-      setFormError("Stake must be greater than $0."); return;
-    }
-    setFormError("");
-    const newBets = [{
-      ...form, id: Date.now(), odds: oddsNum, stake: parseFloat(stake),
-    }, ...bets];
-    setBets(newBets);
-    try {
-      await saveBets(newBets);
-      setForm({ game: "", type: "Moneyline", pick: "", odds: "", stake: "", result: "pending" });
-      toast.success("Bet logged!");
-    } catch {
-      setBets(bets);
-      toast.error("Failed to log bet — check connection.");
-    }
-  }, [form, toast, bets, saveBets]);
-
-  const [editingBet, setEditingBet] = useState(null);
-
-  const updateBet = useCallback(async () => {
-    const { game, pick, odds, stake } = form;
-    if (!game.trim() || !pick.trim() || !odds || !stake) {
-      setFormError("Game, Pick, Odds, and Stake are required."); return;
-    }
-    const oddsNum = parseFloat(odds);
-    if (isNaN(oddsNum) || oddsNum === 0) {
-      setFormError("Odds must be a valid number (e.g. -110 or +150)."); return;
-    }
-    if (parseFloat(stake) <= 0) {
-      setFormError("Stake must be greater than $0."); return;
-    }
-    setFormError("");
-
-    const updated = bets.map(b =>
-      b.id === editingBet.id
-        ? { ...form, id: b.id, odds: oddsNum, stake: parseFloat(stake) }
-        : b
+  if (isLoading) {
+    return (
+      <div className="space-y-2 py-2">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className="h-10 rounded-md bg-pitch-750 animate-pulse" />
+        ))}
+      </div>
     );
-    setBets(updated);
-    setEditingBet(null);
-    setForm({ game: "", type: "Moneyline", pick: "", odds: "", stake: "", result: "pending" });
-    try {
-      await saveBets(updated);
-      toast.success("Bet updated!");
-    } catch {
-      setBets(bets);
-      toast.error("Update failed — rolled back.");
-    }
-  }, [form, editingBet, bets, saveBets, toast]);
+  }
 
-  const cancelEdit = () => {
-    setEditingBet(null);
-    setForm({ game: "", type: "Moneyline", pick: "", odds: "", stake: "", result: "pending" });
-    setFormError("");
-  };
-
-  const deleteBet = async (id) => {
-    const newBets = bets.filter(b => b.id !== id);
-    setBets(newBets);
-    try {
-      await saveBets(newBets);
-    } catch {
-      toast.error("Failed to delete bet — check connection.");
-      setBets(bets);
-    }
-  };
-  const updateResult = async (id, r) => {
-    const newBets = bets.map(b => b.id === id ? { ...b, result: r } : b);
-    setBets(newBets);
-    try {
-      await saveBets(newBets);
-      setEditingId(null);
-      toast.success("Result updated.");
-    } catch {
-      toast.error("Failed to update result — check connection.");
-      setEditingId(null);
-      setBets(bets);
-    }
-  };
-  const clearAll = async () => {
-    if (window.confirm("Clear all bets? This cannot be undone.")) {
-      const oldBets = bets;
-      setBets([]);
-      try {
-        await saveBets([]); 
-        toast.info("Bet log cleared.");
-      } catch {
-        toast.error("Failed to clear bets — check connection.");
-        setBets(oldBets);
-      }
-    }
-  };
-
-  const stats = useMemo(() => {
-    const decisive  = bets.filter(b => b.result === "win" || b.result === "loss");
-    const wins      = bets.filter(b => b.result === "win").length;
-    const totalPL   = bets.reduce((s, b) => s + calcPL(b.stake, b.odds, b.result), 0);
-    const totalStake = decisive.reduce((s, b) => s + b.stake, 0);
-    const roi       = calcROI(totalPL, totalStake);
-    const winRate   = decisive.length > 0 ? ((wins / decisive.length) * 100).toFixed(1) + "%" : "—";
-    return {
-      totalPL, roi, winRate, pending: bets.filter(b => b.result === "pending").length,
-      wins, losses: decisive.length - wins,
-    };
-  }, [bets]);
-
-  const chartData = useMemo(() => {
-    let running = 0;
-    return [...bets].filter(b => b.result !== "pending").reverse().map((b, i) => {
-      running += calcPL(b.stake, b.odds, b.result);
-      return { bet: i + 1, pl: +running.toFixed(2), result: b.result };
-    });
-  }, [bets]);
-
-  const typeBreakdown = useMemo(() => {
-    const types = {};
-    bets.forEach(b => {
-      if (b.result === "pending") return;
-      if (!types[b.type]) types[b.type] = { wins: 0, losses: 0, pl: 0, count: 0 };
-      if (b.result === "win") types[b.type].wins++;
-      if (b.result === "loss") types[b.type].losses++;
-      types[b.type].pl += calcPL(b.stake, b.odds, b.result);
-      types[b.type].count++;
-    });
-    return Object.entries(types).map(([type, d]) => ({
-      type,
-      winRate: d.count > 0 ? +((d.wins / d.count) * 100).toFixed(0) : 0,
-      pl: +d.pl.toFixed(2),
-      count: d.count,
-    })).sort((a, b) => b.winRate - a.winRate);
-  }, [bets]);
-
-  const displayBets = filterResult === "all" ? bets : bets.filter(b => b.result === filterResult);
+  if (isError || (!isLoading && games.length === 0)) {
+    return (
+      <div className="py-6 text-center">
+        <Activity size={20} className="text-pitch-600 mx-auto mb-2" />
+        <div className="text-[11px] text-pitch-500">
+          {isError ? "Couldn't load prop lines." : "No prop lines available today."}
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
+    <div className="space-y-3">
+      {/* Game picker */}
+      <div className="flex items-center justify-between">
+        <div className="flex gap-1.5 flex-wrap">
+          {games.map(g => (
+          <button
+            key={g.key}
+            onClick={() => { setSelectedGame(g.key); setExpandedPlayer(null); setPlayerSearch(""); }}
+            className={`px-2.5 py-1 rounded text-[10px] font-mono font-medium transition-all
+              ${selectedGame === g.key
+                ? "bg-accent/15 text-accent border border-accent/30"
+                : "bg-pitch-750 text-pitch-400 border border-pitch-600 hover:border-pitch-500"}`}
+          >
+            {g.awayTeam}@{g.homeTeam}
+          </button>
+        ))}
+        </div>
+        <OddsCreditsWidget />
+      </div>
 
-      {/* Summary tiles */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-4">
-        {[
-          { lbl: "Total Bets", val: bets.length,                                         cls: "text-pitch-50"  },
-          { lbl: "Win Rate",   val: stats.winRate,                                       cls: "text-pitch-50"  },
-          { lbl: "Net P&L",    val: formatCurrency(stats.totalPL),                       cls: stats.totalPL >= 0 ? "text-win" : "text-loss" },
-          { lbl: "ROI",        val: `${stats.roi >= 0 ? "+" : ""}${stats.roi.toFixed(1)}%`, cls: stats.roi >= 0 ? "text-win" : "text-loss" },
-          { lbl: "Pending",    val: stats.pending,                                        cls: "text-draw"      },
-        ].map(m => (
-          <div key={m.lbl} className="pm-tile p-4 text-center">
-            <div className="pm-label mb-1.5">{m.lbl}</div>
-            <div className={`pm-number font-medium text-2xl ${m.cls}`}>{m.val}</div>
+      {/* Market picker */}
+      <div className="flex gap-1.5 flex-wrap">
+        {MARKET_KEYS.map(mk => (
+          <button
+            key={mk}
+            onClick={() => { setSelectedMarket(mk); setExpandedPlayer(null); setPlayerSearch(""); }}
+            className={`px-2.5 py-1 rounded text-[10px] font-medium transition-all
+              ${selectedMarket === mk
+                ? "bg-pitch-700 text-pitch-100 border border-pitch-500"
+                : "bg-pitch-800 text-pitch-500 border border-pitch-700 hover:text-pitch-300"}`}
+          >
+            {MARKET_LABELS[mk]}
+          </button>
+        ))}
+      </div>
+
+      {/* Line movement alerts */}
+      {lineMoves.length > 0 && (
+        <div className="space-y-1">
+          <div className="pm-label text-[9px]">Line movement</div>
+          {lineMoves
+            .filter(m => !selectedGame || m.gameKey === selectedGame)
+            .slice(0, 5)
+            .map((m, i) => (
+              <div key={i}
+                className="flex items-center justify-between px-2.5 py-1.5 rounded
+                  bg-draw/8 border border-draw/20 text-[10px]">
+                <span className="text-pitch-300 font-medium truncate">{m.playerName}</span>
+                <div className="flex items-center gap-2 flex-shrink-0 font-mono">
+                  <span className="text-pitch-500">{MARKET_LABELS[m.market]}</span>
+                  <span className="text-pitch-500 line-through">{m.prevLine}</span>
+                  <span className={m.direction === "up" ? "text-win" : "text-loss"}>
+                    {m.direction === "up" ? "▲" : "▼"} {m.newLine}
+                  </span>
+                </div>
+              </div>
+            ))}
+        </div>
+      )}
+
+      {/* Player search — only shown when enough players to warrant it */}
+      {currentGame && Object.keys(currentGame.players).length > 8 && (
+        <div className="relative">
+          <input
+            className="pm-input w-full pl-7 text-[11px]"
+            placeholder="Search players…"
+            value={playerSearch}
+            onChange={e => { setPlayerSearch(e.target.value); setExpandedPlayer(null); }}
+          />
+          <Target size={11} className="absolute left-2 top-1/2 -translate-y-1/2 text-pitch-600 pointer-events-none" />
+          {playerSearch && (
+            <button
+              onClick={() => setPlayerSearch("")}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-pitch-600 hover:text-pitch-400"
+            >
+              <X size={11} />
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Player rows */}
+      {players.length === 0 ? (
+        <div className="py-4 text-center text-[11px] text-pitch-600">
+          No lines for this market yet.
+        </div>
+      ) : (
+        <div className="space-y-1">
+          {players.map(player => {
+            const m = player.markets[selectedMarket];
+            const isExpanded = expandedPlayer === player.id;
+            const bestOverImpl  = m.bestOverOdds  != null ? oddsToImplied(m.bestOverOdds)  : null;
+            const bestUnderImpl = m.bestUnderOdds != null ? oddsToImplied(m.bestUnderOdds) : null;
+            const kellyO = bestOverImpl && bankroll
+              ? kellyBet(bestOverImpl, m.bestOverOdds, bankroll) : null;
+            const kellyU = bestUnderImpl && bankroll
+              ? kellyBet(bestUnderImpl, m.bestUnderOdds, bankroll) : null;
+
+            return (
+              <motion.div key={player.id} layout className="overflow-hidden">
+                {/* Main row */}
+                <div
+                  onClick={() => setExpandedPlayer(isExpanded ? null : player.id)}
+                  className={`flex items-center justify-between px-3 py-2 rounded-md cursor-pointer
+                    transition-colors text-[11px]
+                    ${isExpanded
+                      ? "bg-pitch-700 border border-pitch-600"
+                      : "bg-pitch-800 border border-pitch-700 hover:border-pitch-600"}`}
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="font-medium text-pitch-200 truncate">{player.name}</span>
+                    {player.team && (
+                      <span className="text-[9px] text-pitch-500 font-mono flex-shrink-0">{player.team}</span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-3 flex-shrink-0">
+                    <span className="font-mono text-pitch-300">{m.line}</span>
+                    <div className="flex gap-1.5">
+                      <span className={`font-mono text-[10px] px-1.5 py-0.5 rounded
+                        ${m.bestOverOdds != null && m.bestOverOdds > 0
+                          ? "bg-win/10 text-win border border-win/20"
+                          : "bg-pitch-750 text-pitch-400 border border-pitch-600"}`}>
+                        O {fmtOdds(m.bestOverOdds ?? m.overOdds)}
+                      </span>
+                      <span className={`font-mono text-[10px] px-1.5 py-0.5 rounded
+                        ${m.bestUnderOdds != null && m.bestUnderOdds > 0
+                          ? "bg-win/10 text-win border border-win/20"
+                          : "bg-pitch-750 text-pitch-400 border border-pitch-600"}`}>
+                        U {fmtOdds(m.bestUnderOdds ?? m.underOdds)}
+                      </span>
+                    </div>
+                    <ChevronDown
+                      size={10}
+                      className={`text-pitch-600 transition-transform ${isExpanded ? "rotate-180" : ""}`}
+                    />
+                  </div>
+                </div>
+
+                {/* Expanded: book breakdown + bet buttons */}
+                <AnimatePresence>
+                  {isExpanded && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: "auto" }}
+                      exit={{ opacity: 0, height: 0 }}
+                      transition={{ duration: 0.18 }}
+                      className="overflow-hidden"
+                    >
+                      <div className="px-3 py-2.5 bg-pitch-750 rounded-b-md border border-t-0 border-pitch-600 space-y-2.5">
+                        {/* Kelly sizing hints */}
+                        {(kellyO || kellyU) && (
+                          <div className="flex gap-3 text-[9px] text-pitch-500">
+                            {kellyO != null && kellyO > 0 && (
+                              <span>Kelly Over: <span className="text-pitch-300 font-mono">{formatCurrency(kellyO)}</span></span>
+                            )}
+                            {kellyU != null && kellyU > 0 && (
+                              <span>Kelly Under: <span className="text-pitch-300 font-mono">{formatCurrency(kellyU)}</span></span>
+                            )}
+                          </div>
+                        )}
+                        <PropHistoryPanel
+                          playerId={nameToId[player.name?.toLowerCase()] ?? null}
+                          playerName={player.name}
+                          market={selectedMarket}
+                          line={m.line}
+                        />
+
+                        {/* Per-book lines */}
+                        {m.books && m.books.length > 0 && (
+                          <div className="space-y-1">
+                            <div className="pm-label text-[9px] mb-1">Line shopping</div>
+                            {m.books.map(bk => {
+                              const isBestOver  = bk.book === m.bestOverBook;
+                              const isBestUnder = bk.book === m.bestUnderBook;
+                              return (
+                                <div key={bk.book}
+                                  className="flex items-center justify-between text-[10px] font-mono">
+                                  <span className="text-pitch-500">{BOOK_LABELS[bk.book] || bk.book}</span>
+                                  <div className="flex gap-3">
+                                    <span className={isBestOver ? "text-win" : "text-pitch-400"}>
+                                      O {fmtOdds(bk.overOdds)}
+                                      {isBestOver && <span className="text-[8px] text-win/60 ml-0.5">★</span>}
+                                    </span>
+                                    <span className={isBestUnder ? "text-win" : "text-pitch-400"}>
+                                      U {fmtOdds(bk.underOdds)}
+                                      {isBestUnder && <span className="text-[8px] text-win/60 ml-0.5">★</span>}
+                                    </span>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+
+                        {/* Bet these buttons */}
+                        <div className="flex gap-2 pt-1">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onAddPropBet({
+                                player: player.name,
+                                playerTeam: player.team,
+                                market: selectedMarket,
+                                side: "over",
+                                line: m.line,
+                                odds: m.bestOverOdds ?? m.overOdds,
+                                book: m.bestOverBook,
+                                matchup: currentGame ? `${currentGame.awayTeam}@${currentGame.homeTeam}` : "",
+                              });
+                            }}
+                            className="flex-1 py-1.5 rounded text-[10px] font-medium
+                              bg-accent/10 text-accent border border-accent/25
+                              hover:bg-accent/20 transition-colors"
+                          >
+                            + Bet Over
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onAddPropBet({
+                                player: player.name,
+                                playerTeam: player.team,
+                                market: selectedMarket,
+                                side: "under",
+                                line: m.line,
+                                odds: m.bestUnderOdds ?? m.underOdds,
+                                book: m.bestUnderBook,
+                                matchup: currentGame ? `${currentGame.awayTeam}@${currentGame.homeTeam}` : "",
+                              });
+                            }}
+                            className="flex-1 py-1.5 rounded text-[10px] font-medium
+                              bg-pitch-700 text-pitch-300 border border-pitch-600
+                              hover:bg-pitch-650 transition-colors"
+                          >
+                            + Bet Under
+                          </button>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </motion.div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function UnitSettings({ bankroll }) {
+  const [open, setOpen] = useState(false);
+  const [unitPct, setUnitPct] = useState(() => Number(lsGet("pm_unit_pct")) || 0.01);
+
+  const unitSize = +(bankroll * unitPct).toFixed(2);
+
+  const handleChange = (val) => {
+    const pct = Math.max(0.001, Math.min(0.25, val)); // 0.1% – 25%
+    setUnitPct(pct);
+    lsSet("pm_unit_pct", pct);
+    window.dispatchEvent(new CustomEvent("plusminus:storage", { detail: { key: "pm_unit_pct" } }));
+  };
+
+  return (
+    <div className="pm-card p-3">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="flex items-center justify-between w-full text-[11px] text-pitch-400 hover:text-pitch-300"
+      >
+        <span className="flex items-center gap-1.5">
+          <Settings size={11} />
+          Unit size: <span className="font-mono text-pitch-200 ml-1">{formatCurrency(unitSize)}</span>
+          <span className="text-pitch-600">({(unitPct * 100).toFixed(1)}% of bankroll)</span>
+        </span>
+        <ChevronDown size={10} className={`transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            className="overflow-hidden"
+          >
+            <div className="pt-3 space-y-2">
+              <div className="text-[10px] text-pitch-500">
+                1 unit = {(unitPct * 100).toFixed(1)}% of your bankroll ({formatCurrency(unitSize)}).
+                Stakes and P/L will display in units throughout the tracker.
+              </div>
+              <div className="flex items-center gap-3">
+                <input
+                  type="range" min={0.001} max={0.05} step={0.001}
+                  value={unitPct}
+                  onChange={e => handleChange(Number(e.target.value))}
+                  className="flex-1 accent-accent"
+                />
+                <span className="font-mono text-[11px] text-pitch-200 w-12 text-right">
+                  {(unitPct * 100).toFixed(1)}%
+                </span>
+              </div>
+              <div className="flex gap-2">
+                {[0.01, 0.02, 0.05].map(p => (
+                  <button key={p}
+                    onClick={() => handleChange(p)}
+                    className={`px-2 py-0.5 rounded text-[10px] border transition-all
+                      ${Math.abs(unitPct - p) < 0.0001
+                        ? "bg-accent/15 text-accent border-accent/30"
+                        : "bg-pitch-750 text-pitch-500 border-pitch-700 hover:text-pitch-300"}`}
+                  >
+                    {(p * 100).toFixed(0)}u
+                  </button>
+                ))}
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+function ParlayLegBuilder({ legs, onChange }) {
+  const addLeg = () => {
+    if (legs.length >= 15) return;
+    onChange([...legs, { desc: "", odds: "", result: "pending", team: "", matchup: "" }]);
+  };
+  const removeLeg = (i) => onChange(legs.filter((_, idx) => idx !== i));
+  const updateLeg = (i, field, val) => {
+    const next = [...legs];
+    next[i] = { ...next[i], [field]: val };
+    onChange(next);
+  };
+
+  const combinedDecimal = legs.reduce((prod, l) => {
+    const n = parseFloat(l.odds);
+    if (!n || !isFinite(n)) return prod;
+    const dec = n > 0 ? 1 + n / 100 : 1 - 100 / n;
+    return prod * dec;
+  }, 1);
+  const combinedAmerican = combinedDecimal >= 2
+    ? Math.round((combinedDecimal - 1) * 100)
+    : combinedDecimal > 1
+      ? Math.round(-100 / (combinedDecimal - 1))
+      : null;
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <div className="pm-label">Legs ({legs.length}/15)</div>
+        {combinedAmerican !== null && (
+          <div className="text-[10px] font-mono text-pitch-300">
+            Combined: <span className={combinedAmerican > 0 ? "text-win" : "text-pitch-200"}>
+              {combinedAmerican > 0 ? "+" : ""}{combinedAmerican}
+            </span>
+          </div>
+        )}
+      </div>
+
+      {legs.map((leg, i) => (
+        <div key={i} className="bg-pitch-750 rounded-md p-2.5 space-y-1.5">
+          <div className="flex items-center gap-1.5">
+            <span className="text-[9px] text-pitch-600 font-mono w-4 flex-shrink-0">#{i + 1}</span>
+            <input
+              className="pm-input flex-1 text-[11px]"
+              placeholder="Leg description (e.g. BOS ML, Tatum over 27.5)"
+              value={leg.desc}
+              onChange={e => updateLeg(i, "desc", e.target.value)}
+            />
+            <button onClick={() => removeLeg(i)}
+              className="p-1 text-pitch-600 hover:text-loss transition-colors flex-shrink-0">
+              <X size={11} />
+            </button>
+          </div>
+          <div className="flex gap-2 pl-5">
+            <div className="flex-1">
+              <input
+                className="pm-input w-full text-[11px]"
+                type="number"
+                placeholder="Odds (-110)"
+                value={leg.odds}
+                onChange={e => updateLeg(i, "odds", e.target.value)}
+              />
+            </div>
+            <select
+              className="pm-input text-[11px]"
+              value={leg.result ?? "pending"}
+              onChange={e => updateLeg(i, "result", e.target.value)}
+            >
+              <option value="pending">Pending</option>
+              <option value="win">Win</option>
+              <option value="loss">Loss (bust)</option>
+              <option value="push">Push</option>
+            </select>
+          </div>
+        </div>
+      ))}
+
+      <button onClick={addLeg} disabled={legs.length >= 15}
+        className="flex items-center gap-1.5 text-[10px] text-pitch-500 hover:text-pitch-300
+          transition-colors disabled:opacity-40 py-1">
+        <Plus size={10} /> Add leg
+      </button>
+    </div>
+  );
+}
+
+function PropHistoryPanel({ playerId, playerName, market, line }) {
+  const { data, isLoading } = usePlayerPropHistory(playerId, market, line, 10);
+
+  if (!playerId) return null;
+
+  if (isLoading) {
+    return (
+      <div className="space-y-1 pt-1">
+        <div className="pm-label text-[9px]">Last 10 games vs line</div>
+        <div className="flex gap-1">
+          {Array.from({ length: 10 }).map((_, i) => (
+            <div key={i} className="w-5 h-5 rounded bg-pitch-750 animate-pulse" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (!data) return null;
+
+  return (
+    <div className="space-y-1.5 pt-1 border-t border-pitch-700 mt-1.5">
+      <div className="flex items-center justify-between">
+        <div className="pm-label text-[9px]">Last {data.total} games vs {line}</div>
+        <div className="flex gap-3 text-[9px] font-mono">
+          <span className="text-pitch-400">
+            Avg: <span className="text-pitch-200">{data.avg}</span>
+          </span>
+          <span className="text-pitch-400">
+            L5: <span className="text-pitch-200">{data.last5Avg}</span>
+          </span>
+          <span className={`font-medium ${
+            data.hitRate >= 0.6 ? "text-win" :
+            data.hitRate <= 0.4 ? "text-loss" : "text-pitch-300"
+          }`}>
+            {data.hits}/{data.total} over
+          </span>
+        </div>
+      </div>
+
+      <div className="flex gap-1 items-end">
+        {data.games.map((g, i) => (
+          <div key={i} className="flex flex-col items-center gap-0.5 flex-1">
+            <div className="text-[8px] font-mono text-pitch-600 leading-none">
+              {g.value}
+            </div>
+            <div
+              title={`${g.date} ${g.matchup}: ${g.value}`}
+              className={`w-full rounded-sm transition-colors ${
+                g.hit === true  ? "bg-win h-3" :
+                g.hit === false ? "bg-loss h-3" :
+                "bg-pitch-600 h-2"
+              }`}
+            />
           </div>
         ))}
       </div>
 
-      {/* Add bet form */}
-      <div className="pm-card p-4 mb-4">
-        <div className="pm-label mb-3">Log a bet</div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 mb-3">
-          <input className="pm-input col-span-2 sm:col-span-1"
-            placeholder="Game (OKC @ BKN)"
-            value={form.game}
-            onChange={e => setForm(f => ({ ...f, game: e.target.value }))}
-            onKeyDown={e => e.key === "Enter" && addBet()} />
-          <select className="pm-select" value={form.type}
-            onChange={e => setForm(f => ({ ...f, type: e.target.value }))}>
-            {["Moneyline","Spread","Over/Under","Player prop","Parlay","Futures"].map(t => (
-              <option key={t}>{t}</option>
-            ))}
-          </select>
-          <input className="pm-input" placeholder="Pick (OKC -16)"
-            value={form.pick}
-            onChange={e => setForm(f => ({ ...f, pick: e.target.value }))}
-            onKeyDown={e => e.key === "Enter" && addBet()} />
-          <input className="pm-input" placeholder="Odds (-110)" type="number"
-            value={form.odds}
-            onChange={e => setForm(f => ({ ...f, odds: e.target.value }))} />
-          <input className="pm-input" placeholder="Stake ($)" type="number" min="0"
-            value={form.stake}
-            onChange={e => setForm(f => ({ ...f, stake: e.target.value }))}
-            onKeyDown={e => e.key === "Enter" && addBet()} />
-          <select className="pm-select" value={form.result}
-            onChange={e => setForm(f => ({ ...f, result: e.target.value }))}>
-            {RESULT_OPTIONS.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
-          </select>
-        </div>
+      <div className="flex gap-3 text-[9px] text-pitch-600">
+        <span className="flex items-center gap-1">
+          <span className="w-2 h-2 rounded-sm bg-win inline-block" /> Over
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="w-2 h-2 rounded-sm bg-loss inline-block" /> Under
+        </span>
+      </div>
+    </div>
+  );
+}
 
-        {/* Inline calculator */}
-        {form.odds && !isNaN(parseFloat(form.odds)) && (
-          <div className="mb-3 text-[11px] text-pitch-500 flex flex-wrap items-center gap-x-3 gap-y-1">
-            <span className="flex items-center gap-1">
-              <TrendingUp size={10} />
-              Break-even:{" "}
-              <span className="text-pitch-300 font-mono">
-                {(breakEven(parseFloat(form.odds)) * 100).toFixed(1)}%
-              </span>
-            </span>
-            {form.stake && !isNaN(parseFloat(form.stake)) && (
-              <span>
-                Win payout:{" "}
-                <span className="text-win font-mono">
-                  {formatCurrency(calcPL(parseFloat(form.stake), parseFloat(form.odds), "win"))}
-                </span>
+function OddsCreditsWidget() {
+  const { data: config } = useServerConfig();
+  const credits = config?.oddsCredits;
+  if (!credits) return null;
+
+  const pct = credits.used != null
+    ? Math.round(credits.remaining / (credits.remaining + credits.used) * 100)
+    : null;
+
+  const color = credits.remaining > 200 ? "text-win"
+    : credits.remaining > 50  ? "text-draw"
+    : "text-loss";
+
+  return (
+    <div className={`flex items-center gap-1.5 text-[10px] font-mono ${color}`}
+      title={`${credits.remaining} API credits remaining${credits.used != null ? ` · ${credits.used} used` : ""}`}>
+      <div className="w-1.5 h-1.5 rounded-full bg-current opacity-80" />
+      {credits.remaining.toLocaleString()} credits
+      {pct !== null && <span className="text-pitch-600">({pct}%)</span>}
+    </div>
+  );
+}
+
+// ── BetTracker (unified game + prop bets) ────────────────────────
+export function BetTracker() {
+  const toast    = useToast();
+  const { bets, isLoading, isSaving, isDeleting, saveBets, deleteBet: serverDeleteBet } = useBets();
+
+  // ── tracker sub-tab: "log" | "props"
+  const [trackerTab, setTrackerTab] = useState("log");
+
+  // ── add-bet form
+  const EMPTY_FORM = {
+    type: "game",
+    legs: [],
+    // game fields
+    matchup: "", team: "",
+    // prop fields
+    player: "", playerTeam: "", market: "player_points", side: "over", line: "",
+    // shared
+    stake: "", odds: "", result: "pending", book: "", note: "",
+  };
+  const [form, setForm] = useState(EMPTY_FORM);
+  const [showForm, setShowForm] = useState(false);
+  const [filterResult, setFilterResult] = useState("all");
+  const [filterType, setFilterType]     = useState("all");
+
+  // ── bankroll from localStorage (mirrors Betting view)
+  const [bankroll, setBankrollState] = useState(() => {
+    const stored = Number(lsGet("bankroll"));
+    return Number.isFinite(stored) && stored > 0 ? stored : DEFAULT_BANKROLL;
+  });
+
+  useEffect(() => {
+    const handleStorage = (e) => {
+      if (e.detail?.key?.includes("bankroll")) {
+        const stored = Number(lsGet("bankroll"));
+        if (Number.isFinite(stored) && stored > 0) setBankrollState(stored);
+      }
+    };
+    window.addEventListener("plusminus:storage", handleStorage);
+    return () => window.removeEventListener("plusminus:storage", handleStorage);
+  }, []);
+
+  // ── Pre-fill form from prop browser "Bet this" button
+  const handleAddPropBet = useCallback((prefill) => {
+    setForm(f => ({
+      ...EMPTY_FORM,
+      type:       "prop",
+      player:     prefill.player     ?? "",
+      playerTeam: prefill.playerTeam ?? "",
+      market:     prefill.market     ?? "player_points",
+      side:       prefill.side       ?? "over",
+      line:       String(prefill.line ?? ""),
+      odds:       prefill.odds != null ? String(prefill.odds) : "",
+      book:       prefill.book ?? "",
+      matchup:    prefill.matchup ?? "",
+      result:     "pending",
+    }));
+    setShowForm(true);
+    setTrackerTab("log");
+    // Scroll the form into view after render
+    setTimeout(() => {
+      document.getElementById("bet-form-anchor")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 80);
+  }, []);
+
+  // ── Stats derived from bets
+  const stats = useMemo(() => {
+    if (!bets?.length) return null;
+    const settled = bets.filter(b => b.result !== "pending");
+    const wins    = settled.filter(b => b.result === "win");
+    const losses  = settled.filter(b => b.result === "loss");
+    const pushes  = settled.filter(b => b.result === "push");
+
+    const totalStaked = settled.reduce((s, b) => s + (b.stake || 0), 0);
+    const totalPL     = settled.reduce((s, b) => s + calcPL(b.odds, b.stake, b.result), 0);
+
+    const gameBets = bets.filter(b => b.type !== "prop");
+    const propBets = bets.filter(b => b.type === "prop");
+    const propSettled = propBets.filter(b => b.result !== "pending");
+
+    return {
+      total:      bets.length,
+      pending:    bets.filter(b => b.result === "pending").length,
+      wins:       wins.length,
+      losses:     losses.length,
+      pushes:     pushes.length,
+      totalPL,
+      totalStaked,
+      roi:        totalStaked > 0 ? calcROI(totalPL, totalStaked) : 0,
+      winRate:    settled.length > 0 ? wins.length / settled.length : 0,
+      gameBets:   gameBets.length,
+      propBets:   propBets.length,
+      propWins:   propSettled.filter(b => b.result === "win").length,
+      propTotal:  propSettled.length,
+      propByMarket: (() => {
+        const map = {};
+        (bets || [])
+          .filter(b => b.type === "prop" && b.result !== "pending")
+          .forEach(b => {
+            if (!map[b.market]) map[b.market] = { wins: 0, total: 0, pl: 0 };
+            map[b.market].total++;
+            if (b.result === "win") map[b.market].wins++;
+            map[b.market].pl += calcPL(b.odds, b.stake, b.result);
+          });
+        return map;
+      })(),
+    };
+  }, [bets]);
+
+  // ── Filtered list
+  const filteredBets = useMemo(() => {
+    if (!bets) return [];
+    return [...bets]
+      .filter(b => filterResult === "all" || b.result === filterResult)
+      .filter(b => filterType   === "all" || (filterType === "prop" ? b.type === "prop" : b.type !== "prop"))
+      .sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+  }, [bets, filterResult, filterType]);
+
+  // ── Bankroll curve for chart
+  const bankrollCurve = useMemo(() => {
+    if (!bets?.length) return [];
+    const sorted = [...bets]
+      .filter(b => b.result !== "pending" && b.date)
+      .sort((a, b) => a.date.localeCompare(b.date));
+    let running = bankroll;
+    return sorted.map((b, i) => {
+      running += calcPL(b.odds, b.stake, b.result);
+      return { i: i + 1, value: +running.toFixed(2), pl: +calcPL(b.odds, b.stake, b.result).toFixed(2) };
+    });
+  }, [bets, bankroll]);
+
+  // ── Form submit
+  const handleSubmit = () => {
+    if (form.type === "parlay") {
+      if (form.legs.length < 2) { toast.error("Parlays need at least 2 legs."); return; }
+      if (form.legs.some(l => !l.desc.trim())) { toast.error("All legs need a description."); return; }
+      if (form.legs.some(l => isNaN(parseFloat(l.odds)))) { toast.error("All legs need valid odds."); return; }
+    }
+
+    const stake = parseFloat(form.stake);
+    const odds  = parseFloat(form.odds);
+    if (!form.odds || isNaN(odds)) { toast.error("Enter valid odds."); return; }
+    if (isNaN(stake) || stake < 0) { toast.error("Enter a valid stake."); return; }
+    if (form.type === "prop") {
+      if (!form.player.trim()) { toast.error("Enter player name."); return; }
+      const line = parseFloat(form.line);
+      if (isNaN(line)) { toast.error("Enter a valid line."); return; }
+    }
+
+    const newBet = {
+      id:     crypto.randomUUID?.() ?? `${Date.now()}-${Math.random()}`,
+      type:   form.type,
+      stake, odds,
+      result: form.result,
+      date:   new Date().toISOString().slice(0, 10),
+      ...(form.matchup.trim() && { matchup: form.matchup.trim() }),
+      ...(form.note.trim()    && { note:    form.note.trim() }),
+      ...(form.book.trim()    && { book:    form.book.trim() }),
+      ...(form.team.trim()    && form.type !== "prop" && { team: form.team.trim().slice(0, 10) }),
+      ...(form.type === "prop" && {
+        player:     form.player.trim(),
+        playerTeam: form.playerTeam.trim(),
+        market:     form.market,
+        side:       form.side,
+        line:       parseFloat(form.line),
+      }),
+      ...(form.type === "parlay" && {
+        legs: form.legs.map(l => ({
+          desc:   l.desc.trim(),
+          odds:   parseFloat(l.odds),
+          result: l.result ?? "pending",
+        })),
+      }),
+    };
+
+    saveBets([...(bets || []), newBet], {
+      onSuccess: () => {
+        toast.success(form.type === "prop"
+          ? `${form.player} ${form.side} ${form.line} logged.`
+          : "Bet logged.");
+        setForm(EMPTY_FORM);
+        setShowForm(false);
+      },
+      onError: () => toast.error("Couldn't save bet. Try again."),
+    });
+  };
+
+  const handleDelete = (id) => {
+    serverDeleteBet(id, {
+      onSuccess: () => toast.success("Bet removed."),
+      onError:   () => toast.error("Couldn't delete bet."),
+    });
+  };
+
+  const handleUpdate = (id, result) => {
+    const updated = (bets || []).map(b => b.id === id ? { ...b, result } : b);
+    saveBets(updated, {
+      onSuccess: () => toast.success("Result updated."),
+      onError:   () => toast.error("Couldn't update result."),
+    });
+  };
+
+  // ── CSV export
+  const handleExport = () => {
+    if (!bets?.length) return;
+    const headers = ["date","type","matchup","player","market","side","line","team","odds","stake","result","book","note","pl"];
+    const rows = bets.map(b => {
+      const pl = calcPL(b.odds, b.stake, b.result);
+      return [
+        b.date ?? "",
+        b.type ?? "game",
+        b.matchup ?? "",
+        b.player ?? "",
+        b.market ?? "",
+        b.side ?? "",
+        b.line ?? "",
+        b.team ?? "",
+        b.odds,
+        b.stake,
+        b.result,
+        b.book ?? "",
+        `"${(b.note ?? "").replace(/"/g, '""')}"`,
+        pl.toFixed(2),
+      ].join(",");
+    });
+    const csv  = [headers.join(","), ...rows].join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url  = URL.createObjectURL(blob);
+    const a    = Object.assign(document.createElement("a"), { href: url, download: "plusminus-bets.csv" });
+    document.body.appendChild(a); a.click();
+    document.body.removeChild(a); URL.revokeObjectURL(url);
+  };
+
+  // ─────────────────────────────────────────────────────────────
+  //  RENDER
+  // ─────────────────────────────────────────────────────────────
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0 }}
+      className="space-y-4"
+    >
+      {/* ── Top tabs: Bet Log | Props Browser */}
+      <div className="flex gap-1.5 border-b border-pitch-700 pb-3">
+        {[
+          { id: "log",   label: "Bet Log",      Icon: Layers },
+          { id: "props", label: "Prop Markets",  Icon: Activity },
+        ].map(({ id, label, Icon }) => (
+          <button
+            key={id}
+            onClick={() => setTrackerTab(id)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-medium transition-all
+              ${trackerTab === id
+                ? "bg-accent/15 text-accent border border-accent/30"
+                : "bg-pitch-800 text-pitch-400 border border-pitch-700 hover:text-pitch-300 hover:border-pitch-600"}`}
+          >
+            <Icon size={11} />
+            {label}
+            {id === "log" && stats && stats.propBets > 0 && (
+              <span className="text-[9px] px-1 py-0.5 rounded-full bg-accent/10 text-accent/70">
+                {stats.propBets} props
               </span>
             )}
-          </div>
+          </button>
+        ))}
+      </div>
+
+      {/* ═══ PROPS BROWSER TAB ═══════════════════════════════════ */}
+      <AnimatePresence mode="wait">
+        {trackerTab === "props" && (
+          <motion.div
+            key="props"
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={{ duration: 0.18 }}
+          >
+            <PropsBrowser onAddPropBet={handleAddPropBet} bankroll={bankroll} />
+          </motion.div>
         )}
 
-        <div className="flex items-center gap-3">
-          <button onClick={editingBet ? updateBet : addBet} disabled={isSaving} className="pm-btn disabled:opacity-50 disabled:cursor-not-allowed">
-            {isSaving
-              ? <><Loader size={13} strokeWidth={1.8} className="animate-spin" /> Saving...</>
-              : editingBet
-                ? "Update bet"
-                : <><Plus size={13} strokeWidth={1.8} /> Add bet</>
-            }
-          </button>
-          {editingBet && !isSaving && (
-            <button onClick={cancelEdit} className="pm-btn-ghost">Cancel</button>
-          )}
-          {formError && (
-            <motion.span initial={{ opacity: 0, x: -4 }} animate={{ opacity: 1, x: 0 }}
-              className="text-[11px] text-loss">
-              {formError}
-            </motion.span>
-          )}
-          {saveError && (
-            <motion.span initial={{ opacity: 0, x: -4 }} animate={{ opacity: 1, x: 0 }}
-              className="text-[11px] text-loss">
-              Save failed: {saveError}
-            </motion.span>
-          )}
-        </div>
-      </div>
+        {/* ═══ BET LOG TAB ═══════════════════════════════════════ */}
+        {trackerTab === "log" && (
+          <motion.div
+            key="log"
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={{ duration: 0.18 }}
+            className="space-y-4"
+          >
+            {/* ── Summary stats ─────────────────────────────── */}
+            {stats && (() => {
+              const unitPct = Number(lsGet("pm_unit_pct")) || 0.01;
+              return (
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                  {[
+                    { label: "Record",   value: `${stats.wins}–${stats.losses}${stats.pushes ? `–${stats.pushes}` : ""}`, sub: `${stats.total} total` },
+                    { label: "Win Rate", value: formatPct(stats.winRate),                  sub: `${stats.wins}W of ${stats.wins + stats.losses}` },
+                    { label: "P/L",      value: formatCurrency(stats.totalPL),             sub: `${stats.roi >= 0 ? "+" : ""}${stats.roi.toFixed(1)}% ROI`, color: stats.totalPL >= 0 ? "text-win" : "text-loss" },
+                    { label: "Props",    value: `${stats.propWins}/${stats.propTotal}`,    sub: `${stats.propBets} tracked` },
+                    { label: "Units P/L", value: `${plInUnits(stats.totalPL, getUnitSize(bankroll)) ?? "—"}u`, sub: `@ ${(unitPct*100).toFixed(1)}% unit`, color: stats.totalPL >= 0 ? "text-win" : "text-loss" },
+                  ].map(s => (
+                    <div key={s.label} className="pm-tile p-3">
+                      <div className="pm-label mb-1">{s.label}</div>
+                      <div className={`pm-number text-lg ${s.color || "text-pitch-100"}`}>{s.value}</div>
+                      <div className="text-[10px] text-pitch-600 mt-0.5">{s.sub}</div>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
 
-      {/* Bet log table */}
-      <div className="pm-card overflow-x-auto mb-4">
-        <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 border-b border-pitch-700">
-          <div className="flex items-center gap-2">
-            <span className="pm-label">Bet log</span>
-            <span className="text-[10px] text-pitch-600">· {bets.length} entries</span>
-          </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <div className="flex gap-1">
-              {["all","win","loss","pending"].map(f => (
-                <button key={f} onClick={() => setFilterResult(f)}
-                  className={`text-[10px] px-2 py-1 rounded border transition-all
-                    ${filterResult === f
-                      ? f === "win"     ? "bg-win/10 text-win border-win/20"
-                      : f === "loss"    ? "bg-loss/10 text-loss border-loss/20"
-                      : f === "pending" ? "bg-draw/10 text-draw border-draw/20"
-                      : "bg-accent/10 text-accent border-accent/20"
-                      : "bg-pitch-750 text-pitch-500 border-pitch-700 hover:border-pitch-600"}`}>
-                  {f.charAt(0).toUpperCase() + f.slice(1)}
-                </button>
-              ))}
-            </div>
-            {bets.length > 0 && (
-              <button onClick={() => exportBetsCSV(bets)}
-                className="flex items-center gap-1 text-[10px] text-pitch-400
-                           hover:text-accent transition-colors">
-                <Download size={11} strokeWidth={1.8} /> Export CSV
-              </button>
+            {/* ── Bankroll curve ─────────────────────────────── */}
+            <UnitSettings bankroll={bankroll} />
+            {bankrollCurve.length > 2 && (
+              <div className="pm-card p-3">
+                <div className="pm-label mb-2">Bankroll curve</div>
+                <ResponsiveContainer width="100%" height={90}>
+                  <AreaChart data={bankrollCurve} margin={{ top: 2, right: 4, bottom: 0, left: 4 }}>
+                    <defs>
+                      <linearGradient id="btGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%"  stopColor="#00d4aa" stopOpacity={0.18} />
+                        <stop offset="95%" stopColor="#00d4aa" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <XAxis dataKey="i" hide />
+                    <YAxis hide domain={["auto", "auto"]} />
+                    <Tooltip
+                      {...tooltipStyle}
+                      formatter={(v) => [formatCurrency(v), "Bankroll"]}
+                    />
+                    <ReferenceLine y={bankroll} stroke="#2e3a50" strokeDasharray="3 3" />
+                    <Area
+                      type="monotone" dataKey="value"
+                      stroke="#00d4aa" strokeWidth={1.5}
+                      fill="url(#btGrad)"
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
             )}
-            {bets.length > 0 && (
-              <button onClick={clearAll}
-                className="flex items-center gap-1 text-[10px] text-pitch-500
-                           hover:text-loss transition-colors">
-                <Trash2 size={11} strokeWidth={1.8} /> Clear all
-              </button>
-            )}
-          </div>
-        </div>
 
-        <table className="w-full text-sm min-w-[640px]">
-          <thead>
-            <tr className="border-b border-pitch-700">
-              {["Game","Type","Pick","Odds","Stake","Break-even","P&L","Result",""].map(h => (
-                <th key={h} className="px-3 py-2.5 text-left pm-label">{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {displayBets.length === 0 && (
-              <tr>
-                <td colSpan={9} className="px-3 py-10 text-center text-pitch-500 text-sm">
-                  {filterResult === "all" ? "No bets logged." : `No ${filterResult} bets.`}
-                </td>
-              </tr>
-            )}
-            <AnimatePresence>
-              {displayBets.map(b => {
-                const pl        = calcPL(b.stake, b.odds, b.result);
-                const be        = (breakEven(b.odds) * 100).toFixed(1);
-                const isEditing = editingId === b.id;
-
-                return (
-                  <motion.tr key={b.id} layout
-                    initial={{ opacity: 0, y: -4 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, x: -20 }}
-                    className="border-b border-pitch-700 hover:bg-pitch-780 transition-colors group"
-                  >
-                    <td className="px-3 py-2.5 font-medium text-pitch-100 max-w-[140px] truncate">{b.game}</td>
-                    <td className="px-3 py-2.5 text-pitch-400 text-[11px]">{b.type}</td>
-                    <td className="px-3 py-2.5 text-pitch-300 max-w-[120px] truncate">{b.pick}</td>
-                    <td className="px-3 py-2.5 font-mono text-pitch-300 text-[12px]">
-                      {b.odds > 0 ? "+" : ""}{b.odds}
-                    </td>
-                    <td className="px-3 py-2.5 font-mono text-pitch-300">${b.stake}</td>
-                    <td className="px-3 py-2.5 font-mono text-[11px] text-pitch-500">{be}%</td>
-                    <td className={`px-3 py-2.5 font-mono font-medium
-                      ${b.result === "pending" ? "text-pitch-500"
-                        : pl > 0 ? "text-win" : pl < 0 ? "text-loss" : "text-pitch-400"}`}>
-                      {b.result === "pending" ? "—" : formatCurrency(pl)}
-                    </td>
-                    <td className="px-3 py-2.5">
-                      {isEditing ? (
-                        <div className="flex flex-wrap gap-1 items-center">
-                          {RESULT_OPTIONS.map(opt => (
-                            <button key={opt.value} onClick={() => updateResult(b.id, opt.value)}
-                              className={`pm-badge border cursor-pointer transition-all hover:scale-105
-                                ${b.result === opt.value ? "ring-1 ring-accent/40" : ""} ${opt.cls}`}>
-                              {opt.label}
-                            </button>
-                          ))}
-                          <button onClick={() => setEditingId(null)}
-                            className="text-pitch-600 hover:text-pitch-300 transition-colors ml-0.5">
-                            <X size={12} strokeWidth={1.8} />
-                          </button>
+            {/* ── Prop performance by market ─────────────────────── */}
+            {stats && stats.propBets > 0 && (() => {
+              const byMarket = {};
+              (bets || [])
+                .filter(b => b.type === "prop" && b.result !== "pending")
+                .forEach(b => {
+                  if (!byMarket[b.market]) byMarket[b.market] = { wins: 0, total: 0, pl: 0 };
+                  byMarket[b.market].total++;
+                  if (b.result === "win") byMarket[b.market].wins++;
+                  byMarket[b.market].pl += calcPL(b.odds, b.stake, b.result);
+                });
+              const rows = Object.entries(byMarket)
+                .map(([market, s]) => ({ market, ...s, winRate: s.total > 0 ? s.wins / s.total : 0 }))
+                .sort((a, b) => b.winRate - a.winRate);
+              if (!rows.length) return null;
+              return (
+                <div className="pm-card p-3">
+                  <div className="pm-label mb-2">Prop performance by market</div>
+                  <div className="space-y-1.5">
+                    {rows.map(r => (
+                      <div key={r.market} className="flex items-center gap-3">
+                        <span className="text-[10px] text-pitch-400 w-24 flex-shrink-0">
+                          {MARKET_LABELS[r.market] ?? r.market}
+                        </span>
+                        {/* Win rate bar */}
+                        <div className="flex-1 h-1.5 rounded-full bg-pitch-700 overflow-hidden">
+                          <motion.div
+                            className="h-full rounded-full bg-accent"
+                            initial={{ width: 0 }}
+                            animate={{ width: `${r.winRate * 100}%` }}
+                            transition={{ duration: 0.6 }}
+                          />
                         </div>
-                      ) : (
-                        <button onClick={() => setEditingId(b.id)} title="Click to update"
-                          className={`pm-badge border cursor-pointer hover:brightness-125 transition-all
-                            ${b.result === "win"     ? "bg-win/10  text-win  border-win/20"
-                            : b.result === "loss"    ? "bg-loss/10 text-loss border-loss/20"
-                            : b.result === "push"    ? "bg-draw/10 text-draw border-draw/20"
-                            : "bg-pitch-750 text-pitch-500 border-pitch-600"}`}>
-                          {b.result.toUpperCase()}
+                        <span className="font-mono text-[10px] text-pitch-300 w-8 text-right flex-shrink-0">
+                          {formatPct(r.winRate)}
+                        </span>
+                        <span className={`font-mono text-[10px] w-14 text-right flex-shrink-0
+                          ${r.pl >= 0 ? "text-win" : "text-loss"}`}>
+                          {r.pl >= 0 ? "+" : ""}{formatCurrency(r.pl)}
+                        </span>
+                        <span className="text-[9px] text-pitch-600 w-8 text-right flex-shrink-0">
+                          {r.wins}/{r.total}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* ── Add bet button + form anchor ──────────────── */}
+            <div id="bet-form-anchor">
+              <button
+                onClick={() => setShowForm(s => !s)}
+                className="pm-btn-primary flex items-center gap-1.5 text-[11px] py-1.5 px-3"
+              >
+                <Plus size={12} />
+                {showForm ? "Cancel" : "Log Bet"}
+              </button>
+            </div>
+
+            {/* ── Add bet form ──────────────────────────────── */}
+            <AnimatePresence>
+              {showForm && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="overflow-hidden"
+                >
+                  <div className="pm-card p-4 space-y-3">
+                    {/* Bet type toggle */}
+                    <div className="flex gap-1.5">
+                      {[["game","Game Bet"], ["prop","Prop Bet"], ["parlay","Parlay"]].map(([t, label]) => (
+                        <button
+                          key={t}
+                          onClick={() => setForm(f => ({ ...f, type: t }))}
+                          className={`px-3 py-1 rounded text-[10px] font-medium transition-all
+                            ${form.type === t
+                              ? "bg-accent/15 text-accent border border-accent/30"
+                              : "bg-pitch-750 text-pitch-500 border border-pitch-700 hover:text-pitch-300"}`}
+                        >
+                          {label}
                         </button>
-                      )}
-                    </td>
-                    <td className="px-3 py-2.5 flex items-center justify-end gap-1">
-                      <button onClick={() => {
-                          setEditingBet(b);
-                          setForm({ game: b.game, type: b.type, pick: b.pick, odds: b.odds, stake: b.stake, result: b.result });
-                        }}
-                        className="text-[10px] text-pitch-600 hover:text-accent transition-colors p-0.5 rounded px-1.5" title="Edit bet">
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => handleDelete(b.id)}
-                        disabled={isDeleting}
-                        aria-label="Delete bet"
-                        className="pm-btn-danger p-1.5 opacity-0 group-hover:opacity-100 transition-opacity ml-1"
-                        title="Delete bet"
-                      >
-                        <Trash2 size={11} strokeWidth={1.8} />
-                      </button>
-                    </td>
-                  </motion.tr>
-                );
-              })}
+                      ))}
+                    </div>
+
+                    {/* Game-specific fields */}
+                    {form.type === "game" && (
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="pm-label block mb-1">Matchup</label>
+                          <input
+                            className="pm-input w-full"
+                            placeholder="e.g. BOS@LAL"
+                            value={form.matchup}
+                            onChange={e => setForm(f => ({ ...f, matchup: e.target.value }))}
+                          />
+                        </div>
+                        <div>
+                          <label className="pm-label block mb-1">Team bet on</label>
+                          <input
+                            className="pm-input w-full"
+                            placeholder="e.g. BOS"
+                            maxLength={10}
+                            value={form.team}
+                            onChange={e => setForm(f => ({ ...f, team: e.target.value.toUpperCase() }))}
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Prop-specific fields */}
+                    {form.type === "prop" && (
+                      <div className="space-y-2">
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="pm-label block mb-1">Player</label>
+                            <input
+                              className="pm-input w-full"
+                              placeholder="e.g. Jayson Tatum"
+                              value={form.player}
+                              onChange={e => setForm(f => ({ ...f, player: e.target.value }))}
+                            />
+                          </div>
+                          <div>
+                            <label className="pm-label block mb-1">Matchup</label>
+                            <input
+                              className="pm-input w-full"
+                              placeholder="e.g. BOS@LAL"
+                              value={form.matchup}
+                              onChange={e => setForm(f => ({ ...f, matchup: e.target.value }))}
+                            />
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2">
+                          <div>
+                            <label className="pm-label block mb-1">Market</label>
+                            <select
+                              className="pm-input w-full"
+                              value={form.market}
+                              onChange={e => setForm(f => ({ ...f, market: e.target.value }))}
+                            >
+                              {MARKET_KEYS.map(mk => (
+                                <option key={mk} value={mk}>{MARKET_LABELS[mk]}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="pm-label block mb-1">Side</label>
+                            <select
+                              className="pm-input w-full"
+                              value={form.side}
+                              onChange={e => setForm(f => ({ ...f, side: e.target.value }))}
+                            >
+                              <option value="over">Over</option>
+                              <option value="under">Under</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="pm-label block mb-1">Line</label>
+                            <input
+                              className="pm-input w-full"
+                              type="number"
+                              step="0.5"
+                              placeholder="27.5"
+                              value={form.line}
+                              onChange={e => setForm(f => ({ ...f, line: e.target.value }))}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Shared fields: odds / stake / result / book */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                      <div>
+                        <label className="pm-label block mb-1">Odds (American)</label>
+                        <input
+                          className="pm-input w-full"
+                          type="number"
+                          placeholder="-110"
+                          value={form.odds}
+                          onChange={e => setForm(f => ({ ...f, odds: e.target.value }))}
+                        />
+                      </div>
+                      <div>
+                        <label className="pm-label block mb-1">Stake ($)</label>
+                        <input
+                          className="pm-input w-full"
+                          type="number"
+                          min="0"
+                          step="5"
+                          placeholder="50"
+                          value={form.stake}
+                          onChange={e => setForm(f => ({ ...f, stake: e.target.value }))}
+                        />
+                      </div>
+                      <div>
+                        <label className="pm-label block mb-1">Result</label>
+                        <select
+                          className="pm-input w-full"
+                          value={form.result}
+                          onChange={e => setForm(f => ({ ...f, result: e.target.value }))}
+                        >
+                          {["pending","win","loss","push"].map(r => (
+                            <option key={r} value={r}>{r.charAt(0).toUpperCase() + r.slice(1)}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="pm-label block mb-1">Book</label>
+                        <select
+                          className="pm-input w-full"
+                          value={form.book}
+                          onChange={e => setForm(f => ({ ...f, book: e.target.value }))}
+                        >
+                          <option value="">Any</option>
+                          {Object.entries(BOOK_LABELS).map(([k, v]) => (
+                            <option key={k} value={k}>{v}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Kelly hint */}
+                    {form.odds && form.stake && !isNaN(parseFloat(form.odds)) && (
+                      <div className="text-[10px] text-pitch-500">
+                        Kelly suggest:{" "}
+                        <span className="text-pitch-300 font-mono">
+                          {formatCurrency(kellyBet(oddsToImplied(parseFloat(form.odds)), parseFloat(form.odds), bankroll))}
+                        </span>
+                        {" "}· Break-even:{" "}
+                        <span className="text-pitch-300 font-mono">
+                          {formatPct(breakEven(parseFloat(form.odds)))}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Note */}
+                    <div>
+                      <label className="pm-label block mb-1">Note (optional)</label>
+                      <input
+                        className="pm-input w-full"
+                        placeholder="e.g. fade the public, injury report edge…"
+                        maxLength={200}
+                        value={form.note}
+                        onChange={e => setForm(f => ({ ...f, note: e.target.value }))}
+                      />
+                    </div>
+
+                    <button
+                      onClick={handleSubmit}
+                      disabled={isSaving}
+                      className="pm-btn-primary flex items-center gap-1.5 text-[11px] py-1.5 px-4 disabled:opacity-50"
+                    >
+                      {isSaving ? <Loader size={11} className="animate-spin" /> : <CheckCircle size={11} />}
+                      {isSaving ? "Saving…" : "Save Bet"}
+                    </button>
+                  </div>
+                </motion.div>
+              )}
             </AnimatePresence>
-          </tbody>
-        </table>
+
+            {/* ── Filter bar ────────────────────────────────── */}
+            {bets && bets.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {/* Result filter */}
+                {["all","pending","win","loss","push"].map(r => (
+                  <button
+                    key={r}
+                    onClick={() => setFilterResult(r)}
+                    className={`px-2.5 py-1 rounded text-[10px] font-medium transition-all
+                      ${filterResult === r
+                        ? "bg-accent/15 text-accent border border-accent/30"
+                        : "bg-pitch-800 text-pitch-500 border border-pitch-700 hover:text-pitch-300"}`}
+                  >
+                    {r.charAt(0).toUpperCase() + r.slice(1)}
+                  </button>
+                ))}
+                <div className="w-px bg-pitch-700 self-stretch mx-0.5" />
+                {/* Type filter */}
+                {[["all","All"],["game","Game"],["prop","Prop"]].map(([t, label]) => (
+                  <button
+                    key={t}
+                    onClick={() => setFilterType(t)}
+                    className={`px-2.5 py-1 rounded text-[10px] font-medium transition-all
+                      ${filterType === t
+                        ? "bg-pitch-600 text-pitch-100 border border-pitch-500"
+                        : "bg-pitch-800 text-pitch-500 border border-pitch-700 hover:text-pitch-300"}`}
+                  >
+                    {label}
+                  </button>
+                ))}
+
+                {/* Export */}
+                <button
+                  onClick={handleExport}
+                  className="ml-auto flex items-center gap-1 px-2.5 py-1 rounded text-[10px]
+                    bg-pitch-800 text-pitch-500 border border-pitch-700 hover:text-pitch-300 transition-all"
+                >
+                  <Download size={9} /> Export CSV
+                </button>
+              </div>
+            )}
+
+            {/* ── Bet list ──────────────────────────────────── */}
+            {isLoading ? (
+              <div className="space-y-1.5">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <div key={i} className="h-12 rounded-md bg-pitch-800 animate-pulse" />
+                ))}
+              </div>
+            ) : filteredBets.length === 0 ? (
+              <EmptyState
+                title="No bets yet"
+                description={bets?.length
+                  ? "No bets match this filter."
+                  : 'Log your first bet above, or browse prop lines in the "Prop Markets" tab.'}
+                icon={Target}
+              />
+            ) : (
+              <motion.div variants={container} initial="hidden" animate="show" className="space-y-1.5">
+                {filteredBets.map(bet => {
+                  const pl       = calcPL(bet.odds, bet.stake, bet.result);
+                  const isProp   = bet.type === "prop";
+                  const isPending = bet.result === "pending";
+
+                  return (
+                    <motion.div
+                      key={bet.id}
+                      variants={item}
+                      layout
+                      className="group flex items-start justify-between gap-3 px-3 py-2.5 rounded-md
+                        bg-pitch-800 border border-pitch-700 hover:border-pitch-600 transition-colors"
+                    >
+                      {/* Left: description */}
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          {/* Type badge */}
+                          {isProp ? (
+                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-accent/10 text-accent/80 border border-accent/20">
+                              PROP
+                            </span>
+                          ) : bet.type === "parlay" ? (
+                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-draw/10 text-draw/90 border border-draw/20">
+                              PARLAY
+                            </span>
+                          ) : (
+                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-pitch-700 text-pitch-500 border border-pitch-600">
+                              GAME
+                            </span>
+                          )}
+
+                          {/* Primary label */}
+                          {isProp ? (
+                            <span className="text-[11px] font-medium text-pitch-200 truncate">
+                              {bet.player}
+                              <span className="text-pitch-500 font-normal ml-1">
+                                {bet.side} {bet.line} {MARKET_LABELS[bet.market] ?? bet.market}
+                              </span>
+                            </span>
+                          ) : bet.type === "parlay" ? (
+                            <span className="text-[11px] font-medium text-pitch-200">
+                              <span className="text-[9px] mr-1 font-mono text-draw">{bet.legCount ?? bet.legs?.length ?? "?"}L</span>
+                              Parlay
+                              {bet.legs?.slice(0, 2).map((l, i) => (
+                                <span key={i} className="text-pitch-500 font-normal ml-1 text-[10px]">· {l.desc}</span>
+                              ))}
+                              {(bet.legs?.length ?? 0) > 2 && (
+                                <span className="text-pitch-600 text-[10px]"> +{bet.legs.length - 2} more</span>
+                              )}
+                            </span>
+                          ) : (
+                            <span className="text-[11px] font-medium" style={{
+                              color: bet.team && TEAM_COLORS[bet.team] ? TEAM_COLORS[bet.team] : undefined,
+                            }}>
+                              {bet.team && TEAM_COLORS[bet.team] && (
+                                <span
+                                  className="inline-block w-1.5 h-1.5 rounded-full mr-1.5 flex-shrink-0 align-middle"
+                                  style={{ background: TEAM_COLORS[bet.team] }}
+                                />
+                              )}
+                              {bet.matchup || bet.team || "—"}
+                            </span>
+                          )}
+
+                          {/* Matchup context for props */}
+                          {isProp && bet.matchup && (
+                            <span className="text-[9px] text-pitch-600 font-mono">{bet.matchup}</span>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                          <span className="font-mono text-[10px] text-pitch-500">
+                            {bet.odds > 0 ? "+" : ""}{bet.odds}
+                          </span>
+                          <span className="text-[10px] text-pitch-600">·</span>
+                          <span className="font-mono text-[10px] text-pitch-500">
+                            {formatCurrency(bet.stake)}
+                          </span>
+                          {bet.book && (
+                            <>
+                              <span className="text-[10px] text-pitch-700">·</span>
+                              <span className="text-[10px] text-pitch-600">
+                                {BOOK_LABELS[bet.book] || bet.book}
+                              </span>
+                            </>
+                          )}
+                          {bet.date && (
+                            <>
+                              <span className="text-[10px] text-pitch-700">·</span>
+                              <span className="text-[10px] text-pitch-700 font-mono">{bet.date}</span>
+                            </>
+                          )}
+                        </div>
+                        {bet.note && (
+                          <div className="text-[10px] text-pitch-600 mt-0.5 italic truncate">{bet.note}</div>
+                        )}
+                      </div>
+
+                      {/* Right: P/L + result selector + delete */}
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        {/* P/L */}
+                        {!isPending && (() => {
+                          const unitSize = getUnitSize(bankroll);
+                          const plUnits  = plInUnits(pl, unitSize);
+                          return (
+                            <div className="text-right">
+                              <div className={`font-mono text-[11px] font-medium
+                                ${pl > 0 ? "text-win" : pl < 0 ? "text-loss" : "text-pitch-500"}`}>
+                                {pl > 0 ? "+" : ""}{formatCurrency(pl)}
+                              </div>
+                              {plUnits !== null && (
+                                <div className={`font-mono text-[9px]
+                                  ${pl > 0 ? "text-win/70" : pl < 0 ? "text-loss/70" : "text-pitch-600"}`}>
+                                  {plUnits > 0 ? "+" : ""}{plUnits}u
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
+
+                        {/* Result quick-edit */}
+                        <select
+                          value={bet.result}
+                          onChange={e => handleUpdate(bet.id, e.target.value)}
+                          className={`text-[10px] rounded px-1.5 py-0.5 border font-medium cursor-pointer
+                            bg-pitch-750 transition-colors
+                            ${bet.result === "win"     ? "text-win  border-win/30"  : ""}
+                            ${bet.result === "loss"    ? "text-loss border-loss/30" : ""}
+                            ${bet.result === "push"    ? "text-draw border-draw/30" : ""}
+                            ${bet.result === "pending" ? "text-pitch-400 border-pitch-600" : ""}`}
+                        >
+                          <option value="pending">Pending</option>
+                          <option value="win">Win</option>
+                          <option value="loss">Loss</option>
+                          <option value="push">Push</option>
+                        </select>
+
+                        {/* Delete */}
+                        <button
+                          onClick={() => handleDelete(bet.id)}
+                          disabled={isDeleting}
+                          className="opacity-0 group-hover:opacity-100 transition-opacity
+                            p-1 rounded hover:bg-loss/15 text-pitch-600 hover:text-loss disabled:opacity-30"
+                          aria-label="Delete bet"
+                        >
+                          <Trash2 size={11} />
+                        </button>
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </motion.div>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// PATCH 2 — Historical Performance Dashboard
+// ═══════════════════════════════════════════════════════════════════
+
+export function HistoricalDashboard() {
+  const { bets, isLoading } = useBets();
+
+  // ── Monthly P/L buckets ──────────────────────────────────────
+  const monthlyData = useMemo(() => {
+    if (!bets?.length) return [];
+    const map = {};
+    for (const b of bets) {
+      if (!b.date || b.result === "pending") continue;
+      const month = b.date.slice(0, 7); // "2025-03"
+      if (!map[month]) map[month] = { month, pl: 0, staked: 0, wins: 0, total: 0 };
+      map[month].pl     += calcPL(b.odds, b.stake, b.result);
+      map[month].staked += b.stake ?? 0;
+      map[month].total++;
+      if (b.result === "win") map[month].wins++;
+    }
+    return Object.values(map)
+      .sort((a, b) => a.month.localeCompare(b.month))
+      .map(m => ({
+        ...m,
+        pl:      +m.pl.toFixed(2),
+        roi:     m.staked > 0 ? +((m.pl / m.staked) * 100).toFixed(1) : 0,
+        winRate: m.total > 0  ? +(m.wins / m.total * 100).toFixed(1)  : 0,
+        label:   new Date(m.month + "-02").toLocaleDateString("en-US", { month: "short", year: "2-digit" }),
+      }));
+  }, [bets]);
+
+  // ── ROI trend (cumulative) ───────────────────────────────────
+  const roiTrend = useMemo(() => {
+    let cumPL = 0, cumStaked = 0;
+    return monthlyData.map(m => {
+      cumPL     += m.pl;
+      cumStaked += m.staked;
+      return {
+        label:  m.label,
+        cumROI: cumStaked > 0 ? +((cumPL / cumStaked) * 100).toFixed(1) : 0,
+      };
+    });
+  }, [monthlyData]);
+
+  // ── Streak tracker ───────────────────────────────────────────
+  const streakData = useMemo(() => {
+    if (!bets?.length) return { current: 0, type: null, best: 0, worst: 0 };
+    const settled = [...bets]
+      .filter(b => b.result === "win" || b.result === "loss")
+      .sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+
+    let cur = 0, curType = null, best = 0, worst = 0;
+    for (const b of settled) {
+      if (curType === b.result) {
+        cur++;
+      } else {
+        if (curType === "win") best = Math.max(best, cur);
+        if (curType === "loss") worst = Math.max(worst, cur);
+        cur = 1; curType = b.result;
+      }
+    }
+    if (curType === "win") best = Math.max(best, cur);
+    if (curType === "loss") worst = Math.max(worst, cur);
+
+    return { current: cur, type: curType, best, worst };
+  }, [bets]);
+
+  // ── Best/worst books ─────────────────────────────────────────
+  const bookStats = useMemo(() => {
+    if (!bets?.length) return [];
+    const map = {};
+    for (const b of bets) {
+      if (!b.book || b.result === "pending") continue;
+      if (!map[b.book]) map[b.book] = { book: b.book, wins: 0, total: 0, pl: 0 };
+      map[b.book].total++;
+      if (b.result === "win") map[b.book].wins++;
+      map[b.book].pl += calcPL(b.odds, b.stake, b.result);
+    }
+    return Object.values(map)
+      .filter(b => b.total >= 3)
+      .map(b => ({ ...b, pl: +b.pl.toFixed(2), winRate: +(b.wins / b.total * 100).toFixed(1) }))
+      .sort((a, b) => b.pl - a.pl);
+  }, [bets]);
+
+  if (isLoading) {
+    return (
+      <div className="space-y-3">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="h-32 rounded-lg bg-pitch-800 animate-pulse" />
+        ))}
+      </div>
+    );
+  }
+
+  if (!bets?.length) {
+    return (
+      <EmptyState
+        title="No bet history yet"
+        description="Log some bets in the Bet Tracker to see your performance over time."
+        icon={TrendingUp}
+      />
+    );
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0 }}
+      className="space-y-4"
+    >
+      {/* ── Streak + best/worst ─────────────────────────────── */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        {[
+          {
+            label: "Current streak",
+            value: streakData.current ? `${streakData.current}${streakData.type === "win" ? "W" : "L"}` : "—",
+            color: streakData.type === "win" ? "text-win" : streakData.type === "loss" ? "text-loss" : "text-pitch-400",
+          },
+          { label: "Best win streak",  value: streakData.best  ? `${streakData.best}W`  : "—", color: "text-win" },
+          { label: "Worst skid",       value: streakData.worst ? `${streakData.worst}L` : "—", color: "text-loss" },
+          { label: "Months tracked",   value: monthlyData.length, color: "text-pitch-200" },
+        ].map(s => (
+          <div key={s.label} className="pm-tile p-3">
+            <div className="pm-label mb-1">{s.label}</div>
+            <div className={`pm-number text-xl ${s.color}`}>{s.value}</div>
+          </div>
+        ))}
       </div>
 
-      {/* Cumulative P&L chart */}
-      {chartData.length >= 2 && (
-        <div className="pm-card p-4 mb-4">
-          <div className="pm-label mb-3">Cumulative P&L</div>
-          <div style={{ height: 160 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={chartData}>
-                <defs>
-                  <linearGradient id="plGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%"  stopColor="#00d4aa" stopOpacity={0.25} />
-                    <stop offset="95%" stopColor="#00d4aa" stopOpacity={0} />
-                  </linearGradient>
-                  <linearGradient id="plGradNeg" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%"  stopColor="#ef4444" stopOpacity={0.25} />
-                    <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <XAxis dataKey="bet" tick={{ fill: "#546480", fontSize: 10 }}
-                  axisLine={false} tickLine={false} />
-                <YAxis tick={{ fill: "#546480", fontSize: 10 }}
-                  axisLine={false} tickLine={false} tickFormatter={v => `$${v}`} />
-                <ReferenceLine y={0} stroke="#2e3a50" strokeDasharray="4 4" />
-                <Tooltip {...tooltipStyle} formatter={v => [formatCurrency(v), "P&L"]} />
-                <Area type="monotone" dataKey="pl" stroke="#00d4aa" strokeWidth={2}
-                  fill={chartData.at(-1)?.pl >= 0 ? "url(#plGrad)" : "url(#plGradNeg)"}
-                  dot={{ fill: "#00d4aa", r: 3, strokeWidth: 0 }}
-                  activeDot={{ r: 5, fill: "#00d4aa", stroke: "#0a0b0d", strokeWidth: 2 }} />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
+      {/* ── Monthly P/L bar chart ────────────────────────────── */}
+      {monthlyData.length > 0 && (
+        <div className="pm-card p-4">
+          <div className="pm-label mb-3">Monthly P/L</div>
+          <ResponsiveContainer width="100%" height={160}>
+            <BarChart data={monthlyData} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
+              <XAxis dataKey="label" tick={{ fontSize: 10, fill: "#546480" }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 10, fill: "#546480" }} axisLine={false} tickLine={false}
+                tickFormatter={v => `$${v}`} width={42} />
+              <Tooltip
+                {...tooltipStyle}
+                formatter={(v, n) => [
+                  n === "pl" ? formatCurrency(v) : `${v}%`,
+                  n === "pl" ? "P/L" : "Win Rate",
+                ]}
+              />
+              <ReferenceLine y={0} stroke="#2e3a50" />
+              <Bar dataKey="pl" radius={[3, 3, 0, 0]} maxBarSize={32}>
+                {monthlyData.map((m, i) => (
+                  <Cell key={i} fill={m.pl >= 0 ? "#00d4aa" : "#ff4d6d"} opacity={0.85} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
         </div>
       )}
 
-      {/* Win rate by bet type */}
-      {typeBreakdown.length >= 2 && (
+      {/* ── Cumulative ROI trend ─────────────────────────────── */}
+      {roiTrend.length > 1 && (
         <div className="pm-card p-4">
-          <div className="pm-label mb-3">Win rate by bet type</div>
-          <div style={{ height: 160 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={typeBreakdown} barCategoryGap="28%">
-                <XAxis dataKey="type" tick={{ fill: "#546480", fontSize: 10 }}
-                  axisLine={false} tickLine={false} />
-                <YAxis domain={[0, 100]} tick={{ fill: "#546480", fontSize: 10 }}
-                  axisLine={false} tickLine={false} tickFormatter={v => `${v}%`} />
-                <ReferenceLine y={52.4} stroke="#3d4f6a" strokeDasharray="4 4"
-                  label={{ value: "break-even", fill: "#3d4f6a", fontSize: 9, position: "right" }} />
-                <Tooltip {...tooltipStyle}
-                  formatter={(v, _n, props) => [
-                    `${v}% (${props.payload.count} bets · ${formatCurrency(props.payload.pl)})`,
-                    "Win rate",
-                  ]} />
-                <Bar dataKey="winRate" radius={[4, 4, 0, 0]}>
-                  {typeBreakdown.map(e => (
-                    <Cell key={e.type}
-                      fill={e.winRate >= 55 ? "#00d4aa" : e.winRate >= 45 ? "#f59e0b" : "#ef4444"}
-                      fillOpacity={0.85} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-          <div className="mt-3 flex flex-wrap gap-3">
-            {typeBreakdown.map(t => (
-              <div key={t.type} className="flex items-center gap-1.5 text-[10px]">
-                <div className="w-2 h-2 rounded-full"
-                  style={{ background: t.winRate >= 55 ? "#00d4aa" : t.winRate >= 45 ? "#f59e0b" : "#ef4444" }} />
-                <span className="text-pitch-400">{t.type}:</span>
-                <span className={`pm-number font-medium ${t.winRate >= 55 ? "text-win" : t.winRate >= 45 ? "text-draw" : "text-loss"}`}>
-                  {t.winRate}%
+          <div className="pm-label mb-3">Cumulative ROI %</div>
+          <ResponsiveContainer width="100%" height={120}>
+            <AreaChart data={roiTrend} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
+              <defs>
+                <linearGradient id="roiGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%"  stopColor="#00d4aa" stopOpacity={0.2} />
+                  <stop offset="95%" stopColor="#00d4aa" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <XAxis dataKey="label" tick={{ fontSize: 10, fill: "#546480" }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 10, fill: "#546480" }} axisLine={false} tickLine={false}
+                tickFormatter={v => `${v}%`} width={36} />
+              <Tooltip {...tooltipStyle} formatter={v => [`${v}%`, "ROI"]} />
+              <ReferenceLine y={0} stroke="#2e3a50" strokeDasharray="3 3" />
+              <Area type="monotone" dataKey="cumROI"
+                stroke="#00d4aa" strokeWidth={1.5} fill="url(#roiGrad)" />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+
+      {/* ── Best/worst books ─────────────────────────────────── */}
+      {bookStats.length > 0 && (
+        <div className="pm-card p-4">
+          <div className="pm-label mb-3">Performance by book</div>
+          <div className="space-y-2">
+            {bookStats.map(b => (
+              <div key={b.book} className="flex items-center gap-3">
+                <span className="text-[11px] text-pitch-300 w-24 flex-shrink-0">
+                  {BOOK_LABELS[b.book] || b.book}
                 </span>
-                <span className={`pm-number ${t.pl >= 0 ? "text-win/70" : "text-loss/70"}`}>
-                  {formatCurrency(t.pl)}
+                <div className="flex-1 h-1.5 rounded-full bg-pitch-700 overflow-hidden">
+                  <motion.div
+                    className="h-full rounded-full"
+                    style={{ background: b.pl >= 0 ? "#00d4aa" : "#ff4d6d" }}
+                    initial={{ width: 0 }}
+                    animate={{ width: `${Math.min(Math.abs(b.winRate), 100)}%` }}
+                    transition={{ duration: 0.6 }}
+                  />
+                </div>
+                <span className="font-mono text-[10px] text-pitch-400 w-10 text-right flex-shrink-0">
+                  {b.winRate}%
+                </span>
+                <span className={`font-mono text-[10px] w-14 text-right flex-shrink-0
+                  ${b.pl >= 0 ? "text-win" : "text-loss"}`}>
+                  {b.pl >= 0 ? "+" : ""}{formatCurrency(b.pl)}
+                </span>
+                <span className="text-[9px] text-pitch-600 w-10 text-right flex-shrink-0">
+                  {b.wins}/{b.total}
                 </span>
               </div>
             ))}
           </div>
         </div>
       )}
+    </motion.div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// PATCH 3 — Live Play-by-Play Feed
+// ═══════════════════════════════════════════════════════════════════
+
+export function PlayByPlay({ gameId, gameLabel }) {
+  const [plays, setPlays] = useState([]);
+  const [gameInfo, setGameInfo] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isError, setIsError] = useState(false);
+  const intervalRef = useRef(null);
+
+  const fetchPlays = useCallback(async () => {
+    if (!gameId) return;
+    try {
+      const res = await fetch(
+        `https://site.api.espn.com/apis/site/v2/sports/basketball/nba/summary?event=${gameId}`,
+        { signal: AbortSignal.timeout(8000) }
+      );
+      if (!res.ok) throw new Error(`ESPN ${res.status}`);
+      const data = await res.json();
+
+      // Game info
+      const comp = data.header?.competitions?.[0];
+      const home = comp?.competitors?.find(c => c.homeAway === "home");
+      const away = comp?.competitors?.find(c => c.homeAway === "away");
+      setGameInfo({
+        homeTeam:  home?.team?.abbreviation ?? "HOME",
+        awayTeam:  away?.team?.abbreviation ?? "AWAY",
+        homeScore: home?.score ?? "—",
+        awayScore: away?.score ?? "—",
+        status:    data.header?.competitions?.[0]?.status?.type?.shortDetail ?? "",
+        period:    data.header?.competitions?.[0]?.status?.period ?? 0,
+        clock:     data.header?.competitions?.[0]?.status?.displayClock ?? "",
+      });
+
+      // Play-by-play — last 25 plays across all periods, newest first
+      const allPlays = [];
+      for (const period of data.plays ?? []) {
+        // ESPN returns plays as flat array with period field
+        allPlays.push(period);
+      }
+      // Also check data.playByPlay if present
+      const pbpSource = data.playByPlay?.plays ?? data.plays ?? [];
+      const recent = [...pbpSource]
+        .reverse()
+        .slice(0, 40)
+        .map((p, i) => ({
+          id:          p.id ?? i,
+          period:      p.period?.number ?? p.periodNumber ?? "—",
+          clock:       p.clock?.displayValue ?? p.displayClock ?? "—",
+          text:        p.text ?? p.description ?? "—",
+          homeScore:   p.homeScore ?? null,
+          awayScore:   p.awayScore ?? null,
+          scoringPlay: p.scoringPlay ?? false,
+          type:        p.type?.text ?? "",
+        }));
+
+      setPlays(recent);
+      setIsLoading(false);
+      setIsError(false);
+    } catch {
+      setIsError(true);
+      setIsLoading(false);
+    }
+  }, [gameId]);
+
+  useEffect(() => {
+    if (!gameId) return;
+    setIsLoading(true);
+    fetchPlays();
+
+    // Poll every 30s — only worth it for live games
+    intervalRef.current = setInterval(fetchPlays, 30_000);
+    return () => clearInterval(intervalRef.current);
+  }, [gameId, fetchPlays]);
+
+  if (!gameId) {
+    return (
+      <EmptyState
+        title="Select a live game"
+        description="Play-by-play is available for games in progress."
+        icon={PlayCircle}
+      />
+    );
+  }
+
+  if (isError) return <ErrorState message="Couldn't load play-by-play." onRetry={fetchPlays} type="network" />;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0 }}
+      className="space-y-3"
+    >
+      {/* Scoreboard header */}
+      {gameInfo && (
+        <div className="pm-tile p-4 flex items-center justify-between">
+          <div className="text-center flex-1">
+            <div className="font-display text-3xl tracking-widest"
+              style={{ color: TEAM_COLORS[gameInfo.awayTeam] || "#546480" }}>
+              {gameInfo.awayTeam}
+            </div>
+            <div className="pm-number text-2xl mt-1">{gameInfo.awayScore}</div>
+          </div>
+
+          <div className="text-center px-4">
+            <div className="text-[10px] text-pitch-500 font-mono">{gameInfo.status}</div>
+            {gameInfo.period > 0 && (
+              <div className="text-[11px] text-pitch-400 mt-0.5 flex items-center gap-1 justify-center">
+                <Clock size={9} />
+                {gameInfo.clock} · Q{gameInfo.period}
+              </div>
+            )}
+          </div>
+
+          <div className="text-center flex-1">
+            <div className="font-display text-3xl tracking-widest"
+              style={{ color: TEAM_COLORS[gameInfo.homeTeam] || "#546480" }}>
+              {gameInfo.homeTeam}
+            </div>
+            <div className="pm-number text-2xl mt-1">{gameInfo.homeScore}</div>
+          </div>
+        </div>
+      )}
+
+      {/* Play feed */}
+      <div className="pm-card divide-y divide-pitch-700">
+        {isLoading ? (
+          Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} className="px-4 py-3 flex gap-3">
+              <div className="w-10 h-3 rounded bg-pitch-750 animate-pulse flex-shrink-0" />
+              <div className="flex-1 h-3 rounded bg-pitch-750 animate-pulse" />
+            </div>
+          ))
+        ) : plays.length === 0 ? (
+          <div className="px-4 py-6 text-center text-[11px] text-pitch-500">
+            No plays available yet.
+          </div>
+        ) : (
+          <motion.div variants={container} initial="hidden" animate="show">
+            {plays.map(play => (
+              <motion.div
+                key={play.id}
+                variants={item}
+                className={`flex items-start gap-3 px-4 py-2.5 transition-colors
+                  ${play.scoringPlay ? "bg-win/5 border-l-2 border-win/40" : ""}`}
+              >
+                {/* Clock */}
+                <div className="flex-shrink-0 text-right w-16">
+                  <div className="font-mono text-[10px] text-pitch-500">{play.clock}</div>
+                  <div className="font-mono text-[9px] text-pitch-700">Q{play.period}</div>
+                </div>
+
+                {/* Play text */}
+                <div className="flex-1 min-w-0">
+                  <div className={`text-[11px] leading-relaxed
+                    ${play.scoringPlay ? "text-pitch-100 font-medium" : "text-pitch-400"}`}>
+                    {play.text}
+                  </div>
+                </div>
+
+                {/* Score at time of play */}
+                {play.scoringPlay && play.awayScore != null && (
+                  <div className="flex-shrink-0 font-mono text-[10px] text-win">
+                    {play.awayScore}–{play.homeScore}
+                  </div>
+                )}
+              </motion.div>
+            ))}
+          </motion.div>
+        )}
+      </div>
     </motion.div>
   );
 }

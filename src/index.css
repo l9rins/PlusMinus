@@ -493,4 +493,152 @@
     .pm-tile, .pm-card { box-shadow: none; border: 1px solid #2e3a50; }
     nav { display: none; }
   }
+
+  /* ── Touch-friendly tap targets ─────────────────────────────────
+     Any interactive element smaller than 44px on mobile gets a
+     minimum tap target via padding expansion without affecting layout */
+  @media (max-width: 640px) {
+    .pm-btn,
+    .pm-tab,
+    .pm-badge[role="button"],
+    button.pm-btn-primary,
+    button.pm-btn-danger {
+      min-height: 44px;
+      display: inline-flex;
+      align-items: center;
+    }
+
+    /* Nav items in TopNav — ensure full tap height */
+    nav button,
+    nav a {
+      min-height: 44px;
+    }
+  }
+
+  /* ── Parlay leg builder — mobile stack ──────────────────────────
+     On small screens the leg row goes from flex-row to flex-col
+     so the description input gets full width */
+  @media (max-width: 480px) {
+    .parlay-leg-row {
+      flex-direction: column;
+      gap: 0.375rem;
+    }
+
+    .parlay-leg-row .parlay-leg-odds,
+    .parlay-leg-row .parlay-leg-result {
+      width: 100%;
+    }
+  }
+
+  /* ── Prop history panel — compact on mobile ─────────────────────
+     Hit/miss dots shrink on very small screens */
+  @media (max-width: 380px) {
+    .prop-history-dots > div {
+      min-width: 0;
+    }
+    .prop-history-meta {
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+  }
+
+  /* ── BetTracker bet rows — collapse secondary info on mobile ────
+     The right-side cluster (P/L + result selector + delete) wraps
+     below the label on very small screens */
+  @media (max-width: 480px) {
+    .bet-row {
+      flex-wrap: wrap;
+    }
+    .bet-row-actions {
+      flex-basis: 100%;
+      justify-content: flex-end;
+      border-top: 1px solid rgba(46, 58, 80, 0.5);
+      padding-top: 0.375rem;
+      margin-top: 0.25rem;
+    }
+  }
+
+  /* ── PropsBrowser game/market pills — horizontal scroll on mobile
+     Instead of wrapping (which creates a wall of pills), scroll */
+  @media (max-width: 640px) {
+    .props-game-picker,
+    .props-market-picker {
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      scrollbar-width: none;
+      -webkit-overflow-scrolling: touch;
+      padding-bottom: 2px; /* prevent clipping of border on scroll */
+    }
+
+    .props-game-picker::-webkit-scrollbar,
+    .props-market-picker::-webkit-scrollbar {
+      display: none;
+    }
+
+    /* Prevent pills from shrinking */
+    .props-game-picker > button,
+    .props-market-picker > button {
+      flex-shrink: 0;
+    }
+  }
+
+  /* ── OddsCreditsWidget — hide label text on mobile, keep dot ────
+     Full text shows on tablet+ */
+  @media (max-width: 480px) {
+    .odds-credits-label {
+      display: none;
+    }
+    .odds-credits-dot {
+      display: inline-block;
+    }
+  }
+
+  /* ── HistoricalDashboard charts — reduce height on mobile ────── */
+  @media (max-width: 640px) {
+    .hist-bar-chart   { height: 120px !important; }
+    .hist-area-chart  { height: 90px  !important; }
+  }
+
+  /* ── PlayByPlay feed — tighter padding on mobile ────────────────
+     The clock/period column is narrow; description gets more room */
+  @media (max-width: 480px) {
+    .pbp-row {
+      gap: 0.5rem;
+    }
+    .pbp-clock {
+      width: 2.75rem;
+      flex-shrink: 0;
+    }
+  }
+
+  /* ── HeadToHead radar — cap width on mobile ─────────────────────
+     The dual radar side-by-side layout collapses to stacked */
+  @media (max-width: 640px) {
+    .h2h-radar-container {
+      flex-direction: column;
+    }
+    .h2h-radar-container > * {
+      width: 100%;
+    }
+  }
+
+  /* ── Forms — full-width inputs on mobile ────────────────────────
+     The 2-col and 4-col form grids collapse to single column */
+  @media (max-width: 480px) {
+    .bet-form-grid-2,
+    .bet-form-grid-4 {
+      grid-template-columns: 1fr !important;
+    }
+  }
+
+  /* ── UnitSettings slider — ensure thumb is large enough ─────── */
+  @media (max-width: 640px) {
+    input[type="range"] {
+      height: 20px;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      width: 20px;
+      height: 20px;
+    }
+  }
 }

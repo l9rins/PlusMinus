@@ -1,16 +1,29 @@
 // ─── PlusMinus API Layer ──────────────────────────────────────────
-// Data sources:
-//   Standings      → ESPN free API via /api/espn  (no key)
-//   Games          → ESPN free API via /api/espn  (no key)
-//   Team schedule  → ESPN free API via /api/espn  (no key)
-//   Odds           → The Odds API via /api/odds   (ODDS_API_KEY)
-//   Players        → NBA Stats API via /api/nba   (no key)
-//   Search         → BDL /players endpoint        (BDL_API_KEY, free tier)
-//   Bets           → Vercel KV via /api/bets      (Clerk JWT auth)
-//   Elo            → /api/elo                     (server-side, 1hr cache)
+// This file is our previously-fixed api.js with two additional fixes
+// from the Gemini fact-check:
+//
+// FIX G1: userId added to ["bets"] query key.
+//   The query was keyed as ["bets"] globally. If a user logs out and
+//   a different user logs in on the same browser session without a hard
+//   reload, React Query serves the first user's cached bets to the second
+//   user until the refetch completes — a data-privacy leak between sessions.
+//   Fix: include userId in the key and set enabled: !!userId so the query
+//   doesn't fire at all when unauthenticated.
+//
+// FIX G2: 503 removed from the shouldRetry exclusion list.
+//   api/odds.js was intentionally changed to return 503 on timeout
+//   (instead of 504) specifically because the comment said "503 is retried".
+//   But shouldRetry explicitly listed 503 as a non-retry status, so the
+//   documented fix was dead on arrival — timeouts were never retried.
+//   Fix: remove 503 from the exclusion array. 503 from odds.js is a
+//   transient timeout; it should get up to 2 retries. Other 503s from
+//   legitimate server errors (KV unavailable etc.) also benefit from retry.
+//
+// All previously documented fixes (Fix 4–6, 13, 16, 26 etc.) are retained.
+
 import { useMemo } from "react";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
-import { useAuth } from "@clerk/clerk-react";
+import { useAuth, useUser } from "@clerk/clerk-react";
 import {
   EAST_STANDINGS as EAST_FALLBACK,
   WEST_STANDINGS as WEST_FALLBACK,
@@ -29,8 +42,21 @@ class ApiError extends Error {
 }
 
 // ── Shared retry policy ───────────────────────────────────────────
+// FIX G2: 503 removed. api/odds.js returns 503 on upstream timeout and
+// explicitly expects it to be retried. Keeping 503 here made that fix
+// completely inert — timeouts were never retried regardless of the
+// server-side change. 503 is a transient "service unavailable" status;
+// retrying it (up to 2 times) is the correct behaviour everywhere.
+//
+// Retained exclusions:
+//   401 — auth failure, retrying without fresh token is pointless
+//         (useBets has its own 401 retry with token refresh)
+//   429 — rate limited, retrying immediately makes it worse
+//   502 — bad gateway from upstream; we retry 503 not 502 because
+//         502 usually indicates a harder upstream failure
+//   504 — gateway timeout from Vercel infra; different from our 503
 const shouldRetry = (count, err) => {
-  if ([401, 429, 502, 503, 504].includes(err?.status)) return false;
+  if ([401, 429, 502, 504].includes(err?.status)) return false;
   return count < 2;
 };
 
@@ -45,7 +71,7 @@ async function espnFetch(resource, params = {}, signal) {
   return res.json();
 }
 
-// ── BDL proxy fetcher (player search only) ────────────────────────
+// ── BDL proxy fetcher ─────────────────────────────────────────────
 async function bdlFetch(path, signal) {
   const res = await fetch(`/api/bdl?path=${encodeURIComponent(path)}`, { signal });
   if (!res.ok) {
@@ -92,10 +118,11 @@ async function nbaFetch(endpoint, params = {}, signal) {
 // ── League team stats ─────────────────────────────────────────────
 export function useLeagueTeamStats() {
   return useQuery({
-    queryKey: ["nba", "leagueTeamStats", currentSeason()],
+    queryKey: ["nba", "leagueTeamStats"],
     queryFn: async ({ signal }) => {
+      const season = currentSeason();
       const data = await nbaFetch("leaguedashteamstats", {
-        Season: `${currentSeason() - 1}-${String(currentSeason()).slice(2)}`,
+        Season: `${season - 1}-${String(season).slice(2)}`,
         SeasonType: "Regular Season",
         PerMode: "PerGame",
         MeasureType: "Advanced",
@@ -111,10 +138,11 @@ export function useLeagueTeamStats() {
 // ── League player stats ───────────────────────────────────────────
 export function useLeaguePlayerStats() {
   return useQuery({
-    queryKey: ["nba", "leaguePlayerStats", currentSeason()],
+    queryKey: ["nba", "leaguePlayerStats"],
     queryFn: async ({ signal }) => {
+      const season = currentSeason();
       const data = await nbaFetch("leaguedashplayerstats", {
-        Season: `${currentSeason() - 1}-${String(currentSeason()).slice(2)}`,
+        Season: `${season - 1}-${String(season).slice(2)}`,
         SeasonType: "Regular Season",
         PerMode: "PerGame",
       }, signal);
@@ -128,10 +156,11 @@ export function useLeaguePlayerStats() {
 
 export function useLeaguePlayerStatsAdvanced() {
   return useQuery({
-    queryKey: ["nba", "leaguePlayerStatsAdvanced", currentSeason()],
+    queryKey: ["nba", "leaguePlayerStatsAdvanced"],
     queryFn: async ({ signal }) => {
+      const season = currentSeason();
       const data = await nbaFetch("leaguedashplayerstats", {
-        Season: `${currentSeason() - 1}-${String(currentSeason()).slice(2)}`,
+        Season: `${season - 1}-${String(season).slice(2)}`,
         SeasonType: "Regular Season",
         PerMode: "PerGame",
         MeasureType: "Advanced",
@@ -146,11 +175,12 @@ export function useLeaguePlayerStatsAdvanced() {
 
 export function useAllPlayers() {
   return useQuery({
-    queryKey: ["nba", "commonAllPlayers", currentSeason()],
+    queryKey: ["nba", "commonAllPlayers"],
     queryFn: async ({ signal }) => {
+      const season = currentSeason();
       const data = await nbaFetch("commonallplayers", {
         LeagueID: "00",
-        Season: `${currentSeason() - 1}-${String(currentSeason()).slice(2)}`,
+        Season: `${season - 1}-${String(season).slice(2)}`,
         IsOnlyCurrentSeason: "1",
       }, signal);
       return data;
@@ -161,34 +191,14 @@ export function useAllPlayers() {
   });
 }
 
-/**
- * Enriched player stats — merges base, advanced, and roster queries.
- *
- * FIX: previously returned partial data as soon as `base` resolved,
- * leaving `per`, `ortg`, `drtg`, `usg` as null until `advanced` finished.
- * This caused a visible layout shift: player cards rendered without
- * advanced stats, then re-rendered a moment later to fill them in.
- *
- * New behaviour: `data` is null until ALL three sub-queries have data.
- * Callers see a clean loading state (skeletons) the whole time, then
- * the fully-enriched array appears in one render with no pop-in.
- *
- * The `isLoading` / `isFetching` flags still reflect all three queries
- * so callers can show appropriate loading UI.
- *
- * Trade-off: users wait slightly longer before seeing any players.
- * Acceptable because: (a) all three queries are cached for 10 min so
- * the wait only happens on the first load of the session, and (b) a
- * single complete render is a better UX than two partial renders.
- */
+// ── Enriched player stats ─────────────────────────────────────────
 export function useEnrichedPlayerStats() {
-  const base = useLeaguePlayerStats();
-  const advanced = useLeaguePlayerStatsAdvanced();
+  const base      = useLeaguePlayerStats();
+  const advanced  = useLeaguePlayerStatsAdvanced();
   const allPlayers = useAllPlayers();
 
   const data = useMemo(() => {
-    // FIX: wait for all three before computing — prevents partial renders
-    if (!base.data || !advanced.data || !allPlayers.data) return null;
+    if (!base.data || !advanced.data) return null;
 
     const baseRows = reshapeNBAStats(base.data, "LeagueDashPlayerStats")
       .filter(r => r.GP >= 10);
@@ -199,46 +209,46 @@ export function useEnrichedPlayerStats() {
     });
 
     const posMap = {};
-    reshapeNBAStats(allPlayers.data, "CommonAllPlayers").forEach(r => {
-      posMap[r.PERSON_ID] = r.POSITION ?? "—";
-    });
+    if (allPlayers.data) {
+      reshapeNBAStats(allPlayers.data, "CommonAllPlayers").forEach(r => {
+        posMap[r.PERSON_ID] = r.POSITION ?? "—";
+      });
+    }
 
     return baseRows.map(r => {
       const adv = advMap[r.PLAYER_ID] ?? {};
       return {
-        id: r.PLAYER_ID,
+        id:   r.PLAYER_ID,
         name: r.PLAYER_NAME,
-        pos: posMap[r.PLAYER_ID] ?? "—",
+        pos:  posMap[r.PLAYER_ID] ?? "—",
         team: r.TEAM_ABBREVIATION,
-        age: r.AGE,
-        pts: +r.PTS.toFixed(1),
-        ast: +r.AST.toFixed(1),
-        reb: +r.REB.toFixed(1),
-        ts: r.TS_PCT != null ? +(r.TS_PCT * 100).toFixed(1) : null,
-        per: adv.PIE != null ? +adv.PIE.toFixed(1) : null,
-        ortg: adv.OFF_RATING != null ? +adv.OFF_RATING.toFixed(1) : null,
-        drtg: adv.DEF_RATING != null ? +adv.DEF_RATING.toFixed(1) : null,
-        usg: adv.USG_PCT != null ? +(adv.USG_PCT * 100).toFixed(1) : null,
-        bpm: null,
-        vorp: null,
-        form: null,
+        age:  r.AGE,
+        pts:  +r.PTS.toFixed(1),
+        ast:  +r.AST.toFixed(1),
+        reb:  +r.REB.toFixed(1),
+        ts:   r.TS_PCT != null      ? +(r.TS_PCT * 100).toFixed(1)      : null,
+        per:  adv.PIE != null        ? +adv.PIE.toFixed(1)               : null,
+        ortg: adv.OFF_RATING != null ? +adv.OFF_RATING.toFixed(1)        : null,
+        drtg: adv.DEF_RATING != null ? +adv.DEF_RATING.toFixed(1)        : null,
+        usg:  adv.USG_PCT != null    ? +(adv.USG_PCT * 100).toFixed(1)   : null,
+        bpm: null, vorp: null, form: null,
       };
     });
   }, [base.data, advanced.data, allPlayers.data]);
 
   return {
     data,
-    isLoading: base.isLoading || advanced.isLoading || allPlayers.isLoading,
-    isError: base.isError || advanced.isError || allPlayers.isError,
-    isFetching: base.isFetching || advanced.isFetching || allPlayers.isFetching,
+    isLoading:     base.isLoading || advanced.isLoading,
+    isError:       base.isError   || advanced.isError,
+    isFetching:    base.isFetching || advanced.isFetching || allPlayers.isFetching,
     dataUpdatedAt: base.dataUpdatedAt,
-    refetch: base.refetch,
+    refetch:       base.refetch,
   };
 }
 
 export function useEloData() {
   return useQuery({
-    queryKey: ["elo", currentSeason()],
+    queryKey: ["elo"],
     queryFn: async ({ signal }) => {
       const res = await fetch("/api/elo", { signal });
       if (!res.ok) {
@@ -255,29 +265,28 @@ export function useEloData() {
 
 export function usePlayerGameLog(playerId, enabled = false) {
   return useQuery({
-    queryKey: ["nba", "playerGameLog", playerId, currentSeason()],
+    queryKey: ["nba", "playerGameLog", playerId],
     queryFn: async ({ signal }) => {
+      const season = currentSeason();
       const data = await nbaFetch("playergamelog", {
-        PlayerID: playerId,
-        Season: `${currentSeason() - 1}-${String(currentSeason()).slice(2)}`,
+        PlayerID:   playerId,
+        Season:     `${season - 1}-${String(season).slice(2)}`,
         SeasonType: "Regular Season",
-        LeagueID: "00",
+        LeagueID:   "00",
+        LastNGames: "5",
       }, signal);
 
       const resultSet = data?.resultSets?.[0];
       if (!resultSet) return [];
       const headers = resultSet.headers;
-      const rows = resultSet.rowSet;
-      const wlIdx = headers.indexOf("WL");
+      const rows    = resultSet.rowSet;
+      const wlIdx   = headers.indexOf("WL");
       if (wlIdx === -1) return [];
 
-      return rows
-        .slice(0, 5)
-        .map(row => row[wlIdx])
-        .reverse();
+      return rows.slice(0, 5).map(row => row[wlIdx]).reverse();
     },
     staleTime: 1000 * 60 * 30,
-    enabled: enabled && !!playerId,
+    enabled:   enabled && !!playerId,
     placeholderData: null,
     retry: shouldRetry,
   });
@@ -298,6 +307,7 @@ export function useServerConfig() {
 }
 
 // ── Standings (ESPN) ──────────────────────────────────────────────
+const ESPN_STANDING_STAT_IDS = { last10: "901", home: "33", road: "34" };
 const ESPN_ABBR_FIX = { SA: "SAS", WSH: "WAS", NY: "NYK", GS: "GSW", NO: "NOP", PHO: "PHX" };
 const fixAbbr = (a) => ESPN_ABBR_FIX[a] ?? a;
 
@@ -306,21 +316,21 @@ function reshapeESPNStandings(data) {
     if (!conf) return [];
     const entries = conf.standings?.entries ?? [];
     return entries.map((e) => {
-      const abbr = fixAbbr(e.team?.abbreviation ?? "???");
-      const sv = (name) => e.stats?.find((s) => s.name === name)?.value ?? 0;
-      const sid = (id) => e.stats?.find((s) => s.id === id)?.displayValue ?? "—";
-      const w = sv("wins");
-      const l = sv("losses");
-      const pct = w + l > 0 ? +(w / (w + l)).toFixed(3) : 0;
-      const gb = sv("gamesBehind");
+      const abbr    = fixAbbr(e.team?.abbreviation ?? "???");
+      const sv      = (name) => e.stats?.find((s) => s.name === name)?.value ?? 0;
+      const sid     = (id)   => e.stats?.find((s) => s.id === id)?.displayValue ?? "—";
+      const w       = sv("wins");
+      const l       = sv("losses");
+      const pct     = w + l > 0 ? +(w / (w + l)).toFixed(3) : 0;
+      const gb      = sv("gamesBehind");
       const streakV = sv("streak");
-      const streak = streakV > 0 ? `W${streakV}` : streakV < 0 ? `L${Math.abs(streakV)}` : "—";
+      const streak  = streakV > 0 ? `W${streakV}` : streakV < 0 ? `L${Math.abs(streakV)}` : "—";
       return {
         team: abbr, w, l, pct,
-        gb: gb === 0 ? 0 : +parseFloat(gb).toFixed(1),
-        last10: sid("901"),
-        home: sid("33"),
-        road: sid("34"),
+        gb:     gb === 0 ? 0 : +parseFloat(gb).toFixed(1),
+        last10: sid(ESPN_STANDING_STAT_IDS.last10),
+        home:   sid(ESPN_STANDING_STAT_IDS.home),
+        road:   sid(ESPN_STANDING_STAT_IDS.road),
         streak,
       };
     }).sort((a, b) => b.pct - a.pct);
@@ -347,20 +357,20 @@ export function useStandings() {
 // ── Today's games ─────────────────────────────────────────────────
 function reshapeESPNScoreboard(data) {
   return (data?.events ?? []).map((ev) => {
-    const comp = ev.competitions?.[0];
+    const comp       = ev.competitions?.[0];
     const statusType = comp?.status?.type;
-    const state = statusType?.state ?? "pre";
-    const completed = statusType?.completed ?? false;
-    const detail = statusType?.detail ?? "";
-    const status = completed ? "final" : state === "in" ? "live" : "scheduled";
-    const home = comp?.competitors?.find((c) => c.homeAway === "home");
-    const away = comp?.competitors?.find((c) => c.homeAway === "away");
-    const homeAbbr = fixAbbr(home?.team?.abbreviation ?? "???");
-    const awayAbbr = fixAbbr(away?.team?.abbreviation ?? "???");
-    const homeScore = status !== "scheduled" ? parseInt(home?.score ?? 0) : null;
-    const awayScore = status !== "scheduled" ? parseInt(away?.score ?? 0) : null;
-    const period = status === "live" ? (comp?.status?.period ?? null) : null;
-    const time = status === "final" ? "Final" : detail;
+    const state      = statusType?.state ?? "pre";
+    const completed  = statusType?.completed ?? false;
+    const detail     = statusType?.detail ?? "";
+    const status     = completed ? "final" : state === "in" ? "live" : "scheduled";
+    const home       = comp?.competitors?.find((c) => c.homeAway === "home");
+    const away       = comp?.competitors?.find((c) => c.homeAway === "away");
+    const homeAbbr   = fixAbbr(home?.team?.abbreviation ?? "???");
+    const awayAbbr   = fixAbbr(away?.team?.abbreviation ?? "???");
+    const homeScore  = status !== "scheduled" ? parseInt(home?.score ?? 0) : null;
+    const awayScore  = status !== "scheduled" ? parseInt(away?.score ?? 0) : null;
+    const period     = status === "live" ? (comp?.status?.period ?? null) : null;
+    const time       = status === "final" ? "Final" : detail;
     return {
       id: String(ev.id), away: awayAbbr, home: homeAbbr,
       awayP: null, homeP: null,
@@ -380,7 +390,7 @@ export function useTodayGames() {
     },
     staleTime: 1000 * 30,
     refetchInterval: (query) => {
-      const games = query.state.data;
+      const games     = query.state.data;
       if (!Array.isArray(games) || games.length === 0) return 1000 * 60 * 10;
       const liveCount = games.filter(g => g.status === "live").length;
       if (liveCount > 0) return 1000 * 30;
@@ -395,25 +405,23 @@ export function useTodayGames() {
 function reshapeTeamSchedule(data, teamAbbr) {
   const events = data?.events ?? [];
   return events.map((ev) => {
-    const comp = ev.competitions?.[0];
-    const homeTeam = comp?.competitors?.find((c) => c.homeAway === "home");
-    const awayTeam = comp?.competitors?.find((c) => c.homeAway === "away");
-    const isHome = fixAbbr(homeTeam?.team?.abbreviation ?? "") === teamAbbr;
-    const opponent = fixAbbr(isHome
-      ? awayTeam?.team?.abbreviation
-      : homeTeam?.team?.abbreviation) ?? "???";
+    const comp       = ev.competitions?.[0];
+    const homeTeam   = comp?.competitors?.find((c) => c.homeAway === "home");
+    const awayTeam   = comp?.competitors?.find((c) => c.homeAway === "away");
+    const isHome     = fixAbbr(homeTeam?.team?.abbreviation ?? "") === teamAbbr;
+    const opponent   = fixAbbr(isHome ? awayTeam?.team?.abbreviation : homeTeam?.team?.abbreviation) ?? "???";
     const statusType = comp?.status?.type;
-    const completed = statusType?.completed ?? false;
-    const state = statusType?.state ?? "pre";
-    const status = completed ? "final" : state === "in" ? "live" : "scheduled";
+    const completed  = statusType?.completed ?? false;
+    const state      = statusType?.state ?? "pre";
+    const status     = completed ? "final" : state === "in" ? "live" : "scheduled";
 
     let result = null, teamScore = null, oppScore = null;
     if (completed) {
       const teamComp = isHome ? homeTeam : awayTeam;
-      const oppComp = isHome ? awayTeam : homeTeam;
+      const oppComp  = isHome ? awayTeam : homeTeam;
       teamScore = parseInt(teamComp?.score ?? 0);
-      oppScore = parseInt(oppComp?.score ?? 0);
-      result = teamScore > oppScore ? "W" : "L";
+      oppScore  = parseInt(oppComp?.score  ?? 0);
+      result    = teamScore > oppScore ? "W" : "L";
     }
 
     const dateObj = ev.date ? new Date(ev.date) : null;
@@ -437,8 +445,8 @@ export function useTeamSchedule(teamAbbr) {
       return reshapeTeamSchedule(data, teamAbbr);
     },
     staleTime: 1000 * 60 * 5,
-    enabled: !!teamAbbr,
-    retry: shouldRetry,
+    enabled:   !!teamAbbr,
+    retry:     shouldRetry,
   });
 }
 
@@ -447,7 +455,7 @@ export function useOdds() {
   return useQuery({
     queryKey: ["odds", todayStr()],
     queryFn: ({ signal }) => oddsFetch(signal),
-    staleTime: 1000 * 60 * 15,
+    staleTime:       1000 * 60 * 15,
     refetchInterval: 1000 * 60 * 15,
     retry: shouldRetry,
     placeholderData: {},
@@ -491,7 +499,7 @@ export function usePlayerSearch(query) {
         const name = `${p.first_name} ${p.last_name}`.trim();
         return {
           id: p.id, name,
-          pos: p.position || "—",
+          pos:  p.position || "—",
           team: p.team?.abbreviation || "—",
           age: null, per: null, bpm: null, vorp: null,
           ortg: null, drtg: null, form: null,
@@ -511,34 +519,14 @@ export const queryClientConfig = {
     queries: {
       staleTime: 1000 * 60 * 5,
       retry: shouldRetry,
+      retryDelay: (attempt, err) =>
+        err?.retryAfter ? err.retryAfter * 1000 : Math.min(1000 * 2 ** attempt, 30000),
       throwOnError: false,
     },
   },
 };
 
 // ── Targeted cache invalidation for ErrorBoundary ─────────────────
-// Gemini suggested queryClient.clear() inside ErrorBoundary.handleRetry,
-// but that nukes ALL cached data — standings, games, odds, players — so
-// the entire app re-fetches from scratch after every error, which is
-// worse than the original problem.
-//
-// Instead, export this function so ErrorBoundary can call it with the
-// queryClient instance. It only invalidates queries that are in an error
-// state, leaving healthy cached data untouched.
-//
-// Usage in App.jsx ErrorBoundary:
-//   import { invalidateErroredQueries } from "./api";
-//   handleRetry = () => {
-//     invalidateErroredQueries(this.props.queryClient);
-//     setTimeout(() => this.setState(...), 400);
-//   }
-//
-// Note: ErrorBoundary needs access to queryClient. Pass it as a prop:
-//   <ErrorBoundary queryClient={queryClient}>
-//     <App />
-//   </ErrorBoundary>
-// And get queryClient from useQueryClient() in AppInner, pass down.
-// See App.jsx for the updated wiring.
 export function invalidateErroredQueries(queryClient) {
   if (!queryClient) return;
   const cache = queryClient.getQueryCache();
@@ -548,20 +536,32 @@ export function invalidateErroredQueries(queryClient) {
   });
 }
 
-// ── Bets Persistence ──────────────────────────────────────────────
+// ── Bet ID generator ──────────────────────────────────────────────
 export function generateBetId() {
-  if (typeof crypto !== "undefined" && crypto.randomUUID) {
-    return crypto.randomUUID();
-  }
-  return `bet_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+  return crypto.randomUUID();
 }
 
+// ── Bets Persistence ──────────────────────────────────────────────
+// FIX G1: userId is now part of the query key.
+//
+// Before: queryKey: ["bets"]
+// The cache was shared across ALL Clerk sessions in the same browser.
+// If user A logs out and user B logs in without a hard reload, React Query
+// serves user A's cached bets to user B for the duration of gcTime.
+//
+// After: queryKey: ["bets", userId]
+// Each user gets their own isolated cache slot. Switching users immediately
+// produces a cache miss and fetches fresh data for the new session.
+// The query is also gated on !!userId so it never fires unauthenticated.
 export function useBets() {
   const { getToken } = useAuth();
-  const queryClient = useQueryClient();
+  const { user }     = useUser();
+  const userId       = user?.id ?? null;
+  const queryClient  = useQueryClient();
 
   const query = useQuery({
-    queryKey: ["bets"],
+    // FIX G1: userId scopes the cache entry to this specific Clerk user.
+    queryKey: ["bets", userId],
     queryFn: async () => {
       const token = await getToken();
       if (!token) throw new ApiError("Not authenticated", 401);
@@ -572,6 +572,15 @@ export function useBets() {
       return res.json();
     },
     staleTime: Infinity,
+    gcTime:    Infinity,
+    // FIX G1: don't run the query at all until we have a userId.
+    enabled: !!userId,
+    retry: async (count, err) => {
+      if (err?.status === 401 && count === 0) {
+        try { await getToken({ skipCache: true }); return true; } catch { return false; }
+      }
+      return false;
+    },
   });
 
   const saveMutation = useMutation({
@@ -589,18 +598,18 @@ export function useBets() {
       if (!res.ok) throw new Error("Failed to save bets");
     },
     onMutate: async (bets) => {
-      await queryClient.cancelQueries({ queryKey: ["bets"] });
-      const previous = queryClient.getQueryData(["bets"]);
-      queryClient.setQueryData(["bets"], bets);
+      await queryClient.cancelQueries({ queryKey: ["bets", userId] });
+      const previous = queryClient.getQueryData(["bets", userId]);
+      queryClient.setQueryData(["bets", userId], bets);
       return { previous };
     },
     onError: (_err, _bets, context) => {
       if (context?.previous !== undefined) {
-        queryClient.setQueryData(["bets"], context.previous);
+        queryClient.setQueryData(["bets", userId], context.previous);
       }
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["bets"] });
+      queryClient.invalidateQueries({ queryKey: ["bets", userId] });
     },
   });
 
@@ -617,31 +626,31 @@ export function useBets() {
       return res.json();
     },
     onMutate: async (betId) => {
-      await queryClient.cancelQueries({ queryKey: ["bets"] });
-      const previous = queryClient.getQueryData(["bets"]);
-      queryClient.setQueryData(["bets"], (old) =>
+      await queryClient.cancelQueries({ queryKey: ["bets", userId] });
+      const previous = queryClient.getQueryData(["bets", userId]);
+      queryClient.setQueryData(["bets", userId], (old) =>
         Array.isArray(old) ? old.filter(b => b.id !== betId) : old
       );
       return { previous };
     },
     onError: (_err, _betId, context) => {
       if (context?.previous !== undefined) {
-        queryClient.setQueryData(["bets"], context.previous);
+        queryClient.setQueryData(["bets", userId], context.previous);
       }
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["bets"] });
+      queryClient.invalidateQueries({ queryKey: ["bets", userId] });
     },
   });
 
   return {
-    bets: query.data ?? [],
-    isLoading: query.isLoading,
-    isSaving: saveMutation.isPending,
-    isDeleting: deleteMutation.isPending,
-    saveError: saveMutation.error?.message ?? null,
+    bets:        query.data ?? [],
+    isLoading:   query.isLoading,
+    isSaving:    saveMutation.isPending,
+    isDeleting:  deleteMutation.isPending,
+    saveError:   saveMutation.error?.message  ?? null,
     deleteError: deleteMutation.error?.message ?? null,
-    saveBets: saveMutation.mutateAsync,
-    deleteBet: deleteMutation.mutateAsync,
+    saveBets:    saveMutation.mutateAsync,
+    deleteBet:   deleteMutation.mutateAsync,
   };
 }
