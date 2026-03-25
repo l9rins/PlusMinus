@@ -21,11 +21,22 @@ function simGame(eloA, eloB, home, rng) {
   return rng() < eloWinP(eloA, eloB, home);
 }
 
-function simSeries(eloA, eloB, rng) {
+function simSeries(teamA, teamB, rng) {
   let wA = 0, wB = 0, g = 0;
-  const home = [true, true, false, false, true, false, true];
+  // Compare seeds. If they are from different conferences (Finals), compare win pct.
+  const aHasHome = teamA.seed < teamB.seed || (teamA.seed === teamB.seed && teamA.pct > teamB.pct);
+  
+  const homeElo = aHasHome ? teamA.elo : teamB.elo;
+  const awayElo = aHasHome ? teamB.elo : teamA.elo;
+  const homeSchedule = [true, true, false, false, true, false, true];
+
   while (wA < 4 && wB < 4) {
-    rng() < eloWinP(eloA, eloB, home[g++]) ? wA++ : wB++;
+    const homeWin = rng() < eloWinP(homeElo, awayElo, homeSchedule[g++]);
+    if (aHasHome) {
+      homeWin ? wA++ : wB++;
+    } else {
+      homeWin ? wB++ : wA++;
+    }
   }
   return wA === 4;
 }
@@ -270,6 +281,8 @@ export default async function handler(req, res) {
     return {
       team:  t.team,
       elo:   ed?.elo ?? Math.round(1500 + (t.pct - 0.5) * 400),
+      seed:  i + 1,
+      pct:   t.pct,
     };
   });
 
@@ -285,7 +298,8 @@ export default async function handler(req, res) {
     const loser78 = seed7 === s7 ? s8 : s7;
     const w910    = simGame(s9.elo, s10.elo, true, rng)        ? s9 : s10;
     const seed8   = simGame(loser78.elo, w910.elo, true, rng)  ? loser78 : w910;
-    return [seed7, seed8];
+    // Wrap to avoid mutating seed across sims
+    return [{ ...seed7, seed: 7 }, { ...seed8, seed: 8 }];
   }
 
   function simConf(seeds, rng) {
@@ -294,15 +308,15 @@ export default async function handler(req, res) {
     const bracket = [...direct, pi7, pi8];
     bracket.forEach(t => counts[t.team].r1++);
     const r2 = [[0, 7], [3, 4], [2, 5], [1, 6]].map(([a, b]) =>
-      simSeries(bracket[a].elo, bracket[b].elo, rng) ? bracket[a] : bracket[b]
+      simSeries(bracket[a], bracket[b], rng) ? bracket[a] : bracket[b]
     );
     r2.forEach(t => counts[t.team].r2++);
     const cf = [
-      simSeries(r2[0].elo, r2[1].elo, rng) ? r2[0] : r2[1],
-      simSeries(r2[2].elo, r2[3].elo, rng) ? r2[2] : r2[3],
+      simSeries(r2[0], r2[1], rng) ? r2[0] : r2[1],
+      simSeries(r2[2], r2[3], rng) ? r2[2] : r2[3],
     ];
     cf.forEach(t => counts[t.team].conf++);
-    return simSeries(cf[0].elo, cf[1].elo, rng) ? cf[0] : cf[1];
+    return simSeries(cf[0], cf[1], rng) ? cf[0] : cf[1];
   }
 
   const rng = makeLCG(hash);
@@ -312,7 +326,7 @@ export default async function handler(req, res) {
     const wC = simConf(westSeeds, rng);
     counts[eC.team].finals++;
     counts[wC.team].finals++;
-    const champ = simSeries(eC.elo, wC.elo, rng) ? eC : wC;
+    const champ = simSeries(eC, wC, rng) ? eC : wC;
     counts[champ.team].champ++;
   }
 

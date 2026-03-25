@@ -122,7 +122,7 @@ export function useLeagueTeamStats() {
     queryFn: async ({ signal }) => {
       const season = currentSeason();
       const data = await nbaFetch("leaguedashteamstats", {
-        Season: `${season - 1}-${String(season).slice(2)}`,
+        Season: `${season}-${String(season + 1).slice(2)}`,
         SeasonType: "Regular Season",
         PerMode: "PerGame",
         MeasureType: "Advanced",
@@ -142,7 +142,7 @@ export function useLeaguePlayerStats() {
     queryFn: async ({ signal }) => {
       const season = currentSeason();
       const data = await nbaFetch("leaguedashplayerstats", {
-        Season: `${season - 1}-${String(season).slice(2)}`,
+        Season: `${season}-${String(season + 1).slice(2)}`,
         SeasonType: "Regular Season",
         PerMode: "PerGame",
       }, signal);
@@ -160,7 +160,7 @@ export function useLeaguePlayerStatsAdvanced() {
     queryFn: async ({ signal }) => {
       const season = currentSeason();
       const data = await nbaFetch("leaguedashplayerstats", {
-        Season: `${season - 1}-${String(season).slice(2)}`,
+        Season: `${season}-${String(season + 1).slice(2)}`,
         SeasonType: "Regular Season",
         PerMode: "PerGame",
         MeasureType: "Advanced",
@@ -180,7 +180,7 @@ export function useAllPlayers() {
       const season = currentSeason();
       const data = await nbaFetch("commonallplayers", {
         LeagueID: "00",
-        Season: `${season - 1}-${String(season).slice(2)}`,
+        Season: `${season}-${String(season + 1).slice(2)}`,
         IsOnlyCurrentSeason: "1",
       }, signal);
       return data;
@@ -269,7 +269,7 @@ export const playerGameLogQueryConfig = (playerId) => ({
     const season = currentSeason();
     const data = await nbaFetch("playergamelog", {
       PlayerID:   playerId,
-      Season:     `${season - 1}-${String(season).slice(2)}`,
+      Season:     `${season}-${String(season + 1).slice(2)}`,
       SeasonType: "Regular Season",
       LeagueID:   "00",
       LastNGames: "5",
