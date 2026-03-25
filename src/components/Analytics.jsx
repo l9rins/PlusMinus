@@ -20,7 +20,7 @@ import {
 } from "../data";
 import { useStandings, useLeagueTeamStats, useEnrichedPlayerStats, useEloData } from "../api";
 import { FreshnessTag, RowSkeleton, ErrorState } from "./ui";
-import { signed, reshapeNBAStats } from "../utils";
+import { signed, reshapeNBAStats, lsGet, lsSet } from "../utils";
 import { TrendingUp, BarChart2, Zap, Award, Info, Star, Trophy } from "lucide-react";
 import PlayoffBracket from "./PlayoffBracket";
 
@@ -683,8 +683,14 @@ export default function Analytics() {
   const VALID_TABS = ["power", "factors", "elo", "quality", "playoff"];
   const [activeTab, setActiveTab] = useState(() => {
     const tab = searchParams.get("tab");
-    return VALID_TABS.includes(tab) ? tab : "power";
+    if (VALID_TABS.includes(tab)) return tab;
+    return lsGet("analytics_tab") || "power";
   });
+
+  const handleTab = (t) => {
+    setActiveTab(t);
+    lsSet("analytics_tab", t);
+  };
   const { data: standingsData, isLoading, isError, isFetching, refetch, dataUpdatedAt } = useStandings();
   const { data: nbaTeamStats } = useLeagueTeamStats();
   const { data: enrichedPlayers } = useEnrichedPlayerStats();
@@ -745,6 +751,14 @@ export default function Analytics() {
         tier: tier[0], tierColor: tier[1], trajectory,
         color: TEAM_COLORS[t.team] || "#546480",
         fromApi: !!apiEntry,
+        // Simulation data included:
+        isPlayIn:  false, // We can compute this based on seed later if needed, or get from UI
+        playInPct: apiEntry?.playInPct ?? 0,
+        r1Pct:     apiEntry?.r1Pct ?? 0,
+        r2Pct:     apiEntry?.r2Pct ?? 0,
+        confPct:   apiEntry?.confPct ?? 0,
+        finalsPct: apiEntry?.finalsPct ?? 0,
+        champPct:  apiEntry?.champPct ?? 0,
       };
     }).sort((a, b) => b.elo - a.elo);
   }, [standingsData, eloApiData]);
@@ -754,31 +768,19 @@ export default function Analytics() {
       ? computePowerIndex(fourFactors, eloData, shotData) : [],
     [fourFactors, eloData, shotData]
   );
-  const [playoffData, setPlayoffData] = useState([]);
-  const [isSimulating, setIsSimulating] = useState(false);
-
-  const standingsKey = standingsData
-    ? `${standingsData.east?.length}-${standingsData.east?.[0]?.w}-${standingsData.west?.[0]?.w}`
-    : null;
-  const eloKey = eloData.length > 0 ? `${eloData[0]?.elo}-${eloData.length}` : null;
-
-  useEffect(() => {
-    if (!standingsData || !eloData.length) return;
-    setIsSimulating(true);
-    const worker = new Worker(new URL("../workers/playoffWorker.js", import.meta.url), { type: "module" });
-    worker.onmessage = (e) => {
-      setPlayoffData(e.data);
-      setIsSimulating(false);
-      worker.terminate();
-    };
-    worker.onerror = (err) => {
-      console.error("[PlayoffWorker]", err);
-      setIsSimulating(false);
-      worker.terminate();
-    };
-    worker.postMessage({ standings: standingsData, eloData });
-    return () => worker.terminate();
-  }, [standingsKey, eloKey]);
+  // Now setPlayoffData can just be derived from eloData since we appended it directly!
+  // To avoid breaking PlayoffSimView completely, we sort by champPct and add conf/seed
+  const playoffDataVal = useMemo(() => {
+    if (!eloData.length) return [];
+    const eastSet = new Set((standingsData?.east || EAST_STANDINGS).map(t => t.team));
+    
+    // Sort conferences by pct to determine seeds
+    const all = eloData.map(t => ({ ...t, conf: eastSet.has(t.team) ? "East" : "West" }));
+    const east = all.filter(t => t.conf === "East").sort((a, b) => b.pct - a.pct).slice(0, 10).map((t, i) => ({ ...t, seed: i + 1, isPlayIn: i >= 6 }));
+    const west = all.filter(t => t.conf === "West").sort((a, b) => b.pct - a.pct).slice(0, 10).map((t, i) => ({ ...t, seed: i + 1, isPlayIn: i >= 6 }));
+    
+    return [...east, ...west].sort((a, b) => b.champPct - a.champPct);
+  }, [eloData, standingsData]);
 
   const needsStandings = ["factors", "elo", "power", "playoff"].includes(activeTab);
 
@@ -789,7 +791,7 @@ export default function Analytics() {
           {TABS.map(t => {
             const Icon = t.icon;
             return (
-              <button key={t.id} onClick={() => setActiveTab(t.id)}
+              <button key={t.id} onClick={() => handleTab(t.id)}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all
                   ${activeTab === t.id
                     ? "bg-accent/15 text-accent border border-accent/30"
@@ -814,7 +816,7 @@ export default function Analytics() {
             {activeTab === "factors" && <FourFactorsView data={fourFactors} />}
             {activeTab === "elo" && <EloView data={eloData} />}
             {activeTab === "quality" && <ShotQualityView data={shotData} isUsingFallback={isUsingFallback} />}
-            {activeTab === "playoff" && (isSimulating ? <div className="pm-card p-4 flex justify-center items-center"><div className="text-pitch-500 animate-pulse text-sm">Simulating 10,000 runs...</div></div> : <PlayoffSimView data={playoffData} />)}
+            {activeTab === "playoff" && <PlayoffSimView data={playoffDataVal} />}
           </motion.div>
         </AnimatePresence>
       )}

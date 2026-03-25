@@ -232,3 +232,27 @@ export function reshapeNBAStats(data, setName = null) {
     Object.fromEntries(headers.map((h, i) => [h, row[i]]))
   );
 }
+
+// ── Unit-based betting helpers ────────────────────────────────────
+export const getUnitSize = (bankroll = DEFAULT_BANKROLL) =>
+  +(bankroll / 100).toFixed(2);
+
+export const stakeToUnits = (stake, bankroll = DEFAULT_BANKROLL) => {
+  const unit = getUnitSize(bankroll);
+  if (!unit) return 0;
+  return +(Number(stake) / unit).toFixed(2);
+};
+
+export const unitsToDollars = (units, bankroll = DEFAULT_BANKROLL) =>
+  +(Number(units) * getUnitSize(bankroll)).toFixed(2);
+
+export const plInUnits = (pl, unitSize) => {
+  if (!unitSize || !isFinite(pl)) return null;
+  return +(Number(pl) / unitSize).toFixed(2);
+};
+
+// ── Elo ──────────────────────────────────────────────────────────
+export function eloWinProb(eloA, eloB, isAHome = false) {
+  const diff = eloA - eloB + (isAHome ? 35 : 0);
+  return 1 / (1 + Math.pow(10, -diff / 400));
+}

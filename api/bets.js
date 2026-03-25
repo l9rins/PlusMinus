@@ -76,8 +76,9 @@ export default async function handler(req, res) {
   // ── GET — return all bets ────────────────────────────────────────
   if (req.method === "GET") {
     try {
-      const bets = await kv.get(key);
-      return res.status(200).json(bets ?? []);
+      const archiveKey = `${key}:archive`;
+      const [bets, archive] = await Promise.all([kv.get(key), kv.get(archiveKey)]);
+      return res.status(200).json({ active: bets ?? [], archive: archive ?? [] });
     } catch (err) {
       console.error("[api/bets GET]", err);
       return res.status(503).json({ error: "Storage unavailable — please try again." });
@@ -91,9 +92,6 @@ export default async function handler(req, res) {
     if (!Array.isArray(bets)) {
       return res.status(400).json({ error: "Body must be an array" });
     }
-    if (bets.length > 500) {
-      return res.status(400).json({ error: "Maximum 500 bets allowed" });
-    }
 
     const invalidIdx = bets.findIndex(b => !isValidBet(b));
     if (invalidIdx !== -1) {
@@ -103,7 +101,21 @@ export default async function handler(req, res) {
     }
 
     try {
-      const sanitizedBets = bets.map(sanitizeBet);
+      let sanitizedBets = bets.map(sanitizeBet);
+      const archiveKey = `${key}:archive`;
+
+      if (sanitizedBets.length > 400) {
+        const toArchive = sanitizedBets.slice(400);
+        sanitizedBets = sanitizedBets.slice(0, 400);
+        
+        const existingArchive = (await kv.get(archiveKey)) || [];
+        const archiveMap = new Map();
+        existingArchive.forEach(b => archiveMap.set(b.id, b));
+        toArchive.forEach(b => archiveMap.set(b.id, b));
+        
+        await kv.set(archiveKey, Array.from(archiveMap.values()));
+      }
+
       await kv.set(key, sanitizedBets);
       return res.status(200).json({ ok: true });
     } catch (err) {

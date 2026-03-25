@@ -1,13 +1,17 @@
 import { handleOptions, setCORSHeaders } from "./_cors.js";
+import { createClient } from "@vercel/kv";
+
+const kv = createClient({
+  url: process.env.KV_REST_API_URL,
+  token: process.env.KV_REST_API_TOKEN,
+});
 
 const BASE = "https://stats.nba.com/stats";
 
 const NBA_HEADERS = {
-  "User-Agent": "Mozilla/5.0 (compatible; PlusMinus/1.0)",
+  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
   "Referer": "https://www.nba.com/",
   "Accept": "application/json",
-  "Accept-Language": "en-US,en;q=0.9",
-  "Origin": "https://www.nba.com",
 };
 
 // ── SECURITY FIX: per-endpoint parameter whitelists ───────────────
@@ -88,6 +92,19 @@ export default async function handler(req, res) {
 
   const qs = new URLSearchParams(params).toString();
   const url = `${BASE}/${endpoint}?${qs}`;
+  const cacheKey = `nba:${endpoint}:${qs}`;
+
+  try {
+    const cached = await kv.get(cacheKey);
+    if (cached) {
+      const ttl = cacheTTL(endpoint);
+      res.setHeader("Cache-Control", `s-maxage=${ttl}, stale-while-revalidate=60`);
+      res.setHeader("Content-Type", "application/json");
+      return res.status(200).json(cached);
+    }
+  } catch (e) {
+    console.error("KV cache skip:", e);
+  }
 
   try {
     const upstream = await fetch(url, {
@@ -104,13 +121,19 @@ export default async function handler(req, res) {
     const data = await upstream.json();
     const ttl = cacheTTL(endpoint);
 
+    try {
+      await kv.set(cacheKey, data, { ex: 21600 }); // 6 hours
+    } catch (e) {
+      console.error("KV cache set fail:", e);
+    }
+
     res.setHeader("Cache-Control", `s-maxage=${ttl}, stale-while-revalidate=60`);
     res.setHeader("Content-Type", "application/json");
     return res.status(200).json(data);
 
   } catch (err) {
     if (err.name === "TimeoutError") {
-      return res.status(504).json({ error: "NBA Stats timed out" });
+      return res.status(503).json({ error: "NBA Stats timed out — retrying" });
     }
     console.error("[api/nba]", err.message);
     return res.status(502).json({ error: "NBA Stats fetch failed", message: err.message });

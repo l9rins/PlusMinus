@@ -6,24 +6,30 @@ import {
     Zap, ChevronRight, Activity, DollarSign, Flame, Shield,
 } from "lucide-react";
 import { TEAM_NAMES, ODDS_GAMES, TEAM_COLORS } from "../data";
-import { useStandings, useTodayGames, useOdds, mergeOddsIntoGames, useBets } from "../api";
-import { calcPL, lsGet, kellyBet, DEFAULT_BANKROLL, formatCurrency } from "../utils";
+import { useStandings, useTodayGames, useOdds, mergeOddsIntoGames, useBets, useEloData } from "../api";
+import { formatCurrency, formatPct, lsGet, calcROI, eloWinProb } from "../utils";
 import { TileSkeleton, RowSkeleton, ErrorState, FreshnessTag, Tooltip, TeamLink } from "./ui";
 
 const container = { hidden: {}, show: { transition: { staggerChildren: 0.04, delayChildren: 0.05 } } };
 const tile = { hidden: { opacity: 0, y: 14, scale: 0.98 }, show: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.28, ease: [0.25, 0.46, 0.45, 0.94] } } };
 
 function GameTile({ game }) {
-    const fav = (game.homeP === null || game.awayP === null) ? null : game.homeP >= game.awayP ? "home" : "away";
-    const isFinal = game.status === "final";
-    const isLive = game.status === "live";
-    const isScheduled = game.status === "scheduled";
-    const awayColor = TEAM_COLORS[game.away] || "#546480";
-    const homeColor = TEAM_COLORS[game.home] || "#546480";
-    const favP = Math.max(game.homeP ?? 0, game.awayP ?? 0);
-    const confidence = (game.homeP === null || game.awayP === null)
-        ? "none"
-        : favP >= 70 ? "high" : favP >= 58 ? "mid" : "low";
+    const memoized = useMemo(() => {
+        const fav = (game.homeP === null || game.awayP === null) ? null : game.homeP >= game.awayP ? "home" : "away";
+        const isFinal = game.status === "final";
+        const isLive = game.status === "live";
+        const isScheduled = game.status === "scheduled";
+        const awayColor = TEAM_COLORS[game.away] || "#546480";
+        const homeColor = TEAM_COLORS[game.home] || "#546480";
+        const favP = Math.max(game.homeP ?? 0, game.awayP ?? 0);
+        const confidence = (game.homeP === null || game.awayP === null)
+            ? "none"
+            : favP >= 70 ? "high" : favP >= 58 ? "mid" : "low";
+        const awayName = TEAM_NAMES[game.away] || game.away;
+        const homeName = TEAM_NAMES[game.home] || game.home;
+        return { fav, isFinal, isLive, isScheduled, awayColor, homeColor, confidence, awayName, homeName };
+    }, [game]);
+    const { fav, isFinal, isLive, isScheduled, awayColor, homeColor, confidence, awayName, homeName } = memoized;
 
     return (
         <motion.div variants={tile} className="pm-tile p-3 group">
@@ -43,7 +49,7 @@ function GameTile({ game }) {
             <div className="flex items-center gap-2 mb-3">
                 <div className="flex-1 text-center">
                     <div className={`font-display text-xl tracking-wider leading-none mb-0.5 ${fav === "away" ? "" : "text-pitch-300"}`} style={{ color: fav === "away" && fav !== null ? awayColor : undefined }}>{game.away}</div>
-                    <div className="text-[10px] text-pitch-500 truncate px-1">{TEAM_NAMES[game.away] || game.away}</div>
+                    <div className="text-[10px] text-pitch-500 truncate px-1">{awayName}</div>
                     {(isFinal || isLive) ? <motion.div key={game.awayScore} initial={{ scale: 1.1 }} animate={{ scale: 1 }} className="pm-number text-lg mt-1 text-pitch-100">{game.awayScore}</motion.div>
                         : game.awayP !== null
                             ? <div className="pm-number text-sm mt-1 text-pitch-400">{game.awayP}%</div>
@@ -55,7 +61,7 @@ function GameTile({ game }) {
                 </div>
                 <div className="flex-1 text-center">
                     <div className={`font-display text-xl tracking-wider leading-none mb-0.5 ${fav === "home" ? "" : "text-pitch-300"}`} style={{ color: fav === "home" && fav !== null ? homeColor : undefined }}>{game.home}</div>
-                    <div className="text-[10px] text-pitch-500 truncate px-1">{TEAM_NAMES[game.home] || game.home}</div>
+                    <div className="text-[10px] text-pitch-500 truncate px-1">{homeName}</div>
                     {(isFinal || isLive) ? <motion.div key={game.homeScore} initial={{ scale: 1.1 }} animate={{ scale: 1 }} className="pm-number text-lg mt-1 text-pitch-100">{game.homeScore}</motion.div>
                         : game.homeP !== null
                             ? <div className="pm-number text-sm mt-1 text-pitch-400">{game.homeP}%</div>
@@ -90,10 +96,11 @@ function MiniStandings({ teams, conf }) {
                 {teams.slice(0, 8).map((t, i) => {
                     const isPlayoff = i < 6;
                     const isPlayIn = i >= 6 && i <= 9;
+                    const color = useMemo(() => TEAM_COLORS[t.team] || "#546480", [t.team]);
                     return (
                         <div key={`${t.team}-${i}`} className={`flex items-center gap-2 px-2 py-1.5 rounded-sm transition-colors hover:bg-pitch-700 cursor-pointer ${i === 6 ? "border-t border-dashed border-pitch-600 mt-1 pt-2.5" : ""}`}>
                             <span className="pm-number text-[10px] text-pitch-600 w-4 flex-shrink-0">{i + 1}</span>
-                            <div className="w-1.5 h-1.5 rounded-full flex-shrink-0 opacity-80" style={{ background: TEAM_COLORS[t.team] || "#546480" }} />
+                            <div className="w-1.5 h-1.5 rounded-full flex-shrink-0 opacity-80" style={{ background: color }} />
                             <TeamLink abbr={t.team} className={`font-display text-sm tracking-wider flex-1 block ${i === 0 ? "text-accent" : isPlayoff ? "text-pitch-200" : "text-pitch-400"}`}>{t.team}</TeamLink>
                             {t.streak && <span className={`text-[9px] font-mono hidden sm:inline ${t.streak.startsWith("W") ? "text-win/60" : t.streak.startsWith("L") ? "text-loss/60" : "text-pitch-500"}`}>{t.streak}</span>}
                             <span className="pm-number text-[10px] text-pitch-400 flex-shrink-0">{t.w}-{t.l}</span>
@@ -151,7 +158,8 @@ export default function Dashboard() {
     const games = useTodayGames();
     const standings = useStandings();
     const { data: oddsData } = useOdds();
-
+    const { data: eloApiData } = useEloData();
+    const { bets } = useBets();
     const today = new Date().toLocaleDateString("en-US", { weekday: "short", month: "long", day: "numeric", year: "numeric", timeZone: "America/New_York" });
     const rawGameList = games.data || [];
     const gameList = useMemo(() => mergeOddsIntoGames(rawGameList, oddsData) || [], [rawGameList, oddsData]);
@@ -159,8 +167,6 @@ export default function Dashboard() {
     const westList = standings.data?.west || [];
     const liveCount = gameList.filter(g => g.status === "live").length;
     const gameCount = gameList.length;
-
-    const { bets } = useBets();
 
     const betStats = useMemo(() => {
         if (!bets.length) return { total: 0, wins: 0, losses: 0, pending: 0, pl: 0 };
@@ -187,12 +193,29 @@ export default function Dashboard() {
         ? storedBankroll
         : DEFAULT_BANKROLL;
 
+    const elos = useMemo(() => {
+        const allTeams = [...(standings.data?.east || []), ...(standings.data?.west || [])];
+        const res = {};
+        allTeams.forEach(t => {
+            const apiEntry = eloApiData?.teams?.find(e => e.team === t.team);
+            res[t.team] = apiEntry ? apiEntry.elo : Math.round(1500 + (t.pct - 0.5) * 600);
+        });
+        return res;
+    }, [standings.data, eloApiData]);
+
     const topEdge = useMemo(() => {
-        if (oddsData && Object.keys(oddsData).length > 0) {
-            const cards = Object.entries(oddsData).map(([key, o]) => {
+        const odds = oddsData?.data || oddsData;
+        if (odds && Object.keys(odds).length > 0) {
+            const cards = Object.entries(odds).map(([key, o]) => {
                 const [away, home] = key.split("@");
-                const favIsHome = o.homeP >= o.awayP;
-                const modelP = favIsHome ? o.homeP : o.awayP;
+                
+                const homeElo = elos[home] || 1500;
+                const awayElo = elos[away] || 1500;
+                const homeWinP = eloWinProb(awayElo, homeElo, true) * 100;
+                const awayWinP = eloWinProb(homeElo, awayElo, false) * 100;
+                
+                const favIsHome = homeWinP >= awayWinP;
+                const modelP = favIsHome ? homeWinP : awayWinP;
                 const marketP = (favIsHome ? o.consHomeP : o.consAwayP) ?? (favIsHome ? o.homeP : o.awayP);
                 const bestFavOdds = favIsHome ? o.bestHomeOdds : o.bestAwayOdds;
                 return {
@@ -210,13 +233,22 @@ export default function Dashboard() {
     }, [oddsData]);
 
     const bestProb = useMemo(() => {
-        if (oddsData && Object.keys(oddsData).length > 0) {
-            const cards = Object.entries(oddsData).map(([key, o]) => { const [away, home] = key.split("@"); return { matchup: `${away} @ ${home}`, fav: o.homeP >= o.awayP ? home : away, modelP: Math.max(o.homeP, o.awayP) }; });
+        const odds = oddsData?.data || oddsData;
+        if (odds && Object.keys(odds).length > 0) {
+            const cards = Object.entries(odds).map(([key, o]) => { 
+                const [away, home] = key.split("@"); 
+                const homeElo = elos[home] || 1500;
+                const awayElo = elos[away] || 1500;
+                const homeWinP = eloWinProb(awayElo, homeElo, true) * 100;
+                const awayWinP = eloWinProb(homeElo, awayElo, false) * 100;
+                
+                return { matchup: `${away} @ ${home}`, fav: homeWinP >= awayWinP ? home : away, modelP: Math.max(homeWinP, awayWinP) }; 
+            });
             return cards.reduce((best, g) => g.modelP > best.modelP ? g : best, { matchup: "—", fav: "—", modelP: 0 });
         }
         if (!ODDS_GAMES.length) return { matchup: "—", fav: "—", modelP: 0 };
         return ODDS_GAMES.reduce((best, g) => g.modelP > best.modelP ? g : best);
-    }, [oddsData]);
+    }, [oddsData, elos]);
 
     const betSub = betStats.total > 0 ? `${betStats.wins}W · ${betStats.losses}L · ${betStats.pending} open` : "No bets logged yet";
     const edgeDiff = topEdge.modelP - topEdge.impliedP;
@@ -226,7 +258,10 @@ export default function Dashboard() {
             <motion.div variants={tile} className="col-span-12">
                 <div className="flex items-center justify-between mb-2">
                     <div className="pm-label">{today}</div>
-                    <FreshnessTag isFetching={games.isFetching || standings.isFetching} dataUpdatedAt={games.dataUpdatedAt} />
+                    <div className="flex items-center gap-2">
+                        {oddsData?.stale && <span className="text-[9px] text-draw/70 hidden sm:inline-block border border-draw/30 bg-draw/10 px-1.5 py-0.5 rounded cursor-help" title="Using cached odds.">Stale Odds</span>}
+                        <FreshnessTag isFetching={games.isFetching || standings.isFetching} dataUpdatedAt={games.dataUpdatedAt} />
+                    </div>
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                     <SummaryTile label="Games Today" value={gameCount || "—"} sub={gameCount === 0 ? "No games today" : liveCount > 0 ? `${liveCount} in progress` : "Tip-off tonight"} icon={Target} trend={liveCount > 0 ? "up" : null} badge={liveCount > 0 ? { label: "LIVE", cls: "bg-win/10 text-win border border-win/20" } : null} onClick={() => navigate("/scores")} />

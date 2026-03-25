@@ -21,7 +21,7 @@
 //
 // All previously documented fixes (Fix 4–6, 13, 16, 26 etc.) are retained.
 
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { useAuth, useUser } from "@clerk/clerk-react";
 import {
@@ -122,7 +122,7 @@ export function useLeagueTeamStats() {
     queryFn: async ({ signal }) => {
       const season = currentSeason();
       const data = await nbaFetch("leaguedashteamstats", {
-        Season: `${season - 1}-${String(season).slice(2)}`,
+        Season: `${season}-${String(season + 1).slice(2)}`,
         SeasonType: "Regular Season",
         PerMode: "PerGame",
         MeasureType: "Advanced",
@@ -142,7 +142,7 @@ export function useLeaguePlayerStats() {
     queryFn: async ({ signal }) => {
       const season = currentSeason();
       const data = await nbaFetch("leaguedashplayerstats", {
-        Season: `${season - 1}-${String(season).slice(2)}`,
+        Season: `${season}-${String(season + 1).slice(2)}`,
         SeasonType: "Regular Season",
         PerMode: "PerGame",
       }, signal);
@@ -160,7 +160,7 @@ export function useLeaguePlayerStatsAdvanced() {
     queryFn: async ({ signal }) => {
       const season = currentSeason();
       const data = await nbaFetch("leaguedashplayerstats", {
-        Season: `${season - 1}-${String(season).slice(2)}`,
+        Season: `${season}-${String(season + 1).slice(2)}`,
         SeasonType: "Regular Season",
         PerMode: "PerGame",
         MeasureType: "Advanced",
@@ -180,7 +180,7 @@ export function useAllPlayers() {
       const season = currentSeason();
       const data = await nbaFetch("commonallplayers", {
         LeagueID: "00",
-        Season: `${season - 1}-${String(season).slice(2)}`,
+        Season: `${season}-${String(season + 1).slice(2)}`,
         IsOnlyCurrentSeason: "1",
       }, signal);
       return data;
@@ -255,7 +255,10 @@ export function useEloData() {
         const body = await res.json().catch(() => ({}));
         throw new ApiError(body.error || `Elo proxy ${res.status}`, res.status);
       }
-      return res.json();
+      const data = await res.json();
+      const ratings = {};
+      (data.teams ?? []).forEach((t) => { ratings[t.team] = t.elo; });
+      return { ...data, ratings };
     },
     staleTime: 1000 * 60 * 60,
     placeholderData: null,
@@ -263,32 +266,40 @@ export function useEloData() {
   });
 }
 
+export const playerGameLogQueryConfig = (playerId) => ({
+  queryKey: ["nba", "playerGameLog", playerId],
+  queryFn: async ({ signal }) => {
+    const season = currentSeason();
+    const data = await nbaFetch("playergamelog", {
+      PlayerID:   playerId,
+      Season:     `${season}-${String(season + 1).slice(2)}`,
+      SeasonType: "Regular Season",
+      LeagueID:   "00",
+      LastNGames: "5",
+    }, signal);
+
+    const resultSet = data?.resultSets?.[0];
+    if (!resultSet) return [];
+    const headers = resultSet.headers;
+    const rows    = resultSet.rowSet;
+    const wlIdx   = headers.indexOf("WL");
+    if (wlIdx === -1) return [];
+
+    return rows.slice(0, 5).map(row => row[wlIdx]).reverse();
+  },
+  staleTime: 1000 * 60 * 30,
+  retry: shouldRetry,
+});
+
+export function prefetchPlayerGameLog(queryClient, playerId) {
+  return queryClient.prefetchQuery(playerGameLogQueryConfig(playerId));
+}
+
 export function usePlayerGameLog(playerId, enabled = false) {
   return useQuery({
-    queryKey: ["nba", "playerGameLog", playerId],
-    queryFn: async ({ signal }) => {
-      const season = currentSeason();
-      const data = await nbaFetch("playergamelog", {
-        PlayerID:   playerId,
-        Season:     `${season - 1}-${String(season).slice(2)}`,
-        SeasonType: "Regular Season",
-        LeagueID:   "00",
-        LastNGames: "5",
-      }, signal);
-
-      const resultSet = data?.resultSets?.[0];
-      if (!resultSet) return [];
-      const headers = resultSet.headers;
-      const rows    = resultSet.rowSet;
-      const wlIdx   = headers.indexOf("WL");
-      if (wlIdx === -1) return [];
-
-      return rows.slice(0, 5).map(row => row[wlIdx]).reverse();
-    },
-    staleTime: 1000 * 60 * 30,
+    ...playerGameLogQueryConfig(playerId),
     enabled:   enabled && !!playerId,
     placeholderData: null,
-    retry: shouldRetry,
   });
 }
 
@@ -390,11 +401,9 @@ export function useTodayGames() {
     },
     staleTime: 1000 * 30,
     refetchInterval: (query) => {
-      const games     = query.state.data;
-      if (!Array.isArray(games) || games.length === 0) return 1000 * 60 * 10;
-      const liveCount = games.filter(g => g.status === "live").length;
-      if (liveCount > 0) return 1000 * 30;
-      return 1000 * 60 * 2;
+      const data = query.state.data;
+      const hasLive = Array.isArray(data) && data.some(g => g.status === 'live');
+      return hasLive ? 30_000 : 300_000;
     },
     placeholderData: GAMES_FALLBACK,
     retry: shouldRetry,
@@ -462,8 +471,9 @@ export function useOdds() {
   });
 }
 
-export function mergeOddsIntoGames(games, odds) {
-  if (!games || !odds) return games ?? [];
+export function mergeOddsIntoGames(games, oddsPayload) {
+  if (!games || !oddsPayload) return games ?? [];
+  const odds = oddsPayload.data || oddsPayload; // handle wrapper
   return games.map((g) => {
     if (g.status !== "scheduled") return g;
     const match = odds[`${g.away}@${g.home}`];
@@ -558,18 +568,28 @@ export function useBets() {
   const { user }     = useUser();
   const userId       = user?.id ?? null;
   const queryClient  = useQueryClient();
+  const tokenRef     = useRef(null);
+
+  const getCachedToken = async (opts) => {
+    if (tokenRef.current && !opts?.skipCache) return tokenRef.current;
+    const token = await getToken(opts);
+    tokenRef.current = token;
+    return token;
+  };
 
   const query = useQuery({
     // FIX G1: userId scopes the cache entry to this specific Clerk user.
     queryKey: ["bets", userId],
     queryFn: async () => {
-      const token = await getToken();
+      const token = await getCachedToken();
       if (!token) throw new ApiError("Not authenticated", 401);
       const res = await fetch("/api/bets", {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) throw new Error("Failed to load bets");
-      return res.json();
+      const data = await res.json();
+      if (Array.isArray(data)) return data;
+      return [...(data.active || []), ...(data.archive || [])];
     },
     staleTime: Infinity,
     gcTime:    Infinity,
@@ -577,7 +597,7 @@ export function useBets() {
     enabled: !!userId,
     retry: async (count, err) => {
       if (err?.status === 401 && count === 0) {
-        try { await getToken({ skipCache: true }); return true; } catch { return false; }
+        try { await getCachedToken({ skipCache: true }); return true; } catch { return false; }
       }
       return false;
     },
@@ -585,7 +605,7 @@ export function useBets() {
 
   const saveMutation = useMutation({
     mutationFn: async (bets) => {
-      const token = await getToken();
+      const token = await getCachedToken();
       if (!token) throw new ApiError("Not authenticated", 401);
       const res = await fetch("/api/bets", {
         method: "PUT",
@@ -615,7 +635,7 @@ export function useBets() {
 
   const deleteMutation = useMutation({
     mutationFn: async (betId) => {
-      const token = await getToken();
+      const token = await getCachedToken();
       if (!token) throw new Error("Not authenticated");
       const res = await fetch(`/api/bets/${encodeURIComponent(betId)}`, {
         method: "DELETE",
@@ -653,4 +673,43 @@ export function useBets() {
     saveBets:    saveMutation.mutateAsync,
     deleteBet:   deleteMutation.mutateAsync,
   };
+}
+
+// ── Player Props (props API) ──────────────────────────────────────
+export function usePlayerProps(gameId, enabled = false) {
+  return useQuery({
+    queryKey: ["playerProps", gameId],
+    queryFn: async ({ signal }) => {
+      const res = await fetch(`/api/props?gameId=${encodeURIComponent(gameId)}`, { signal });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new ApiError(body.error || `Props proxy ${res.status}`, res.status);
+      }
+      return res.json();
+    },
+    staleTime: 1000 * 60 * 10,
+    enabled: enabled && !!gameId,
+    placeholderData: null,
+    retry: shouldRetry,
+  });
+}
+
+export function usePlayerPropHistory(playerId, market, line, limit = 10) {
+  const enabled = !!playerId && !!market;
+  return useQuery({
+    queryKey: ["playerPropHistory", playerId, market, line, limit],
+    queryFn: async ({ signal }) => {
+      const qs = new URLSearchParams({ playerId, market, ...(line != null && { line }), limit });
+      const res = await fetch(`/api/props?${qs}`, { signal });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new ApiError(body.error || `Props history ${res.status}`, res.status);
+      }
+      return res.json();
+    },
+    staleTime: 1000 * 60 * 30,
+    enabled: enabled && !!playerId && !!market,
+    placeholderData: null,
+    retry: shouldRetry,
+  });
 }

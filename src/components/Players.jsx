@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useVirtualizer, useWindowVirtualizer } from "@tanstack/react-virtual";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Search, SlidersHorizontal, ChevronDown, X, Loader,
@@ -6,20 +8,11 @@ import {
   BarChart2, Zap, Target, ArrowUpDown,
 } from "lucide-react";
 import { TEAM_COLORS, TEAM_NAMES } from "../data";
-import { useEnrichedPlayerStats, usePlayerSearch, usePlayerGameLog } from "../api";
-import { signed, netRatingTier } from "../utils";
+import { useEnrichedPlayerStats, usePlayerSearch, usePlayerGameLog, prefetchPlayerGameLog } from "../api";
+import { signed, netRatingTier, debounce } from "../utils";
 import { TileSkeleton, ErrorState, EmptyState } from "./ui";
 
 const POSITIONS = ["", "PG", "SG", "SF", "PF", "C"];
-
-function useDebounce(value, delay = 350) {
-  const [d, setD] = useState(value);
-  useEffect(() => {
-    const t = setTimeout(() => setD(value), delay);
-    return () => clearTimeout(t);
-  }, [value, delay]);
-  return d;
-}
 
 function TierBadge({ per }) {
   if (per == null) return null;
@@ -87,6 +80,7 @@ function StatChip({ label, value, highlight }) {
 }
 
 function PlayerCard({ player, onCompare, comparePlayer, isComparing, sortKey, isKeyboardFocused }) {
+  const queryClient = useQueryClient();
   const [expanded, setExpanded] = useState(false);
   const cardRef = useRef(null);
   const color = TEAM_COLORS[player.team] || "#546480";
@@ -94,7 +88,7 @@ function PlayerCard({ player, onCompare, comparePlayer, isComparing, sortKey, is
   const initials = player.name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
   const hasAdv = player.per != null;
   const hasStat = player.pts > 0 || player.ast > 0 || player.reb > 0;
-  const { data: gameLogForm, isFetching: formFetching } = usePlayerGameLog(player.id, expanded && hasAdv);
+  const { data: gameLogForm, isFetching: formFetching } = usePlayerGameLog(player.id, expanded);
 
   const radar = hasAdv ? [
     { label: "SCR", value: Math.min(100, (player.pts / 35) * 100) },
@@ -104,6 +98,10 @@ function PlayerCard({ player, onCompare, comparePlayer, isComparing, sortKey, is
     { label: "USG", value: Math.min(100, Math.max(0, ((player.usg ?? 0) / 40) * 100)) },
     { label: "PER", value: Math.min(100, (player.per / 35) * 100) },
   ] : null;
+
+  const handleMouseEnter = useCallback(() => {
+    prefetchPlayerGameLog(queryClient, player.id);
+  }, [player.id, queryClient]);
 
   const onKey = useCallback(e => {
     if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setExpanded(v => !v); }
@@ -115,7 +113,7 @@ function PlayerCard({ player, onCompare, comparePlayer, isComparing, sortKey, is
   return (
     <motion.div ref={cardRef} layout tabIndex={0} role="button" aria-expanded={expanded}
       aria-label={`${player.name}, ${player.pos}, ${player.team}. ${player.pts} pts, ${player.ast} ast, ${player.reb} reb. Enter to expand.`}
-      onKeyDown={onKey} onClick={() => setExpanded(!expanded)}
+      onKeyDown={onKey} onClick={() => setExpanded(!expanded)} onMouseEnter={handleMouseEnter}
       className={`pm-tile transition-all outline-none focus-visible:ring-2 focus-visible:ring-accent/50 cursor-pointer ${expanded ? "ring-1 ring-accent/30" : ""} ${isComparing ? "ring-1 ring-draw/40 bg-draw/5" : ""}`}>
 
       <div className="p-3 flex items-center gap-3 min-w-0">
@@ -259,6 +257,7 @@ function CompareBanner({ player, onClear }) {
 }
 
 export default function Players({ initialQuery = "" }) {
+  const [localQuery, setLocalQuery] = useState(initialQuery);
   const [query, setQuery] = useState(initialQuery);
   const [pos, setPos] = useState("");
   const [sortKey, setSortKey] = useState("pts");
@@ -266,32 +265,47 @@ export default function Players({ initialQuery = "" }) {
   const [focusedIdx, setFocusedIdx] = useState(-1);
   const inputRef = useRef(null);
 
-  useEffect(() => { setQuery(initialQuery); }, [initialQuery]);
+  const debouncedSetQuery = useMemo(() => debounce(setQuery, 200), []);
+
+  useEffect(() => { 
+    setLocalQuery(initialQuery); 
+    setQuery(initialQuery); 
+  }, [initialQuery]);
+  
   useEffect(() => { const t = setTimeout(() => inputRef.current?.focus(), 120); return () => clearTimeout(t); }, []);
 
   const handleCompare = useCallback(p => setComparePlayer(prev => prev?.id === p.id ? null : p), []);
 
-  const debouncedQuery = useDebounce(query, 350);
-  const trimmedQuery = query.trim();
-  const trimmedDebounced = debouncedQuery.trim();
+  const trimmedQuery = localQuery.trim();
+  const trimmedDebounced = query.trim();
   const isSearchMode = trimmedDebounced.length >= 2;
-  const isTyping = trimmedQuery.length >= 2 && query !== debouncedQuery;
+  const isTyping = trimmedQuery.length >= 2 && localQuery !== query;
 
   useEffect(() => { if (isSearchMode) setComparePlayer(null); }, [isSearchMode]);
 
   const { data: staticPlayers, isLoading: staticLoading, isError: staticError, isFetching: staticFetching, dataUpdatedAt, refetch } = useEnrichedPlayerStats();
-  const { data: searchResults, isLoading: searchLoading, isFetching: searchFetching, isError: searchError, refetch: searchRefetch } = usePlayerSearch(debouncedQuery);
+  const { data: searchResults, isLoading: searchLoading, isFetching: searchFetching, isError: searchError, refetch: searchRefetch } = usePlayerSearch(query);
 
   // FIX: [...filtered] spread before sort prevents React Query cache mutation
   const browsePlayers = useMemo(() => {
     const filtered = (staticPlayers || []).filter(p => !pos || p.pos === pos);
-    return [...filtered].sort((a, b) => (b[sortKey] ?? -Infinity) - (a[sortKey] ?? -Infinity));
+    return [...filtered].sort((a, b) => {
+      const av = a[sortKey] ?? -1;
+      const bv = b[sortKey] ?? -1;
+      return bv - av;
+    });
   }, [staticPlayers, pos, sortKey]);
 
   const displayPlayers = isSearchMode ? (searchResults || []) : browsePlayers;
   const isLoading = isSearchMode ? (searchLoading && !searchResults) : staticLoading;
   const isError = isSearchMode ? searchError : staticError;
   const isFetching = isSearchMode && (searchLoading || searchFetching || isTyping);
+
+  const virtualizer = useWindowVirtualizer({
+    count: displayPlayers.length,
+    estimateSize: () => 72,
+    overscan: 5,
+  });
 
   const handleListKeyDown = useCallback(e => {
     if (e.key === "ArrowDown") { e.preventDefault(); setFocusedIdx(p => Math.min(p + 1, displayPlayers.length - 1)); }
@@ -310,10 +324,10 @@ export default function Players({ initialQuery = "" }) {
           {isFetching
             ? <Loader size={13} strokeWidth={1.8} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-accent animate-spin" />
             : <Search size={13} strokeWidth={1.8} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-pitch-500" />}
-          <input ref={inputRef} value={query} onChange={e => { setQuery(e.target.value); setFocusedIdx(-1); }}
+          <input ref={inputRef} value={localQuery} onChange={e => { setLocalQuery(e.target.value); debouncedSetQuery(e.target.value); setFocusedIdx(-1); }}
             placeholder={isSearchMode ? "Searching all NBA players…" : "Search player…"}
             aria-label="Search players" className="pm-input w-full pl-8 pr-8" />
-          {query && <button onClick={() => { setQuery(""); inputRef.current?.focus(); }} aria-label="Clear search"
+          {localQuery && <button onClick={() => { setLocalQuery(""); setQuery(""); inputRef.current?.focus(); }} aria-label="Clear search"
             className="absolute right-2.5 top-1/2 -translate-y-1/2 text-pitch-500 hover:text-pitch-300 transition-colors"><X size={12} /></button>}
         </div>
 
@@ -369,19 +383,26 @@ export default function Players({ initialQuery = "" }) {
           title={isSearchMode ? `No results for "${trimmedDebounced}"` : "No players match"}
           description={isSearchMode ? "Try a different name, or check for typos." : "Try clearing the position filter."} />
       ) : (
-        <div className="space-y-2">
-          <AnimatePresence>
-            {displayPlayers.map((p, idx) => (
-              <motion.div key={`${p.id}-${p.name}`} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }}
-                transition={{ duration: 0.18, delay: Math.min(idx * 0.02, 0.3) }}>
+        <div className="relative w-full" style={{ height: `${virtualizer.getTotalSize()}px` }}>
+          {virtualizer.getVirtualItems().map(virtualItem => {
+            const p = displayPlayers[virtualItem.index];
+            return (
+              <div key={`${p.id}-${p.name}`}
+                data-index={virtualItem.index}
+                ref={virtualizer.measureElement}
+                className="absolute top-0 left-0 w-full"
+                style={{
+                  transform: `translateY(${virtualItem.start}px)`,
+                  paddingBottom: "8px"
+                }}>
                 <PlayerCard player={p} onCompare={!isSearchMode ? handleCompare : null}
                   comparePlayer={comparePlayer} isComparing={comparePlayer?.id === p.id}
-                  sortKey={sortKey} isKeyboardFocused={focusedIdx === idx} />
-              </motion.div>
-            ))}
-          </AnimatePresence>
+                  sortKey={sortKey} isKeyboardFocused={focusedIdx === virtualItem.index} />
+              </div>
+            );
+          })}
           {isSearchMode && displayPlayers.length >= 10 && (
-            <div className="text-center py-3 text-[10px] text-pitch-600">Showing top {displayPlayers.length} results — refine your search to narrow down</div>
+            <div className="text-center py-3 text-[10px] text-pitch-600" style={{ transform: `translateY(${virtualizer.getTotalSize()}px)` }}>Showing top {displayPlayers.length} results — refine your search to narrow down</div>
           )}
         </div>
       )}

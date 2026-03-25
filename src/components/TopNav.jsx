@@ -234,8 +234,9 @@ export default function TopNav({ activeTab, onTabChange }) {
       }));
 
     // High-edge bets from real odds
-    if (oddsData) {
-      Object.entries(oddsData)
+    const odds = oddsData?.data || oddsData;
+    if (odds) {
+      Object.entries(odds)
         .map(([key, o]) => {
           const [away, home] = key.split("@");
           const favIsHome = o.homeP >= o.awayP;

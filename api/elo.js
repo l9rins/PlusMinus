@@ -1,5 +1,45 @@
 import { handleOptions, setCORSHeaders } from "./_cors.js";
 import { createClient } from "@vercel/kv";
+import { EAST_STANDINGS, WEST_STANDINGS } from "../src/data.js";
+
+function makeLCG(seed) {
+  let s = (seed ^ 0xdeadbeef) >>> 0;
+  return () => {
+    s = Math.imul(1664525, s) + 1013904223 >>> 0;
+    return s / 4294967296;
+  };
+}
+
+const SIMS = 10_000;
+const HOME_BUMP = 35;
+
+function eloWinP(eloA, eloB, home = false) {
+  return 1 / (1 + Math.pow(10, -(eloA - eloB + (home ? HOME_BUMP : 0)) / 400));
+}
+
+function simGame(eloA, eloB, home, rng) {
+  return rng() < eloWinP(eloA, eloB, home);
+}
+
+function simSeries(teamA, teamB, rng) {
+  let wA = 0, wB = 0, g = 0;
+  // Compare seeds. If they are from different conferences (Finals), compare win pct.
+  const aHasHome = teamA.seed < teamB.seed || (teamA.seed === teamB.seed && teamA.pct > teamB.pct);
+  
+  const homeElo = aHasHome ? teamA.elo : teamB.elo;
+  const awayElo = aHasHome ? teamB.elo : teamA.elo;
+  const homeSchedule = [true, true, false, false, true, false, true];
+
+  while (wA < 4 && wB < 4) {
+    const homeWin = rng() < eloWinP(homeElo, awayElo, homeSchedule[g++]);
+    if (aHasHome) {
+      homeWin ? wA++ : wB++;
+    } else {
+      homeWin ? wB++ : wA++;
+    }
+  }
+  return wA === 4;
+}
 
 const kv = createClient({
   url: process.env.KV_REST_API_URL,
@@ -8,26 +48,12 @@ const kv = createClient({
 
 const NBA_BASE = "https://stats.nba.com/stats";
 const NBA_HEADERS = {
-  "User-Agent": "Mozilla/5.0 (compatible; PlusMinus/1.0)",
+  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
   "Referer":    "https://www.nba.com/",
   "Accept":     "application/json",
-  "Accept-Language": "en-US,en;q=0.9",
-  "Origin":     "https://www.nba.com",
 };
 
-// All 30 NBA team IDs → abbreviation mapping
-const TEAM_IDS = {
-  1610612737: "ATL", 1610612738: "BOS", 1610612739: "CLE",
-  1610612740: "NOP", 1610612741: "CHI", 1610612742: "DAL",
-  1610612743: "DEN", 1610612744: "GSW", 1610612745: "HOU",
-  1610612746: "LAC", 1610612747: "LAL", 1610612748: "MIA",
-  1610612749: "MIL", 1610612750: "MIN", 1610612751: "BKN",
-  1610612752: "NYK", 1610612753: "ORL", 1610612754: "IND",
-  1610612755: "PHI", 1610612756: "PHX", 1610612757: "POR",
-  1610612758: "SAC", 1610612759: "SAS", 1610612760: "OKC",
-  1610612761: "TOR", 1610612762: "UTA", 1610612763: "MEM",
-  1610612764: "WAS", 1610612765: "DET", 1610612766: "CHA",
-};
+const ABBR_FIX = { SA: "SAS", WSH: "WAS", NY: "NYK", GS: "GSW", NO: "NOP", PHO: "PHX" };
 
 // Derive current season string e.g. "2024-25"
 function currentSeasonStr() {
@@ -52,86 +78,64 @@ function updateElo(winnerElo, loserElo) {
   };
 }
 
-// Fetch one team's game log — returns array of { date, wl, isHome }
-async function fetchTeamGameLog(teamId, season, attempt = 0) {
-  const MAX_ATTEMPTS = 3;
+async function fetchAllGamesViaLeagueLog(season) {
   const qs = new URLSearchParams({
-    TeamID:     teamId,
     Season:     season,
     SeasonType: "Regular Season",
     LeagueID:   "00",
+    Direction:  "ASC",
+    Sorter:     "DATE",
   });
-  const url = `${NBA_BASE}/teamgamelog?${qs}`;
+  const url = `${NBA_BASE}/leaguegamelog?${qs}`;
 
-  try {
-    const res = await fetch(url, {
-      headers: NBA_HEADERS,
-      signal: AbortSignal.timeout(8000),
+  const res = await fetch(url, {
+    headers: NBA_HEADERS,
+    signal: AbortSignal.timeout(12000),
+  });
+  if (!res.ok) return [];
+
+  const data = await res.json();
+  const resultSet = data?.resultSets?.[0];
+  if (!resultSet) return [];
+
+  const h = resultSet.headers;
+  const rows = resultSet.rowSet;
+  const abbrIdx    = h.indexOf("TEAM_ABBREVIATION");
+  const dateIdx    = h.indexOf("GAME_DATE");
+  const matchupIdx = h.indexOf("MATCHUP");
+  const wlIdx      = h.indexOf("WL");
+
+  // Each row is one team's side of a game. Collect home-team rows only
+  // (MATCHUP contains "vs." for home, "@" for away).
+  const games = [];
+  const seen  = new Set();
+
+  for (const row of rows) {
+    const matchup = row[matchupIdx] ?? "";
+    if (!matchup.includes("vs.")) continue; // away side — skip
+
+    const rawAbbr = row[abbrIdx];
+    const homeAbbr = ABBR_FIX[rawAbbr] ?? rawAbbr;
+
+    // Opponent is the last token in "BOS vs. MIA" → "MIA"
+    const parts    = matchup.split(/\s+/);
+    const rawOpp   = parts[parts.length - 1];
+    const awayAbbr = ABBR_FIX[rawOpp] ?? rawOpp;
+
+    const date = row[dateIdx];
+    const key  = `${date}|${homeAbbr}|${awayAbbr}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+
+    games.push({
+      date,
+      home:    homeAbbr,
+      away:    awayAbbr,
+      homeWon: row[wlIdx] === "W",
     });
-
-    // 429 rate limit — back off and retry
-    if (res.status === 429) {
-      if (attempt >= MAX_ATTEMPTS) return [];
-      const retryAfter = parseInt(res.headers.get("Retry-After") || "5", 10);
-      await sleep(retryAfter * 1000);
-      return fetchTeamGameLog(teamId, season, attempt + 1);
-    }
-
-    // Other non-ok responses — don't retry, return empty
-    if (!res.ok) return [];
-
-    const data = await res.json();
-    const resultSet = data?.resultSets?.[0];
-    if (!resultSet) return [];
-    const headers = resultSet.headers;
-    const rows    = resultSet.rowSet;
-
-    const dateIdx    = headers.indexOf("GAME_DATE");
-    const wlIdx      = headers.indexOf("WL");
-    const matchupIdx = headers.indexOf("MATCHUP");
-
-    return rows.map(row => {
-      const matchup    = row[matchupIdx] ?? "";
-      const parts      = matchup.split(/\s+/);
-      const opponentRaw = parts[parts.length - 1];
-      const ABBR_FIX   = { SA: "SAS", WSH: "WAS", NY: "NYK", GS: "GSW", NO: "NOP", PHO: "PHX" };
-      const opponent   = ABBR_FIX[opponentRaw] ?? opponentRaw;
-      return {
-        date:     row[dateIdx],
-        wl:       row[wlIdx],
-        isHome:   !matchup.includes("@"),
-        opponent,
-      };
-    }).reverse();
-
-  } catch (err) {
-    // Timeout or network error — retry with backoff
-    if (attempt >= MAX_ATTEMPTS) return [];
-    const backoff = Math.pow(2, attempt) * 500; // 500ms, 1s, 2s
-    await sleep(backoff);
-    return fetchTeamGameLog(teamId, season, attempt + 1);
   }
-}
 
-// Small delay to avoid hammering stats.nba.com
-const sleep = ms => new Promise(r => setTimeout(r, ms));
-
-// Max 5 concurrent requests to avoid NBA Stats rate limiting
-async function fetchAllGameLogs(teamEntries, season) {
-  const CONCURRENCY = 5;
-  const results = {};
-  
-  for (let i = 0; i < teamEntries.length; i += CONCURRENCY) {
-    const batch = teamEntries.slice(i, i + CONCURRENCY);
-    const batchResults = await Promise.all(
-      batch.map(([teamId, abbr]) =>
-        fetchTeamGameLog(teamId, season).then(log => ({ abbr, log }))
-      )
-    );
-    batchResults.forEach(({ abbr, log }) => { results[abbr] = log; });
-    if (i + CONCURRENCY < teamEntries.length) await sleep(300); // one gap between batches
-  }
-  return results;
+  return games;
 }
 
 export default async function handler(req, res) {
@@ -142,54 +146,38 @@ export default async function handler(req, res) {
   if (req.method !== "GET") return res.status(405).end();
 
   const season = currentSeasonStr();
+  const CACHE_KEY = `elo:${season}`;
   
-  try {
-    const CACHE_KEY = `elo:${season}`;
-    const cached = await kv.get(CACHE_KEY);
-    if (cached) {
-      res.setHeader("Cache-Control", "s-maxage=3600, stale-while-revalidate=300");
-      res.setHeader("Content-Type", "application/json");
-      return res.status(200).json(cached);
+  if (req.query.rebuild !== "true") {
+    try {
+      const cached = await kv.get(CACHE_KEY);
+      if (cached) {
+        res.setHeader("Cache-Control", "s-maxage=3600, stale-while-revalidate=300");
+        res.setHeader("Content-Type", "application/json");
+        return res.status(200).json(cached);
+      }
+      return res.status(503).json({ error: "Elo data is computing. Please try again later." });
+    } catch (e) {
+      console.error("KV cache skip:", e);
+      return res.status(503).json({ error: "Storage error" });
     }
-  } catch (e) {
-    console.error("KV cache skip:", e);
   }
 
-  const teamEntries = Object.entries(TEAM_IDS); // 30 teams
+  // Get all 30 teams from a single API call
+  const allGames = await fetchAllGamesViaLeagueLog(season);
 
-  // Initialize all Elo ratings at 1500
+  // Collect unique team abbreviations from the game log
+  const allTeams = new Set();
+  for (const g of allGames) { allTeams.add(g.home); allTeams.add(g.away); }
+
   const eloMap = {};
   const trajectories = {};
   const gameCounters = {};
-
-  for (const [, abbr] of teamEntries) {
-    eloMap[abbr]      = 1500;
+  
+  for (const abbr of allTeams) {
+    eloMap[abbr]       = 1500;
     trajectories[abbr] = [];
     gameCounters[abbr] = 0;
-  }
-
-  const gameLogs = await fetchAllGameLogs(teamEntries, season);
-
-  // Build a unified chronological game list for proper Elo update ordering.
-  // Each entry: { date, homeAbbr, awayAbbr, homeWon }
-  // We derive this by cross-referencing each team's log — a game appears
-  // in BOTH teams' logs, so we deduplicate by (date, homeAbbr, awayAbbr).
-  const allGames = [];
-  const seen = new Set();
-
-  for (const [abbr, log] of Object.entries(gameLogs)) {
-    for (const g of log) {
-      if (!g.isHome) continue; // only process from home team's perspective to avoid duplicates
-      const key = `${g.date}|${abbr}|${g.opponent}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      allGames.push({
-        date:    g.date,
-        home:    abbr,
-        away:    g.opponent,
-        homeWon: g.wl === "W",
-      });
-    }
   }
 
   allGames.sort((a, b) => new Date(a.date) - new Date(b.date));
@@ -200,19 +188,12 @@ export default async function handler(req, res) {
     const awayElo = eloMap[game.away] ?? 1500;
 
     // Apply home court advantage to win probability only
-    const homeEloAdj = homeElo + HOME_ADV;
-    const { winner: newWinner, loser: newLoser } = updateElo(
-      game.homeWon ? homeEloAdj : awayElo,
-      game.homeWon ? awayElo    : homeEloAdj,
-    );
-
-    if (game.homeWon) {
-      eloMap[game.home] = newWinner;
-      eloMap[game.away] = newLoser;
-    } else {
-      eloMap[game.away] = newWinner;
-      eloMap[game.home] = newLoser;
-    }
+    const homeWinP = winProb(homeElo + HOME_ADV, awayElo);
+    const newHomeElo = +(homeElo + K * ((game.homeWon ? 1 : 0) - homeWinP)).toFixed(2);
+    const newAwayElo = +(awayElo + K * ((game.homeWon ? 0 : 1) - (1 - homeWinP))).toFixed(2);
+    
+    eloMap[game.home] = newHomeElo;
+    eloMap[game.away] = newAwayElo;
 
     // Record trajectory point for both teams
     gameCounters[game.home] = (gameCounters[game.home] || 0) + 1;
@@ -222,15 +203,89 @@ export default async function handler(req, res) {
   }
 
   // Build final response — one entry per team
-  const result = Object.entries(TEAM_IDS).map(([, abbr]) => ({
+  const result = [...allTeams].map((abbr) => ({
     team:       abbr,
     elo:        Math.round(eloMap[abbr] ?? 1500),
     games:      gameCounters[abbr] ?? 0,
     trajectory: trajectories[abbr] ?? [],
+    finalsPct:  0,
+    champPct:   0,
   })).sort((a, b) => b.elo - a.elo);
 
+  const stringToHash = JSON.stringify(EAST_STANDINGS) + JSON.stringify(WEST_STANDINGS);
+  let hash = 0;
+  for (let i = 0; i < stringToHash.length; i++) hash = Math.imul(31, hash) + stringToHash.charCodeAt(i) | 0;
+
+  const safeEloData = result;
+
+  const buildSeeds = conf => conf.slice(0, 10).map((t, i) => {
+    const ed = safeEloData.find(x => x.team === t.team);
+    return {
+      team:  t.team,
+      elo:   ed?.elo ?? Math.round(1500 + (t.pct - 0.5) * 400),
+      seed:  i + 1,
+      pct:   t.pct,
+    };
+  });
+
+  const eastSeeds = buildSeeds(EAST_STANDINGS);
+  const westSeeds = buildSeeds(WEST_STANDINGS);
+  const counts = {};
+  [...eastSeeds, ...westSeeds].forEach(t => { counts[t.team] = { pi: 0, r1: 0, r2: 0, conf: 0, finals: 0, champ: 0 }; });
+
+  function simPlayIn(seeds, rng) {
+    const [s7, s8, s9, s10] = seeds.slice(6, 10);
+    [s7, s8, s9, s10].forEach(t => counts[t.team].pi++);
+    const seed7   = simGame(s7.elo, s8.elo, true, rng)        ? s7 : s8;
+    const loser78 = seed7 === s7 ? s8 : s7;
+    const w910    = simGame(s9.elo, s10.elo, true, rng)        ? s9 : s10;
+    const seed8   = simGame(loser78.elo, w910.elo, true, rng)  ? loser78 : w910;
+    // Wrap to avoid mutating seed across sims
+    return [{ ...seed7, seed: 7 }, { ...seed8, seed: 8 }];
+  }
+
+  function simConf(seeds, rng) {
+    const direct = seeds.slice(0, 6);
+    const [pi7, pi8] = simPlayIn(seeds, rng);
+    const bracket = [...direct, pi7, pi8];
+    bracket.forEach(t => counts[t.team].r1++);
+    const r2 = [[0, 7], [3, 4], [2, 5], [1, 6]].map(([a, b]) =>
+      simSeries(bracket[a], bracket[b], rng) ? bracket[a] : bracket[b]
+    );
+    r2.forEach(t => counts[t.team].r2++);
+    const cf = [
+      simSeries(r2[0], r2[1], rng) ? r2[0] : r2[1],
+      simSeries(r2[2], r2[3], rng) ? r2[2] : r2[3],
+    ];
+    cf.forEach(t => counts[t.team].conf++);
+    return simSeries(cf[0], cf[1], rng) ? cf[0] : cf[1];
+  }
+
+  const rng = makeLCG(hash);
+
+  for (let i = 0; i < SIMS; i++) {
+    const eC = simConf(eastSeeds, rng);
+    const wC = simConf(westSeeds, rng);
+    counts[eC.team].finals++;
+    counts[wC.team].finals++;
+    const champ = simSeries(eC, wC, rng) ? eC : wC;
+    counts[champ.team].champ++;
+  }
+
+  result.forEach(t => {
+    const c = counts[t.team];
+    if (c) {
+      t.playInPct = +(c.pi     / SIMS * 100).toFixed(1);
+      t.r1Pct     = +(c.r1     / SIMS * 100).toFixed(1);
+      t.r2Pct     = +(c.r2     / SIMS * 100).toFixed(1);
+      t.confPct   = +(c.conf   / SIMS * 100).toFixed(1);
+      t.finalsPct = +(c.finals / SIMS * 100).toFixed(1);
+      t.champPct  = +(c.champ  / SIMS * 100).toFixed(1);
+    }
+  });
+
   // In the final result build, add a teamsWithData count:
-  const teamsWithData = Object.values(gameLogs).filter(log => log.length > 0).length;
+  const teamsWithData = allTeams.size;
 
   const responsePayload = {
     season,
