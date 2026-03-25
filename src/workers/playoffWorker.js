@@ -52,11 +52,22 @@ function simGame(eloA, eloB, home, rng) {
   return rng() < eloWinP(eloA, eloB, home);
 }
 
-function simSeries(eloA, eloB, rng) {
+function simSeries(teamA, teamB, rng) {
   let wA = 0, wB = 0, g = 0;
-  const home = [true, true, false, false, true, false, true];
+  // Dynamic home court check based on seed and win percentage
+  const aHasHome = teamA.seed < teamB.seed || (teamA.seed === teamB.seed && teamA.pct > teamB.pct);
+
+  const homeElo = aHasHome ? teamA.elo : teamB.elo;
+  const awayElo = aHasHome ? teamB.elo : teamA.elo;
+  const homeSchedule = [true, true, false, false, true, false, true];
+
   while (wA < 4 && wB < 4) {
-    rng() < eloWinP(eloA, eloB, home[g++]) ? wA++ : wB++;
+    const homeWin = rng() < eloWinP(homeElo, awayElo, homeSchedule[g++]);
+    if (aHasHome) {
+      homeWin ? wA++ : wB++;
+    } else {
+      homeWin ? wB++ : wA++;
+    }
   }
   return wA === 4;
 }
@@ -98,15 +109,15 @@ self.onmessage = (e) => {
     const bracket = [...direct, pi7, pi8];
     bracket.forEach(t => counts[t.team].r1++);
     const r2 = [[0, 7], [3, 4], [2, 5], [1, 6]].map(([a, b]) =>
-      simSeries(bracket[a].elo, bracket[b].elo, rng) ? bracket[a] : bracket[b]
+      simSeries(bracket[a], bracket[b], rng) ? bracket[a] : bracket[b]
     );
     r2.forEach(t => counts[t.team].r2++);
     const cf = [
-      simSeries(r2[0].elo, r2[1].elo, rng) ? r2[0] : r2[1],
-      simSeries(r2[2].elo, r2[3].elo, rng) ? r2[2] : r2[3],
+      simSeries(r2[0], r2[1], rng) ? r2[0] : r2[1],
+      simSeries(r2[2], r2[3], rng) ? r2[2] : r2[3],
     ];
     cf.forEach(t => counts[t.team].conf++);
-    const champ = simSeries(cf[0].elo, cf[1].elo, rng) ? cf[0] : cf[1];
+    const champ = simSeries(cf[0], cf[1], rng) ? cf[0] : cf[1];
     return champ;
   }
 
@@ -120,7 +131,7 @@ self.onmessage = (e) => {
     const wC = simConf(westSeeds, rng);
     counts[eC.team].finals++;
     counts[wC.team].finals++;
-    const champ = simSeries(eC.elo, wC.elo, rng) ? eC : wC;
+    const champ = simSeries(eC, wC, rng) ? eC : wC;
     counts[champ.team].champ++;
   }
 
