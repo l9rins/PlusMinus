@@ -166,6 +166,12 @@ export default async function handler(req, res) {
   // Get all 30 teams from a single API call
   const allGames = await fetchAllGamesViaLeagueLog(season);
 
+  // FIX: Circuit breaker to prevent poisoning the KV cache
+  if (!allGames || allGames.length === 0) {
+    console.error("[api/elo] NBA API returned no games. Aborting rebuild to preserve cache.");
+    return res.status(502).json({ error: "Upstream NBA API failure. Cache preserved." });
+  }
+
   // Collect unique team abbreviations from the game log
   const allTeams = new Set();
   for (const g of allGames) { allTeams.add(g.home); allTeams.add(g.away); }

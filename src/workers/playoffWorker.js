@@ -100,7 +100,10 @@ self.onmessage = (e) => {
     const loser78 = seed7 === s7 ? s8 : s7;
     const w910    = simGame(s9.elo, s10.elo, true, rng)        ? s9 : s10;
     const seed8   = simGame(loser78.elo, w910.elo, true, rng)  ? loser78 : w910;
-    return [seed7, seed8];
+    
+    // FIX: Explicitly assign the new seed designations to ensure
+    // logical consistency and correct home-court math in later rounds.
+    return [{ ...seed7, seed: 7 }, { ...seed8, seed: 8 }];
   }
 
   function simConf(seeds, rng) {
