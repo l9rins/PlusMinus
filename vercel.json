@@ -11,10 +11,6 @@
       "destination": "/api/bets?id=:id"
     },
     {
-      "source": "/api/(.*)",
-      "destination": "/api/$1"
-    },
-    {
       "source": "/((?!api/|manifest\\.json|favicon\\.|og-image\\.).*)",
       "destination": "/index.html"
     }

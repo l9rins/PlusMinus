@@ -75,7 +75,7 @@ export default async function handler(req, res) {
     //      and remove apiKey from the URL.
     const url =
       `${ODDS_BASE}/sports/basketball_nba/odds` +
-      `?apiKey=${apiKey}&regions=us&markets=h2h&oddsFormat=american&bookmakers=draftkings,fanduel,betmgm,caesars,pointsbet,betrivers,espnbet,bet365`;
+      `?apiKey=${apiKey}&regions=us&markets=h2h&oddsFormat=american&bookmakers=draftkings,fanduel,betmgm,caesars,betrivers,espnbet,barstool,pointsbetus,betparx,fliff,hardrock,mybookieag`;
 
     const upstream = await fetch(url, { signal: AbortSignal.timeout(8000) });
 

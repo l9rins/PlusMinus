@@ -64,9 +64,9 @@ export function useAlerts() {
     return {
         data: query.data || [],
         isLoading: query.isLoading,
-        createAlert: createMutation.mutate,
+        createAlert: createMutation.mutateAsync,
         isCreating: createMutation.isPending,
-        deleteAlert: deleteMutation.mutate,
+        deleteAlert: deleteMutation.mutateAsync,
         isDeleting: deleteMutation.isPending,
     };
 }

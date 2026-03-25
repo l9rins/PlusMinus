@@ -255,7 +255,10 @@ export function useEloData() {
         const body = await res.json().catch(() => ({}));
         throw new ApiError(body.error || `Elo proxy ${res.status}`, res.status);
       }
-      return res.json();
+      const data = await res.json();
+      const ratings = {};
+      (data.teams ?? []).forEach((t) => { ratings[t.team] = t.elo; });
+      return { ...data, ratings };
     },
     staleTime: 1000 * 60 * 60,
     placeholderData: null,

@@ -133,7 +133,7 @@ export default async function handler(req, res) {
 
   } catch (err) {
     if (err.name === "TimeoutError") {
-      return res.status(504).json({ error: "NBA Stats timed out" });
+      return res.status(503).json({ error: "NBA Stats timed out — retrying" });
     }
     console.error("[api/nba]", err.message);
     return res.status(502).json({ error: "NBA Stats fetch failed", message: err.message });

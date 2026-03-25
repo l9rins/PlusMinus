@@ -23,7 +23,6 @@ export default function handler(req) {
              resultColor = "#10b981"; // win (green)
              plColor = "#10b981";
              badgeText = "WIN";
-             // calculate PL using standard logic
              const nOdds = parseFloat(odds);
              const nStake = parseFloat(stake);
              const profit = nOdds > 0 ? nStake * (nOdds / 100) : nStake * (100 / Math.abs(nOdds));
@@ -33,6 +32,13 @@ export default function handler(req) {
              plColor = "#f43f5e";
              badgeText = "LOSS";
              plText = `-$${parseFloat(stake).toFixed(2)}`;
+        } else {
+             const nOdds = parseFloat(odds);
+             const nStake = parseFloat(stake);
+             if (!isNaN(nOdds) && !isNaN(nStake) && nStake > 0) {
+                 const toWin = nOdds > 0 ? nStake * (nOdds / 100) : nStake * (100 / Math.abs(nOdds));
+                 plText = `+$${toWin.toFixed(2)}`;
+             }
         }
 
         const titleText = player ? `${player} ${market}` : matchup;
@@ -125,9 +131,11 @@ export default function handler(req) {
                                 <span style={{ color: "#c8d5e8", fontSize: 40, fontWeight: "bold" }}>${parseFloat(stake).toFixed(2)}</span>
                             </div>
                             <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
-                                <span style={{ color: "#546480", fontSize: 24, marginBottom: 10 }}>Payout / P&L</span>
+                                <span style={{ color: "#546480", fontSize: 24, marginBottom: 10 }}>
+                                    {result === "pending" ? "To Win" : "P/L"}
+                                </span>
                                 <span style={{ color: plColor, fontSize: 40, fontWeight: "bold" }}>
-                                    {result === "pending" ? "To-Win" : ""} {plText}
+                                    {plText || "—"}
                                 </span>
                             </div>
                         </div>

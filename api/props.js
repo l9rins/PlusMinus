@@ -60,7 +60,6 @@ const TEAM_MAP = {
 };
 
 import { setCORSHeaders, handleOptions } from "./_cors.js";
-import { checkAlerts } from "./notify.js";
 import { createClient } from "@vercel/kv";
 const kv = createClient({
   url:   process.env.KV_REST_API_URL,
@@ -229,17 +228,11 @@ export default async function handler(req, res) {
         // Module-level cache survives warm Lambda invocations.
         // On each fresh fetch we diff every player/market line against the
         // previous snapshot and annotate moves of >=0.5 points.
-        if (!handler._prevSnapshot) {
-            try {
-                handler._prevSnapshot = (await kv.get("props_snapshot:latest")) ?? {};
-            } catch {
-                handler._prevSnapshot = {};
-            }
-        }
+        const prevSnapshot = (await kv.get("props_snapshot:latest")) ?? {};
 
         const moves = [];
         for (const [gameKey, game] of Object.entries(result)) {
-            const prev = handler._prevSnapshot[gameKey];
+            const prev = prevSnapshot[gameKey];
             if (!prev) continue;
             for (const [playerId, player] of Object.entries(game.players)) {
                 const prevPlayer = prev.players?.[playerId];
@@ -262,8 +255,8 @@ export default async function handler(req, res) {
         // Persist to KV so api/notify.js can diff across Lambda invocations.
         // Fire-and-forget — don't await, don't let KV failure block the response.
         Promise.all([
-          kv.set("props_snapshot:prev",   handler._prevSnapshot, { ex: 7200 }),
-          kv.set("props_snapshot:latest", result,                { ex: 7200 }),
+          kv.set("props_snapshot:prev",   prevSnapshot, { ex: 7200 }),
+          kv.set("props_snapshot:latest", result,       { ex: 7200 }),
         ]).catch(err => console.warn("[api/props] KV snapshot write failed:", err));
 
         // Background: Fire line movement alerts
@@ -273,7 +266,7 @@ export default async function handler(req, res) {
         }).catch(err => console.warn("[api/props] Error checking alerts:", err));
 
         // Update in-memory snapshot for same-Lambda subsequent calls
-        handler._prevSnapshot = result;
+        // Removed `handler._prevSnapshot = result;` to purely rely on KV
 
         // Cache for 10 minutes — props move slowly intraday
         res.setHeader("Cache-Control", "s-maxage=600, stale-while-revalidate=60");
