@@ -1,10 +1,65 @@
 export const config = { runtime: "edge" };
 import { ImageResponse } from "@vercel/og";
 
-export default function handler(req) {
+export default async function handler(req) {
+    if (req.method === "POST") {
+        try {
+            const { bets = [], balance, roi } = await req.json();
+            const slipBets = bets.slice(0, 5); // max 5 on the slip
+
+            return new ImageResponse(
+                <div
+                    style={{
+                        display: "flex", flexDirection: "column",
+                        width: "1200px", height: "630px",
+                        background: "#0d1117",
+                        fontFamily: "monospace",
+                        padding: "48px",
+                    }}
+                >
+                    <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 32 }}>
+                        <div style={{ fontSize: 32, fontWeight: 900, color: "#00d4aa", letterSpacing: 6 }}>
+                            ±PLUSMINUS
+                        </div>
+                        <div style={{ fontSize: 14, color: "#546480", marginLeft: "auto" }}>
+                            Paper Bet Slip
+                        </div>
+                    </div>
+
+                    {slipBets.map((b, i) => (
+                        <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "12px 0", borderBottom: "1px solid #2e3a50" }}>
+                            <div style={{ display: "flex", flexDirection: "column" }}>
+                                <div style={{ color: "#e2e8f0", fontSize: 16, fontWeight: 600 }}>{b.pick}</div>
+                                <div style={{ color: "#546480", fontSize: 12, marginTop: 4 }}>{b.matchup}</div>
+                            </div>
+                            <div style={{ textAlign: "right", display: "flex", flexDirection: "column" }}>
+                                <div style={{ color: "#00d4aa", fontSize: 16, fontWeight: 700 }}>
+                                    {b.odds > 0 ? "+" : ""}{b.odds}
+                                </div>
+                                <div style={{ color: "#7d91ab", fontSize: 12 }}>{b.stake} PMC</div>
+                            </div>
+                        </div>
+                    ))}
+
+                    <div style={{ display: "flex", justifyContent: "space-between", marginTop: "auto", paddingTop: 24 }}>
+                        <div style={{ color: "#546480", fontSize: 13 }}>
+                            Balance: <span style={{ color: "#e2e8f0" }}>{balance} PMC</span>
+                        </div>
+                        <div style={{ color: roi >= 0 ? "#10b981" : "#f43f5e", fontSize: 18, fontWeight: 700 }}>
+                            ROI: {roi >= 0 ? "+" : ""}{roi}%
+                        </div>
+                    </div>
+                </div>,
+                { width: 1200, height: 630 }
+            );
+        } catch (e) {
+            return new Response(`Failed to generate the slip`, { status: 500 });
+        }
+    }
+
     try {
         const { searchParams } = new URL(req.url);
-        
+        // ... existing GET logic ...
         const matchup = searchParams.get("matchup") || "Matchup";
         const team = searchParams.get("team") || "";
         const player = searchParams.get("player");
@@ -142,14 +197,9 @@ export default function handler(req) {
                     </div>
                 </div>
             ),
-            {
-                width: 1200,
-                height: 630,
-            }
+            { width: 1200, height: 630 }
         );
     } catch (e) {
-        return new Response(`Failed to generate the image`, {
-            status: 500,
-        });
+        return new Response(`Failed to generate the image`, { status: 500 });
     }
 }

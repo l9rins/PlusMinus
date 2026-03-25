@@ -36,7 +36,7 @@ export function handleOptions(req, res) {
   if (req.method !== "OPTIONS") return false;
   const origin = req.headers.origin || "";
   setCORSHeaders(res, origin);
-  res.setHeader("Access-Control-Allow-Methods", "GET,PUT,DELETE,OPTIONS");
+  res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
   res.status(204).end();
   return true;

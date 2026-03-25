@@ -77,7 +77,8 @@ export default async function handler(req, res) {
   const impersonateTarget = req.headers["x-impersonate-user"];
   if (impersonateTarget) {
     // Only allow this if the logged-in user matches the Admin ID
-    if (actualUserId === process.env.ADMIN_USER_ID) {
+    const adminId = process.env.ADMIN_USER_ID;
+    if (adminId && actualUserId === adminId) {
       console.log(`[ADMIN] ${actualUserId} impersonating ${impersonateTarget}`);
       targetUserId = impersonateTarget;
     } else {

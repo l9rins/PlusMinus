@@ -18,9 +18,9 @@ import {
 import {
   EAST_STANDINGS, WEST_STANDINGS, PLAYERS, TEAM_NAMES, TEAM_COLORS,
 } from "../data";
-import { useStandings, useLeagueTeamStats, useEnrichedPlayerStats, useEloData } from "../api";
+import { useStandings, useLeagueTeamStats, useEnrichedPlayerStats, useEloData, useFourFactorsStats } from "../api";
 import { FreshnessTag, RowSkeleton, ErrorState } from "./ui";
-import { signed, reshapeNBAStats, lsGet, lsSet } from "../utils";
+import { signed, reshapeNBAStats, lsGet, lsSet, calcPercentile } from "../utils";
 import { TrendingUp, ChartColumnBig, Zap, Award, Info, Star, Trophy } from "lucide-react";
 import PlayoffBracket from "./PlayoffBracket";
 
@@ -285,10 +285,32 @@ function PlayoffSimView({ data }) {
   );
 }
 
+function PctBadge({ value, allValues, invert = false }) {
+  if (value == null || !allValues?.length) return <span className="text-pitch-600 font-mono text-[10px]">—</span>;
+  const { pct, color } = calcPercentile(value, allValues, invert);
+  return (
+    <span
+      title={`${pct}th percentile`}
+      className={`inline-flex items-center justify-center rounded text-[9px] font-bold
+                  px-1.5 py-0.5 min-w-[28px] tabular-nums ${color}`}
+    >
+      {pct}
+    </span>
+  );
+}
+
 // ─── Four Factors View ────────────────────────────────────────
 function FourFactorsView({ data }) {
   const [sortKey, setSortKey] = useState("netRtg");
   const [hovered, setHovered] = useState(null);
+
+  // Build league-wide arrays for percentile calculation
+  const allEfg    = useMemo(() => data.map(t => t.efg),    [data]);
+  const allTov    = useMemo(() => data.map(t => t.tov),    [data]);
+  const allOrb    = useMemo(() => data.map(t => t.orb),    [data]);
+  const allFtRate = useMemo(() => data.map(t => t.ftRate), [data]);
+  const allNetRtg = useMemo(() => data.map(t => t.netRtg), [data]);
+
   const sorted = useMemo(() => [...data].sort((a, b) =>
     sortKey === "tov" ? a[sortKey] - b[sortKey] : b[sortKey] - a[sortKey]
   ), [data, sortKey]);
@@ -357,14 +379,37 @@ function FourFactorsView({ data }) {
                     <span className="text-[10px] text-pitch-600 hidden sm:inline">{t.w}-{t.l}</span>
                   </div>
                 </td>
-                <td className="px-3 py-2.5 font-mono text-pitch-200 tabular-nums">{t.efg}%</td>
-                <td className="px-3 py-2.5 font-mono text-pitch-300 tabular-nums">{t.tov}%</td>
-                <td className="px-3 py-2.5 font-mono text-pitch-300 tabular-nums">{t.orb}%</td>
-                <td className="px-3 py-2.5 font-mono text-pitch-300 tabular-nums">{t.ftRate}</td>
+                <td className="px-3 py-2.5">
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-mono text-pitch-200 tabular-nums">{t.efg}%</span>
+                    <PctBadge value={t.efg} allValues={allEfg} />
+                  </div>
+                </td>
+                <td className="px-3 py-2.5">
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-mono text-pitch-300 tabular-nums">{t.tov}%</span>
+                    <PctBadge value={t.tov} allValues={allTov} invert={true} />
+                  </div>
+                </td>
+                <td className="px-3 py-2.5">
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-mono text-pitch-300 tabular-nums">{t.orb}%</span>
+                    <PctBadge value={t.orb} allValues={allOrb} />
+                  </div>
+                </td>
+                <td className="px-3 py-2.5">
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-mono text-pitch-300 tabular-nums">{t.ftRate}</span>
+                    <PctBadge value={t.ftRate} allValues={allFtRate} />
+                  </div>
+                </td>
                 <td className={`px-3 py-2.5 font-mono font-semibold tabular-nums
                   ${t.netRtg >= 8 ? "text-tier-elite" : t.netRtg >= 3 ? "text-tier-good"
                     : t.netRtg >= 0 ? "text-tier-avg" : t.netRtg >= -3 ? "text-tier-poor" : "text-tier-bad"}`}>
-                  {t.netRtg > 0 ? "+" : ""}{t.netRtg}
+                  <div className="flex items-center gap-1.5">
+                    <span>{t.netRtg > 0 ? "+" : ""}{t.netRtg}</span>
+                    <PctBadge value={t.netRtg} allValues={allNetRtg} />
+                  </div>
                 </td>
                 <td className="px-3 py-2.5 font-mono text-pitch-400 tabular-nums">{t.pct.toFixed(3)}</td>
               </motion.tr>
@@ -376,7 +421,7 @@ function FourFactorsView({ data }) {
         eFG% weights three-pointers at 1.5× to reflect their value. TOV% is possessions lost; lower is better.
         ORB% captures second-chance opportunities. FT Rate (FTA/FGA) reflects aggression.
         Net Rating = O-RTG − D-RTG per 100 possessions.
-        All values sourced live from the NBA Stats API (leaguedashteamstats, MeasureType=Advanced).
+        All values sourced live from the NBA Stats API (leaguedashteamstats, MeasureType=Four Factors).
       </MethodologyNote>
     </motion.div>
   );
@@ -692,7 +737,7 @@ export default function Analytics() {
     lsSet("analytics_tab", t);
   };
   const { data: standingsData, isLoading, isError, isFetching, refetch, dataUpdatedAt } = useStandings();
-  const { data: nbaTeamStats } = useLeagueTeamStats();
+  const { data: nbaTeamStats } = useFourFactorsStats();
   const { data: enrichedPlayers } = useEnrichedPlayerStats();
   const { data: eloApiData } = useEloData();
 

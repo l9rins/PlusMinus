@@ -7,13 +7,15 @@ import {
 } from "lucide-react";
 import { TEAM_NAMES, ODDS_GAMES, TEAM_COLORS } from "../data";
 import { useStandings, useTodayGames, useOdds, mergeOddsIntoGames, useBets, useEloData } from "../api";
-import { formatCurrency, formatPct, lsGet, calcROI, eloWinProb, kellyBet, DEFAULT_BANKROLL } from "../utils";
+import { formatCurrency, formatPct, lsGet, calcROI, calcPL, eloWinProb, kellyBet, DEFAULT_BANKROLL } from "../utils";
 import { TileSkeleton, RowSkeleton, ErrorState, FreshnessTag, Tooltip, TeamLink } from "./ui";
+import GameWinProb from "./GameWinProb";
+import RefCallout from "./RefCallout";
 
 const container = { hidden: {}, show: { transition: { staggerChildren: 0.04, delayChildren: 0.05 } } };
 const tile = { hidden: { opacity: 0, y: 14, scale: 0.98 }, show: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.28, ease: [0.25, 0.46, 0.45, 0.94] } } };
 
-function GameTile({ game }) {
+function GameTile({ game, eloMap }) {
     const memoized = useMemo(() => {
         const fav = (game.homeP === null || game.awayP === null) ? null : game.homeP >= game.awayP ? "home" : "away";
         const isFinal = game.status === "final";
@@ -68,14 +70,10 @@ function GameTile({ game }) {
                             : <div className="pm-number text-sm mt-1 text-pitch-600">—</div>}
                 </div>
             </div>
-            {isScheduled && game.awayP !== null && (
-                <div className="mb-2.5">
-                    <div className="flex justify-between text-[9px] text-pitch-600 mb-1"><span>{game.away}</span><span>{game.home}</span></div>
-                    <div className="h-1.5 rounded-full bg-pitch-700 overflow-hidden relative">
-                        <motion.div className="h-full rounded-full absolute top-0 left-0" style={{ background: awayColor, opacity: 0.85 }} initial={{ width: 0 }} animate={{ width: `${game.awayP}%` }} transition={{ duration: 0.8 }} />
-                    </div>
+                <div className="mt-4 pt-3 border-t border-pitch-750/50 space-y-3">
+                    <GameWinProb game={game} eloMap={eloMap} />
+                    <RefCallout matchup={`${game.away} @ ${game.home}`} />
                 </div>
-            )}
             <div className="flex justify-between text-[10px] text-pitch-500">
                 <span>{game.spread !== "—" ? <span>Spread: <span className="text-pitch-300">{game.spread}</span></span> : "—"}</span>
                 <span>{game.total !== "—" ? <span>O/U: <span className="text-pitch-300">{game.total}</span></span> : null}</span>
@@ -225,12 +223,11 @@ export default function Dashboard() {
                     edge: isNaN(modelP - marketP) ? 0 : modelP - marketP,
                 };
             });
-            return cards.reduce((best, g) => g.edge > best.edge ? g : best,
-                { matchup: "—", fav: "—", modelP: 0, impliedP: 0, bestFavOdds: null, edge: 0 });
-        }
-        if (!ODDS_GAMES.length) return { matchup: "—", fav: "—", modelP: 0, impliedP: 0, bestFavOdds: null, edge: 0 };
-        return ODDS_GAMES.reduce((best, g) => (g.modelP - g.impliedP) > (best.modelP - best.impliedP) ? g : best);
-    }, [oddsData]);
+      return cards.reduce((best, g) => g.edge > best.edge ? g : best,
+        { matchup: "—", fav: "—", modelP: 0, impliedP: 0, bestFavOdds: null, edge: 0 });
+    }
+    return { matchup: "—", fav: "—", modelP: 0, impliedP: 0, bestFavOdds: null, edge: 0 };
+  }, [oddsData, elos]);
 
     const bestProb = useMemo(() => {
         const odds = oddsData?.data || oddsData;
@@ -244,11 +241,10 @@ export default function Dashboard() {
                 
                 return { matchup: `${away} @ ${home}`, fav: homeWinP >= awayWinP ? home : away, modelP: Math.max(homeWinP, awayWinP) }; 
             });
-            return cards.reduce((best, g) => g.modelP > best.modelP ? g : best, { matchup: "—", fav: "—", modelP: 0 });
-        }
-        if (!ODDS_GAMES.length) return { matchup: "—", fav: "—", modelP: 0 };
-        return ODDS_GAMES.reduce((best, g) => g.modelP > best.modelP ? g : best);
-    }, [oddsData, elos]);
+      return cards.reduce((best, g) => g.modelP > best.modelP ? g : best, { matchup: "—", fav: "—", modelP: 0 });
+    }
+    return { matchup: "—", fav: "—", modelP: 0 };
+  }, [oddsData, elos]);
 
     const betSub = betStats.total > 0 ? `${betStats.wins}W · ${betStats.losses}L · ${betStats.pending} open` : "No bets logged yet";
     const edgeDiff = topEdge.modelP - topEdge.impliedP;
@@ -283,7 +279,7 @@ export default function Dashboard() {
                 ) : gameList.length === 0 ? (
                     <div className="pm-card p-12 text-center"><Activity size={28} className="text-pitch-700 mx-auto mb-3" /><div className="text-sm text-pitch-500">No games scheduled today.</div></div>
                 ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"><AnimatePresence>{gameList.slice(0, 6).map(g => <GameTile key={g.id} game={g} />)}</AnimatePresence></div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"><AnimatePresence>{gameList.slice(0, 6).map(g => <GameTile key={g.id} game={g} eloMap={elos} />)}</AnimatePresence></div>
                 )}
                 {gameList.length > 6 && <button onClick={() => navigate("/scores")} className="mt-3 w-full pm-btn-ghost text-center justify-center">+{gameList.length - 6} more games <ChevronRight size={13} /></button>}
             </div>

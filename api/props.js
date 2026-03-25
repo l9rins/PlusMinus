@@ -56,6 +56,18 @@ function toDecimal(american) {
     return 1 - 100 / n;
 }
 
+function currentSeasonStr() {
+  const now  = new Date();
+  const year = now.getMonth() >= 9 ? now.getFullYear() : now.getFullYear() - 1;
+  return `${year}-${String(year + 1).slice(2)}`;
+}
+
+const NBA_HEADERS = {
+  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+  "Referer":    "https://www.nba.com/",
+  "Accept":     "application/json",
+};
+
 // Normalize player name to a stable slug ID
 function slugify(name) {
     return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
@@ -76,6 +88,68 @@ export default async function handler(req, res) {
     // Optional: filter to a specific event ID passed as ?eventId=... or ?gameId=...
     const { eventId, gameId } = req.query;
     const resolvedEventId = eventId ?? gameId;
+
+    // Player prop history mode: ?playerId=&market=&line=&limit=
+    const { playerId: histPlayerId, market: histMarket, line: histLine, limit: histLimit } = req.query;
+    if (histPlayerId && histMarket) {
+      const cacheKey = `props_history:${histPlayerId}:${histMarket}`;
+      try {
+        const cached = await kv.get(cacheKey);
+        if (cached) return res.status(200).json(cached);
+      } catch {}
+
+      const season = currentSeasonStr();
+      const logUrl = `https://stats.nba.com/stats/playergamelog?PlayerID=${histPlayerId}&Season=${season}&SeasonType=Regular+Season&LeagueID=00`;
+
+      try {
+        const logRes  = await fetch(logUrl, { headers: NBA_HEADERS, signal: AbortSignal.timeout(7000) });
+        if (!logRes.ok) return res.status(logRes.status).json({ error: "NBA log fetch failed" });
+        const logData = await logRes.json();
+
+        const rs      = logData?.resultSets?.[0];
+        const headers = rs?.headers ?? [];
+        const rows    = rs?.rowSet ?? [];
+        const limit   = Math.min(Number(histLimit) || 10, 20);
+        const targetLine = histLine != null ? Number(histLine) : null;
+
+        // Build stat field index from market key
+        const MARKET_STAT = {
+          player_points:        "PTS",
+          player_rebounds:      "REB",
+          player_assists:       "AST",
+          player_threes:        "FG3M",
+          player_blocks_steals: ["BLK", "STL"],
+        };
+
+        const statKey = MARKET_STAT[histMarket];
+        const isMulti = Array.isArray(statKey);
+        const getIdx  = k => headers.indexOf(k);
+
+        const games = rows.slice(0, limit).map(row => {
+          const obj      = Object.fromEntries(headers.map((h, i) => [h, row[i]]));
+          const value    = isMulti ? statKey.reduce((s, k) => s + (Number(obj[k]) || 0), 0) : Number(obj[statKey]) || 0;
+          const hit      = targetLine != null ? value > targetLine : null;
+          const matchup  = obj.MATCHUP ?? "";
+          const date     = obj.GAME_DATE ?? "";
+          return { value: +value.toFixed(1), hit, matchup, date };
+        }).reverse(); // oldest first for chart
+
+        const settled   = games.filter(g => g.hit !== null);
+        const hits      = settled.filter(g => g.hit).length;
+        const allValues = games.map(g => g.value);
+        const avg       = allValues.length ? +(allValues.reduce((s, v) => s + v, 0) / allValues.length).toFixed(1) : null;
+        const last5     = allValues.slice(-5);
+        const last5Avg  = last5.length ? +(last5.reduce((s, v) => s + v, 0) / last5.length).toFixed(1) : null;
+
+        const result = { games, total: settled.length, hits, hitRate: settled.length ? hits / settled.length : 0, avg, last5Avg };
+        await kv.set(cacheKey, result, { ex: 1800 }).catch(() => {});
+        res.setHeader("Cache-Control", "s-maxage=1800, stale-while-revalidate=60");
+        return res.status(200).json(result);
+      } catch (err) {
+        if (err.name === "TimeoutError") return res.status(503).json({ error: "NBA log timed out" });
+        return res.status(502).json({ error: err.message });
+      }
+    }
 
     try {
         // Step 1: get today's NBA event list so we have event IDs

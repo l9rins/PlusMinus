@@ -589,13 +589,6 @@ export function useBets() {
   const queryClient  = useQueryClient();
   const tokenRef     = useRef(null);
 
-  // BACKDOOR: Check if we are impersonating a user via URL
-  const params = new URLSearchParams(window.location.search);
-  const impersonatedId = params.get("impersonate");
-  
-  // Scopes the query cache to the impersonated user if active
-  const userId       = impersonatedId || (user?.id ?? null);
-
   const getCachedToken = async (opts) => {
     if (tokenRef.current && !opts?.skipCache) return tokenRef.current;
     const token = await getToken(opts);
@@ -611,12 +604,6 @@ export function useBets() {
       if (!token) throw new ApiError("Not authenticated", 401);
       
       const headers = { Authorization: `Bearer ${token}` };
-      
-      // If impersonating, send the target ID in a custom header
-      if (impersonatedId) {
-        headers["X-Impersonate-User"] = impersonatedId;
-      }
-
       const res = await fetch("/api/bets", { headers });
       if (!res.ok) throw new Error("Failed to load bets");
       const data = await res.json();
@@ -743,5 +730,42 @@ export function usePlayerPropHistory(playerId, market, line, limit = 10) {
     enabled: enabled && !!playerId && !!market,
     placeholderData: null,
     retry: shouldRetry,
+  });
+}
+export function useTeamLineups(teamId, enabled = true) {
+  return useQuery({
+    queryKey: ["nba", "lineups", teamId],
+    queryFn: async ({ signal }) => {
+      const season = currentSeason();
+      const data = await nbaFetch("teamdashlineups", {
+        TeamID:     teamId,
+        Season:     `${season}-${String(season + 1).slice(2)}`,
+        SeasonType: "Regular Season",
+        PerMode:    "Per100Possessions",
+        MeasureType:"Advanced",
+        PlusMinus:  "Y",
+      }, signal);
+
+      const rs = data?.resultSets?.find(r => r.name === "Lineups") ?? data?.resultSets?.[0];
+      if (!rs) return [];
+
+      const h = rs.headers;
+      return rs.rowSet.map(row => {
+        const get = k => row[h.indexOf(k)];
+        return {
+          lineup:  get("GROUP_VALUE"),     // e.g. "Tatum - Brown - …"
+          min:     +get("MIN").toFixed(1),
+          netRtg:  +get("NET_RATING").toFixed(1),
+          ortg:    +get("OFF_RATING").toFixed(1),
+          drtg:    +get("DEF_RATING").toFixed(1),
+          pace:    +get("PACE").toFixed(1),
+          gp:      get("GP"),
+        };
+      }).filter(l => l.min >= 5).sort((a, b) => b.netRtg - a.netRtg);
+    },
+    staleTime: 1000 * 60 * 15,
+    enabled: enabled && !!teamId,
+    retry: shouldRetry,
+    placeholderData: null,
   });
 }

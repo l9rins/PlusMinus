@@ -17,9 +17,12 @@ import {
   formatCurrency, formatPct, kellyBet, DEFAULT_BANKROLL,
   calcROI, breakEven, oddsToDecimal, oddsToImplied, eloWinProb,
   stakeToUnits, plInUnits, getUnitSize, unitsToDollars, reshapeNBAStats,
+  signed, todayStr, currentSeason, netRatingTier, netRatingColor, edgeLabel, formatShortDate, formatGameTime,
+  calcPropHitRate, hitRateTier
 } from "../utils";
 import { TileSkeleton, RowSkeleton, ErrorState, FreshnessTag, EmptyState, useToast, TeamLink, CalibrationCurve } from "./ui";
 import { useAlerts } from "../hooks/useAlerts";
+import GameWinProb from "./GameWinProb";
 
 // ── Shared animation + tooltip config ────────────────────────────
 const container = { hidden: {}, show: { transition: { staggerChildren: 0.035 } } };
@@ -99,6 +102,8 @@ export function Scores() {
   };
   const { data: rawGames, isLoading, isError, isFetching, refetch, dataUpdatedAt } = useTodayGames();
   const { data: oddsData } = useOdds();
+  const { data: eloApiData } = useEloData();
+  const eloMap = eloApiData?.data || eloApiData || {};
   const games = useMemo(() => mergeOddsIntoGames(rawGames, oddsData) || [], [rawGames, oddsData]);
 
   const today = new Date().toLocaleDateString("en-US", {
@@ -296,22 +301,10 @@ export function Scores() {
                   </div>
                 </div>
 
-                {/* Probability bar */}
+                {/* Probability bar with Injury Adjustments */}
                 {g.status === "scheduled" && (
-                  <div className="space-y-1">
-                    <div className="flex justify-between text-[10px] text-pitch-500">
-                      <span className="font-mono">{g.awayP != null ? `${g.awayP}%` : "—"}</span>
-                      <span className="font-mono">{g.homeP != null ? `${g.homeP}%` : "—"}</span>
-                    </div>
-                    <div className="h-1.5 rounded-full bg-pitch-700 overflow-hidden relative">
-                      <motion.div
-                        className="h-full absolute top-0 left-0 rounded-full"
-                        style={{ background: g.awayColor, opacity: 0.8 }}
-                        initial={{ width: 0 }}
-                        animate={{ width: `${g.awayP ?? 0}%` }}
-                        transition={{ duration: 0.8 }}
-                      />
-                    </div>
+                  <div className="mt-4 pt-4 border-t border-pitch-750">
+                    <GameWinProb game={g} eloMap={eloMap} />
                   </div>
                 )}
 
@@ -608,7 +601,7 @@ export function Betting() {
       
       const modelP    = fav === game.home ? homeWinP : awayWinP;
       const diff      = modelP !== null ? +(modelP - impliedP).toFixed(1) : null;
-      const edge      = diff !== null ? (diff >= 10 ? "high" : diff >= 5 ? "mid" : "low") : "none";
+      const edge      = diff !== null ? edgeLabel(modelP, impliedP) : "none";
       const favOdds   = (fav === game.home ? odds.bestHomeOdds : odds.bestAwayOdds) ?? -110;
       const kellyAmt  = diff !== null && diff >= 5
         ? kellyBet(modelP / 100, favOdds, bankroll) : null;
@@ -1438,45 +1431,77 @@ function PropHistoryPanel({ playerId, playerName, market, line }) {
 
   if (!data) return null;
 
+  const { hitRate, streak, streakType, last5Rate } = calcPropHitRate(data.games);
+  const tier = hitRateTier(hitRate);
+
   return (
     <div className="space-y-1.5 pt-1 border-t border-pitch-700 mt-1.5">
-      <div className="flex items-center justify-between">
+      {/* ── Summary row ── */}
+      <div className="flex items-center justify-between flex-wrap gap-1.5">
         <div className="pm-label text-[9px]">Last {data.total} games vs {line}</div>
-        <div className="flex gap-3 text-[9px] font-mono">
-          <span className="text-pitch-400">
-            Avg: <span className="text-pitch-200">{data.avg}</span>
+
+        {/* Hot/cold badge */}
+        <span className={`text-[9px] font-medium px-1.5 py-0.5 rounded border ${tier.cls}`}>
+          {tier.label}
+        </span>
+      </div>
+
+      {/* ── Hit-rate progress bar ── */}
+      <div>
+        <div className="flex justify-between text-[9px] text-pitch-500 mb-0.5">
+          <span>
+            Hit over{" "}
+            <span className={hitRate >= 0.6 ? "text-win font-semibold" : hitRate <= 0.4 ? "text-loss" : "text-pitch-300"}>
+              {data.hits}/{data.total}
+            </span>
+            {" "}({Math.round(hitRate * 100)}%)
           </span>
-          <span className="text-pitch-400">
-            L5: <span className="text-pitch-200">{data.last5Avg}</span>
-          </span>
-          <span className={`font-medium ${
-            data.hitRate >= 0.6 ? "text-win" :
-            data.hitRate <= 0.4 ? "text-loss" : "text-pitch-300"
-          }`}>
-            {data.hits}/{data.total} over
-          </span>
+          {last5Rate !== null && (
+            <span className="text-pitch-600">
+              L5: <span className="text-pitch-300 font-mono">{Math.round(last5Rate * 100)}%</span>
+            </span>
+          )}
+        </div>
+        <div className="h-2 rounded-full bg-pitch-700 overflow-hidden">
+          <motion.div
+            className={`h-full rounded-full ${hitRate >= 0.6 ? "bg-win" : hitRate <= 0.4 ? "bg-loss" : "bg-draw"}`}
+            style={{ opacity: 0.85 }}
+            initial={{ width: 0 }}
+            animate={{ width: `${hitRate * 100}%` }}
+            transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
+          />
         </div>
       </div>
 
+      {/* ── Streak callout ── */}
+      {streak >= 3 && (
+        <div className={`flex items-center gap-1.5 text-[9px] px-2 py-1 rounded border
+          ${streakType === "over" ? "bg-win/8 border-win/20 text-win" : "bg-loss/8 border-loss/20 text-loss"}`}>
+          {streakType === "over" ? "🔥" : "🧊"}
+          <span className="font-medium">{streak}-game {streakType} streak</span>
+        </div>
+      )}
+
+      {/* ── Per-game bar chart (existing) ── */}
       <div className="flex gap-1 items-end">
         {data.games.map((g, i) => (
           <div key={i} className="flex flex-col items-center gap-0.5 flex-1">
-            <div className="text-[8px] font-mono text-pitch-600 leading-none">
-              {g.value}
-            </div>
+            <div className="text-[8px] font-mono text-pitch-600 leading-none">{g.value}</div>
             <div
               title={`${g.date} ${g.matchup}: ${g.value}`}
               className={`w-full rounded-sm transition-colors ${
-                g.hit === true  ? "bg-win h-3" :
-                g.hit === false ? "bg-loss h-3" :
-                "bg-pitch-600 h-2"
+                g.hit === true  ? "bg-win h-3"  :
+                g.hit === false ? "bg-loss h-3" : "bg-pitch-600 h-2"
               }`}
             />
           </div>
         ))}
       </div>
 
-      <div className="flex gap-3 text-[9px] text-pitch-600">
+      {/* ── Stat summary ── */}
+      <div className="flex gap-3 text-[9px] font-mono text-pitch-500">
+        <span>Avg: <span className="text-pitch-200">{data.avg}</span></span>
+        <span>L5: <span className="text-pitch-200">{data.last5Avg}</span></span>
         <span className="flex items-center gap-1">
           <span className="w-2 h-2 rounded-sm bg-win inline-block" /> Over
         </span>
@@ -1661,7 +1686,8 @@ export function BetTracker() {
     }
 
     const newBet = {
-      id:     crypto.randomUUID?.() ?? `${Date.now()}-${Math.random()}`,
+      id:        crypto.randomUUID?.() ?? `${Date.now()}-${Math.random()}`,
+      createdAt: new Date().toISOString(),
       type:   form.type,
       stake, odds,
       result: form.result,
@@ -1716,32 +1742,31 @@ export function BetTracker() {
   // ── CSV export
   const handleExport = () => {
     if (!bets?.length) return;
-    const headers = ["date","type","matchup","player","market","side","line","team","odds","stake","result","book","note","pl"];
+    const headers = ["Date", "Type", "Matchup", "Player", "Market", "Side", "Line", "Odds", "Stake", "Result", "P/L", "Note"];
     const rows = bets.map(b => {
-      const pl = calcPL(b.odds, b.stake, b.result);
+      // FIX: Use createdAt for reliable date formatting; fallback to b.date
+      const date = b.createdAt ? new Date(b.createdAt).toLocaleDateString("en-US") : b.date || "";
       return [
-        b.date ?? "",
-        b.type ?? "game",
-        b.matchup ?? "",
-        b.player ?? "",
-        b.market ?? "",
-        b.side ?? "",
-        b.line ?? "",
-        b.team ?? "",
-        b.odds,
-        b.stake,
-        b.result,
-        b.book ?? "",
-        `"${(b.note ?? "").replace(/"/g, '""')}"`,
-        pl.toFixed(2),
+        `"${date}"`,
+        `"${b.type ?? "game"}"`,
+        `"${(b.matchup ?? "").replace(/"/g, '""')}"`,
+        `"${(b.player ?? "").replace(/"/g, '""')}"`,
+        `"${b.market ?? ""}"`,
+        `"${b.side ?? ""}"`,
+        `"${b.line ?? ""}"`,
+        b.odds, b.stake,
+        `"${b.result}"`,
+        calcPL(b.odds, b.stake, b.result),
+        `"${(b.note ?? "").replace(/"/g, '""')}"`
       ].join(",");
     });
-    const csv  = [headers.join(","), ...rows].join("\n");
+    const csv = [headers.join(","), ...rows].join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
-    const url  = URL.createObjectURL(blob);
-    const a    = Object.assign(document.createElement("a"), { href: url, download: "plusminus-bets.csv" });
-    document.body.appendChild(a); a.click();
-    document.body.removeChild(a); URL.revokeObjectURL(url);
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `PlusMinus_Bets_${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
   };
 
   // ─────────────────────────────────────────────────────────────

@@ -21,6 +21,9 @@ const Scores     = lazy(() => import("./components/Views").then(m => ({ default:
 const Standings  = lazy(() => import("./components/Views").then(m => ({ default: m.Standings })));
 const Betting    = lazy(() => import("./components/Views").then(m => ({ default: m.Betting })));
 const BetTracker = lazy(() => import("./components/Views").then(m => ({ default: m.BetTracker })));
+const PaperBetting = lazy(() => import("./components/PaperBetting"));
+const WebhookSettings = lazy(() => import("./components/WebhookSettings"));
+import { useSSE } from "./hooks/useSSE";
 
 // ── Dynamic team theming ──────────────────────────────────────────
 // FIX G3a: Restore the *original* CSS variable values on unmount instead
@@ -79,17 +82,19 @@ const ROUTE_META = {
   "/tracker":   { title: "Bet Tracker", tab: "tracker"    },
   "/analytics": { title: "Analytics",   tab: "analytics"  },
   "/compare":   { title: "Compare",     tab: "compare"    },
+  "/paper":     { title: "Leaderboard", tab: "paper"      },
+  "/settings":  { title: "Settings",    tab: "settings"   },
 };
 
 const SHORTCUT_ROUTES = {
   d: "/", s: "/scores", l: "/standings", p: "/players",
-  b: "/betting", t: "/tracker", a: "/analytics", c: "/compare",
+  b: "/betting", t: "/tracker", a: "/analytics", c: "/compare", h: "/paper", g: "/settings",
 };
 
 const TAB_ROUTES = {
   dashboard: "/", scores: "/scores", standings: "/standings",
   players: "/players", betting: "/betting", tracker: "/tracker",
-  analytics: "/analytics", compare: "/compare",
+  analytics: "/analytics", compare: "/compare", paper: "/paper",
 };
 
 // ── Page skeleton ─────────────────────────────────────────────────
@@ -181,6 +186,13 @@ function AppInner() {
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState("");
 
+  // SSE: Real-time odds and alerts
+  useSSE({
+    onAlert: (alert) => {
+      // Browser notification handled inside useSSE.
+    }
+  });
+
   useEffect(() => {
     const meta = ROUTE_META[location.pathname];
     if (meta) {
@@ -252,6 +264,8 @@ function AppInner() {
                     <Route path="/tracker"    element={<BetTracker />} />
                     <Route path="/analytics"  element={<Analytics />} />
                     <Route path="/compare"    element={<HeadToHead />} />
+                    <Route path="/paper"      element={<PaperBetting />} />
+                    <Route path="/settings"   element={<WebhookSettings />} />
                     <Route path="/team/:abbr" element={<TeamDetail />} />
                     <Route path="*"           element={<Navigate to="/" replace />} />
                   </Routes>

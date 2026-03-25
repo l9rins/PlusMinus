@@ -1,6 +1,6 @@
 import { handleOptions, setCORSHeaders } from "./_cors.js";
 import { createClient } from "@vercel/kv";
-import { EAST_STANDINGS, WEST_STANDINGS } from "../src/data.js";
+import { EAST_STANDINGS, WEST_STANDINGS } from "./_fallbacks.js";
 
 function makeLCG(seed) {
   let s = (seed ^ 0xdeadbeef) >>> 0;
@@ -70,13 +70,7 @@ function winProb(eloA, eloB) {
   return 1 / (1 + Math.pow(10, (eloB - eloA) / 400));
 }
 
-function updateElo(winnerElo, loserElo) {
-  const exp = winProb(winnerElo, loserElo);
-  return {
-    winner: +(winnerElo + K * (1 - exp)).toFixed(2),
-    loser:  +(loserElo  + K * (0 - (1 - exp))).toFixed(2),
-  };
-}
+
 
 async function fetchAllGamesViaLeagueLog(season) {
   const qs = new URLSearchParams({
@@ -150,10 +144,15 @@ export default async function handler(req, res) {
   
   // FIX: Secure the rebuild backdoor
   const isRebuildRequested = req.query.rebuild === "true";
-  const providedSecret = req.headers.authorization?.replace("Bearer ", "");
+  const providedAuthToken = req.headers.authorization?.replace("Bearer ", "");
+  const providedQuerySecret = req.query.secret; // For Cron jobs (headers not supported)
+  const isAuthorized = process.env.ADMIN_SECRET && (
+    providedAuthToken === process.env.ADMIN_SECRET || 
+    providedQuerySecret === process.env.ADMIN_SECRET
+  );
   
   if (isRebuildRequested) {
-    if (!process.env.ADMIN_SECRET || providedSecret !== process.env.ADMIN_SECRET) {
+    if (!isAuthorized) {
       return res.status(403).json({ error: "Forbidden: Invalid Admin Secret" });
     }
     console.log("[api/elo] Admin triggered manual rebuild");

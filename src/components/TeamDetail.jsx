@@ -15,11 +15,10 @@ import {
     ArrowLeft, TrendingUp, TrendingDown, Minus,
     Calendar, CircleCheck, CircleX, Clock
 } from "lucide-react";
-import { TEAM_COLORS, TEAM_NAMES, PLAYERS, EAST_STANDINGS, WEST_STANDINGS } from "../data";
-import { useStandings, useTeamSchedule, useEnrichedPlayerStats } from "../api";
-import { useTeamTheme } from "../App";
 import { RowSkeleton, ErrorState } from "./ui";
 import { signed } from "../utils";
+import LineupTable from "./LineupTable";
+import { TEAM_IDS, TEAM_COLORS, TEAM_NAMES, PLAYERS, EAST_STANDINGS, WEST_STANDINGS } from "../data";
 
 const container = { hidden: {}, show: { transition: { staggerChildren: 0.05 } } };
 const item = { hidden: { opacity: 0, y: 8 }, show: { opacity: 1, y: 0, transition: { duration: 0.2 } } };
@@ -105,7 +104,9 @@ function StatTile({ label, value, sub, color }) {
 export default function TeamDetail() {
     const { abbr } = useParams();
     const navigate = useNavigate();
+    const [activeTab, setActiveTab] = useState("overview");
     const teamAbbr = abbr?.toUpperCase() ?? "";
+    const teamId = TEAM_IDS[teamAbbr];
     const color = TEAM_COLORS[teamAbbr] || "#546480";
     const teamName = TEAM_NAMES[teamAbbr] || teamAbbr;
 
@@ -254,156 +255,187 @@ export default function TeamDetail() {
                 <StatTile label="Road" value={teamStanding?.road ?? "—"} />
             </motion.div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
-                {/* Elo trajectory chart */}
-                <motion.div variants={item} className="pm-card p-4 lg:col-span-2">
-                    <div className="pm-label mb-3 flex items-center gap-2">
-                        Season Elo Trajectory
-                        <span className={`text-[10px] font-mono flex items-center gap-1
-              ${eloTrend > 0 ? "text-win" : eloTrend < 0 ? "text-loss" : "text-pitch-500"}`}>
-                            {eloTrend > 0 ? <TrendingUp size={10} /> : eloTrend < 0 ? <TrendingDown size={10} /> : <Minus size={10} />}
-                            {eloTrend !== 0 ? `${eloTrend > 0 ? "+" : ""}${eloTrend}` : "Flat"}
-                        </span>
-                    </div>
-                    <div style={{ height: 160 }}>
-                        <ResponsiveContainer width="100%" height="100%">
-                            <AreaChart data={eloTrajectory}>
-                                <defs>
-                                    <linearGradient id={`eloGrad-${teamAbbr}`} x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor={color} stopOpacity={0.3} />
-                                        <stop offset="95%" stopColor={color} stopOpacity={0} />
-                                    </linearGradient>
-                                </defs>
-                                <CartesianGrid strokeDasharray="3 3" stroke="#1a2233" vertical={false} />
-                                <XAxis dataKey="game" tick={{ fill: "#546480", fontSize: 10 }} axisLine={false} tickLine={false}
-                                    label={{ value: "Games played", position: "insideBottomRight", offset: -4, fill: "#3d4f6a", fontSize: 9 }} />
-                                <YAxis domain={["auto", "auto"]} tick={{ fill: "#546480", fontSize: 10 }} axisLine={false} tickLine={false} />
-                                <ReferenceLine y={1500} stroke="#2e3a50" strokeDasharray="4 2" strokeWidth={1}
-                                    label={{ value: "avg", position: "right", fill: "#3d4f6a", fontSize: 9 }} />
-                                <Tooltip {...tooltipStyle} formatter={v => [v, "Elo"]} />
-                                <Area type="monotone" dataKey="elo" stroke={color} fill={`url(#eloGrad-${teamAbbr})`}
-                                    strokeWidth={2} dot={false} activeDot={{ r: 4, fill: color }} />
-                            </AreaChart>
-                        </ResponsiveContainer>
-                    </div>
-                </motion.div>
 
-                {/* Star player card */}
-                <motion.div variants={item} className="pm-card p-4">
-                    <div className="pm-label mb-3">Star Player</div>
-                    {starPlayer ? (
-                        <div>
-                            <div className="flex items-center gap-3 mb-4">
-                                <div className="w-11 h-11 rounded-xl flex items-center justify-center text-sm font-bold flex-shrink-0"
-                                    style={{ background: `${color}20`, color, border: `1px solid ${color}40` }}>
-                                    {starPlayer.name.split(" ").map(w => w[0]).join("").slice(0, 2)}
-                                </div>
+
+            {/* Tabs Navigation */}
+            <motion.div variants={item} className="flex gap-1.5 mb-6 border-b border-pitch-700 pb-px">
+                {[
+                    { id: "overview", label: "Overview" },
+                    { id: "lineups", label: "Lineups" },
+                ].map(t => (
+                    <button
+                        key={t.id}
+                        onClick={() => setActiveTab(t.id)}
+                        className={`px-4 py-2 text-[11px] font-medium transition-all relative
+                            ${activeTab === t.id ? "text-accent" : "text-pitch-500 hover:text-pitch-300"}`}
+                    >
+                        {t.label}
+                        {activeTab === t.id && (
+                            <motion.div layoutId="teamTab" className="absolute bottom-0 left-0 right-0 h-0.5 bg-accent" />
+                        )}
+                    </button>
+                ))}
+            </motion.div>
+
+            {/* Tab Content */}
+            {activeTab === "overview" && (
+                <div className="space-y-4">
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                        {/* Elo trajectory chart */}
+                        <motion.div variants={item} className="pm-card p-4 lg:col-span-2">
+                            <div className="pm-label mb-3 flex items-center gap-2">
+                                Season Elo Trajectory
+                                <span className={`text-[10px] font-mono flex items-center gap-1
+                                    ${eloTrend > 0 ? "text-win" : eloTrend < 0 ? "text-loss" : "text-pitch-500"}`}>
+                                    {eloTrend > 0 ? <TrendingUp size={10} /> : eloTrend < 0 ? <TrendingDown size={10} /> : <Minus size={10} />}
+                                    {eloTrend !== 0 ? `${eloTrend > 0 ? "+" : ""}${eloTrend}` : "Flat"}
+                                </span>
+                            </div>
+                            <div style={{ height: 160 }}>
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <AreaChart data={eloTrajectory}>
+                                        <defs>
+                                            <linearGradient id={`eloGrad-${teamAbbr}`} x1="0" y1="0" x2="0" y2="1">
+                                                <stop offset="5%" stopColor={color} stopOpacity={0.3} />
+                                                <stop offset="95%" stopColor={color} stopOpacity={0} />
+                                            </linearGradient>
+                                        </defs>
+                                        <CartesianGrid strokeDasharray="3 3" stroke="#1a2233" vertical={false} />
+                                        <XAxis dataKey="game" tick={{ fill: "#546480", fontSize: 10 }} axisLine={false} tickLine={false}
+                                            label={{ value: "Games played", position: "insideBottomRight", offset: -4, fill: "#3d4f6a", fontSize: 9 }} />
+                                        <YAxis domain={["auto", "auto"]} tick={{ fill: "#546480", fontSize: 10 }} axisLine={false} tickLine={false} />
+                                        <ReferenceLine y={1500} stroke="#2e3a50" strokeDasharray="4 2" strokeWidth={1}
+                                            label={{ value: "avg", position: "right", fill: "#3d4f6a", fontSize: 9 }} />
+                                        <Tooltip {...tooltipStyle} formatter={v => [v, "Elo"]} />
+                                        <Area type="monotone" dataKey="elo" stroke={color} fill={`url(#eloGrad-${teamAbbr})`}
+                                            strokeWidth={2} dot={false} activeDot={{ r: 4, fill: color }} />
+                                    </AreaChart>
+                                </ResponsiveContainer>
+                            </div>
+                        </motion.div>
+
+                        {/* Star player card */}
+                        <motion.div variants={item} className="pm-card p-4">
+                            <div className="pm-label mb-3">Star Player</div>
+                            {starPlayer ? (
                                 <div>
-                                    <div className="text-sm font-semibold text-pitch-100">{starPlayer.name}</div>
-                                    <div className="text-[10px] text-pitch-400">{starPlayer.pos} · Age {starPlayer.age}</div>
-                                </div>
-                            </div>
-                            <div className="grid grid-cols-3 gap-2 mb-3">
-                                {[
-                                    { lbl: "PTS", val: starPlayer.pts },
-                                    { lbl: "AST", val: starPlayer.ast },
-                                    { lbl: "REB", val: starPlayer.reb },
-                                ].map(s => (
-                                    <div key={s.lbl} className="bg-pitch-750 rounded-md p-2 text-center border border-pitch-650">
-                                        <div className="font-mono font-bold text-sm text-pitch-100 tabular-nums">{s.val}</div>
-                                        <div className="text-[9px] text-pitch-500 uppercase tracking-widest mt-0.5">{s.lbl}</div>
-                                    </div>
-                                ))}
-                            </div>
-                            <div className="space-y-1.5">
-                                {[
-                                    { lbl: "PER", val: starPlayer.per, barVal: starPlayer.per, max: 35 },
-                                    { lbl: "TS%", val: starPlayer.ts, barVal: starPlayer.ts, max: 75 },
-                                    { lbl: "BPM", val: starPlayer.bpm, barVal: Math.max(0, (starPlayer.bpm ?? 0) + 5), max: 17 },
-                                ].map(s => (
-                                    <div key={s.lbl} className="flex items-center gap-2">
-                                        <span className="text-[10px] text-pitch-500 w-7">{s.lbl}</span>
-                                        <div className="flex-1 h-1.5 bg-pitch-700 rounded-full overflow-hidden">
-                                            <motion.div className="h-full rounded-full"
-                                                style={{ background: color, opacity: 0.8 }}
-                                                initial={{ width: 0 }}
-                                                animate={{ width: `${Math.min(100, (s.barVal / s.max) * 100)}%` }}
-                                                transition={{ duration: 0.7 }} />
+                                    <div className="flex items-center gap-3 mb-4">
+                                        <div className="w-11 h-11 rounded-xl flex items-center justify-center text-sm font-bold flex-shrink-0"
+                                            style={{ background: `${color}20`, color, border: `1px solid ${color}40` }}>
+                                            {starPlayer.name.split(" ").map(w => w[0]).join("").slice(0, 2)}
                                         </div>
-                                        <span className="font-mono text-[10px] text-pitch-300 w-6 text-right tabular-nums">{s.val}</span>
+                                        <div>
+                                            <div className="text-sm font-semibold text-pitch-100">{starPlayer.name}</div>
+                                            <div className="text-[10px] text-pitch-400">{starPlayer.pos} · Age {starPlayer.age}</div>
+                                        </div>
                                     </div>
-                                ))}
-                            </div>
-                        </div>
-                    ) : (
-                        <div className="text-pitch-500 text-sm text-center py-4">No player data</div>
-                    )}
-                </motion.div>
-            </div>
+                                    <div className="grid grid-cols-3 gap-2 mb-3">
+                                        {[
+                                            { lbl: "PTS", val: starPlayer.pts },
+                                            { lbl: "AST", val: starPlayer.ast },
+                                            { lbl: "REB", val: starPlayer.reb },
+                                        ].map(s => (
+                                            <div key={s.lbl} className="bg-pitch-750 rounded-md p-2 text-center border border-pitch-650">
+                                                <div className="font-mono font-bold text-sm text-pitch-100 tabular-nums">{s.val}</div>
+                                                <div className="text-[9px] text-pitch-500 uppercase tracking-widest mt-0.5">{s.lbl}</div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        {[
+                                            { lbl: "PER", val: starPlayer.per, barVal: starPlayer.per, max: 35 },
+                                            { lbl: "TS%", val: starPlayer.ts, barVal: starPlayer.ts, max: 75 },
+                                            { lbl: "BPM", val: starPlayer.bpm, barVal: Math.max(0, (starPlayer.bpm ?? 0) + 5), max: 17 },
+                                        ].map(s => (
+                                            <div key={s.lbl} className="flex items-center gap-2">
+                                                <span className="text-[10px] text-pitch-500 w-7">{s.lbl}</span>
+                                                <div className="flex-1 h-1.5 bg-pitch-700 rounded-full overflow-hidden">
+                                                    <motion.div className="h-full rounded-full"
+                                                        style={{ background: color, opacity: 0.8 }}
+                                                        initial={{ width: 0 }}
+                                                        animate={{ width: `${Math.min(100, (s.barVal / s.max) * 100)}%` }}
+                                                        transition={{ duration: 0.7 }} />
+                                                </div>
+                                                <span className="font-mono text-[10px] text-pitch-300 w-6 text-right tabular-nums">{s.val}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="text-pitch-500 text-sm text-center py-4">No player data</div>
+                            )}
+                        </motion.div>
+                    </div>
 
-            {/* Schedule grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                {/* Recent results */}
-                <motion.div variants={item} className="pm-card p-4">
-                    <div className="pm-label mb-3">Recent Results</div>
-                    {schedError ? (
-                        <ErrorState message="Couldn't load schedule." onRetry={refetch} />
-                    ) : schedLoading ? (
-                        <RowSkeleton rows={5} />
-                    ) : pastGames.length === 0 ? (
-                        <div className="text-pitch-500 text-sm text-center py-4">No results yet</div>
-                    ) : (
-                        <div className="space-y-px">
-                            {pastGames.slice(0, 10).map((g, i) => (
-                                <motion.div key={g.id}
-                                    initial={{ opacity: 0, x: -4 }} animate={{ opacity: 1, x: 0 }}
-                                    transition={{ delay: i * 0.025 }}
-                                    className="flex items-center gap-2.5 px-2 py-2 rounded hover:bg-pitch-750 transition-colors">
-                                    <ResultBadge result={g.result} />
-                                    <span className="flex-1 text-[11px] text-pitch-300">
-                                        {g.isHome ? "vs" : "@"} {g.opponent}
-                                    </span>
-                                    {g.teamScore !== null && (
-                                        <span className={`font-mono text-[11px] tabular-nums font-medium
-                      ${g.result === "W" ? "text-win" : "text-loss"}`}>
-                                            {g.teamScore}–{g.oppScore}
-                                        </span>
-                                    )}
-                                    <span className="text-[10px] text-pitch-600 w-14 text-right">{g.dateStr}</span>
-                                </motion.div>
-                            ))}
-                        </div>
-                    )}
-                </motion.div>
+                    {/* Schedule grid */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                        {/* Recent results */}
+                        <motion.div variants={item} className="pm-card p-4">
+                            <div className="pm-label mb-3">Recent Results</div>
+                            {schedError ? (
+                                <ErrorState message="Couldn't load schedule." onRetry={refetch} />
+                            ) : standLoading || schedLoading ? (
+                                <RowSkeleton rows={5} />
+                            ) : pastGames.length === 0 ? (
+                                <div className="text-pitch-500 text-sm text-center py-4">No results yet</div>
+                            ) : (
+                                <div className="space-y-px">
+                                    {pastGames.slice(0, 10).map((g, i) => (
+                                        <motion.div key={g.id}
+                                            initial={{ opacity: 0, x: -4 }} animate={{ opacity: 1, x: 0 }}
+                                            transition={{ delay: i * 0.025 }}
+                                            className="flex items-center gap-2.5 px-2 py-2 rounded hover:bg-pitch-750 transition-colors">
+                                            <ResultBadge result={g.result} />
+                                            <span className="flex-1 text-[11px] text-pitch-300">
+                                                {g.isHome ? "vs" : "@"} {g.opponent}
+                                            </span>
+                                            {g.teamScore !== null && (
+                                                <span className={`font-mono text-[11px] tabular-nums font-medium
+                                                    ${g.result === "W" ? "text-win" : "text-loss"}`}>
+                                                    {g.teamScore}–{g.oppScore}
+                                                </span>
+                                            )}
+                                            <span className="text-[10px] text-pitch-600 w-14 text-right">{g.dateStr}</span>
+                                        </motion.div>
+                                    ))}
+                                </div>
+                            )}
+                        </motion.div>
 
-                {/* Upcoming */}
-                <motion.div variants={item} className="pm-card p-4">
-                    <div className="pm-label mb-3">Upcoming Games</div>
-                    {schedLoading ? (
-                        <RowSkeleton rows={5} />
-                    ) : upcomingGames.length === 0 ? (
-                        <div className="text-pitch-500 text-sm text-center py-4">No upcoming games found</div>
-                    ) : (
-                        <div className="space-y-px">
-                            {upcomingGames.map((g, i) => (
-                                <motion.div key={g.id}
-                                    initial={{ opacity: 0, x: -4 }} animate={{ opacity: 1, x: 0 }}
-                                    transition={{ delay: i * 0.04 }}
-                                    className="flex items-center gap-2.5 px-2 py-2 rounded hover:bg-pitch-750 transition-colors">
-                                    <Clock size={11} className="text-pitch-600 flex-shrink-0" strokeWidth={1.5} />
-                                    <span className="flex-1 text-[11px] text-pitch-300">
-                                        {g.isHome ? "vs" : "@"}{" "}
-                                        <span className="font-medium text-pitch-200">{g.opponent}</span>
-                                    </span>
-                                    <span className="text-[10px] text-pitch-500 font-mono">
-                                        {g.detail || g.dateStr}
-                                    </span>
-                                </motion.div>
-                            ))}
-                        </div>
-                    )}
-                </motion.div>
-            </div>
+                        {/* Upcoming */}
+                        <motion.div variants={item} className="pm-card p-4">
+                            <div className="pm-label mb-3">Upcoming Games</div>
+                            {schedLoading ? (
+                                <RowSkeleton rows={5} />
+                            ) : upcomingGames.length === 0 ? (
+                                <div className="text-pitch-500 text-sm text-center py-4">No upcoming games found</div>
+                            ) : (
+                                <div className="space-y-px">
+                                    {upcomingGames.map((g, i) => (
+                                        <motion.div key={g.id}
+                                            initial={{ opacity: 0, x: -4 }} animate={{ opacity: 1, x: 0 }}
+                                            transition={{ delay: i * 0.04 }}
+                                            className="flex items-center gap-2.5 px-2 py-2 rounded hover:bg-pitch-750 transition-colors">
+                                            <Clock size={11} className="text-pitch-600 flex-shrink-0" strokeWidth={1.5} />
+                                            <span className="flex-1 text-[11px] text-pitch-300">
+                                                {g.isHome ? "vs" : "@"}{" "}
+                                                <span className="font-medium text-pitch-200">{g.opponent}</span>
+                                            </span>
+                                            <span className="text-[10px] text-pitch-500 font-mono">
+                                                {g.detail || g.dateStr}
+                                            </span>
+                                        </motion.div>
+                                    ))}
+                                </div>
+                            )}
+                        </motion.div>
+                    </div>
+                </div>
+            )}
+
+            {activeTab === "lineups" && (
+                <LineupTable teamId={teamId} teamColor={color} />
+            )}
         </motion.div>
     );
 }

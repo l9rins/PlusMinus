@@ -59,6 +59,10 @@ const ENDPOINT_PARAMS = {
   playergamelog: [
     "PlayerID", "Season", "SeasonType", "LeagueID",
   ],
+  teamdashlineups: [
+    "TeamID", "Season", "SeasonType", "PerMode",
+    "MeasureType", "PlusMinus", "GameSegment",
+  ],
 };
 
 const ALLOWED_ENDPOINTS = Object.keys(ENDPOINT_PARAMS);

@@ -256,3 +256,69 @@ export function eloWinProb(eloA, eloB, isAHome = false) {
   const diff = eloA - eloB + (isAHome ? 35 : 0);
   return 1 / (1 + Math.pow(10, -diff / 400));
 }
+// ── Prop hit-rate helpers ─────────────────────────────────────────
+/**
+ * Given an array of game objects with a boolean `.hit` field,
+ * returns { hitRate, streak, streakType, last5Rate }.
+ * Works with the shape returned by usePlayerPropHistory.
+ */
+export function calcPropHitRate(games = []) {
+  if (!games.length) return { hitRate: 0, streak: 0, streakType: null, last5Rate: null };
+
+  const settled = games.filter(g => g.hit !== null && g.hit !== undefined);
+  if (!settled.length) return { hitRate: 0, streak: 0, streakType: null, last5Rate: null };
+
+  const hits    = settled.filter(g => g.hit === true).length;
+  const hitRate = hits / settled.length;
+
+  // Current streak (from most recent backward)
+  let streak     = 0;
+  let streakType = null;
+  for (let i = settled.length - 1; i >= 0; i--) {
+    const current = settled[i].hit;
+    if (streakType === null) { streakType = current ? "over" : "under"; streak = 1; }
+    else if ((streakType === "over") === current) streak++;
+    else break;
+  }
+
+  // Last-5 rate (most recent 5 settled games)
+  const last5     = settled.slice(-5);
+  const last5Rate = last5.length ? last5.filter(g => g.hit).length / last5.length : null;
+
+  return { hitRate, streak, streakType, last5Rate };
+}
+
+/**
+ * Returns a label + CSS class for a hit rate, matching PlusMinus' tier colors.
+ */
+export function hitRateTier(rate) {
+  if (rate >= 0.75) return { label: "🔥 Hot",  cls: "text-win  border-win/30  bg-win/10"  };
+  if (rate >= 0.60) return { label: "↑ Solid", cls: "text-draw border-draw/30 bg-draw/10" };
+  if (rate <= 0.30) return { label: "🧊 Cold", cls: "text-loss border-loss/30 bg-loss/10" };
+  return { label: "~ Even",   cls: "text-pitch-400 border-pitch-600 bg-pitch-750" };
+}
+
+// ── Percentile helper ─────────────────────────────────────────────
+/**
+ * Given a value and an array of all values for that stat,
+ * returns { pct, color, label } using Cleaning the Glass color coding.
+ *
+ * @param {number}   value     - the team/player's value
+ * @param {number[]} allValues - full league array (must contain value)
+ * @param {boolean}  invert    - true for stats where LOWER is better (e.g. TOV%)
+ */
+export function calcPercentile(value, allValues, invert = false) {
+  if (!allValues || allValues.length === 0) return { pct: 50, color: "bg-pitch-700 text-pitch-400", label: "—" };
+
+  const sorted = [...allValues].filter(v => v != null).sort((a, b) => a - b);
+  const rank   = sorted.filter(v => v < value).length;
+  const rawPct = Math.round((rank / sorted.length) * 100);
+  const pct    = invert ? 100 - rawPct : rawPct;
+
+  // CTG-style: orange = elite, green = good, yellow = average, blue = below
+  if (pct >= 90) return { pct, color: "bg-orange-500  text-white",      label: "Elite"  };
+  if (pct >= 75) return { pct, color: "bg-green-500   text-white",      label: "Good"   };
+  if (pct >= 50) return { pct, color: "bg-yellow-400  text-black",      label: "Avg+"   };
+  if (pct >= 25) return { pct, color: "bg-pitch-600   text-pitch-300",  label: "Avg-"   };
+  return              { pct, color: "bg-blue-500    text-white",      label: "Poor"   };
+}

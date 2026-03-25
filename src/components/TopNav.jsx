@@ -5,7 +5,7 @@ import {
   LayoutDashboard, Users, BarChart3, Target,
   TrendingUp, Activity, ChevronDown, Search, Bell,
   Settings, X, Menu, Zap, ChevronRight, Sun, Moon,
-  GitCompare, BarChart2,
+  GitCompare, BarChart2, Coins,
 } from "lucide-react";
 import { UserButton } from "@clerk/clerk-react";
 import { useTodayGames, useOdds } from "../api";
@@ -57,6 +57,13 @@ const NAV_ITEMS = [
     sub: [
       { label: "Team vs Team", path: "/compare", desc: "Elo, stats, star player clash" },
       { label: "Win probability", path: "/compare", desc: "Home court advantage included" },
+    ],
+  },
+  {
+    label: "Leaderboard", icon: Coins, path: "/paper",
+    sub: [
+      { label: "Paper Betting", path: "/paper", desc: "No real money · just PMC" },
+      { label: "Global Ranking", path: "/paper", desc: "Compete with users & model" },
     ],
   },
   // { label: "History",   icon: BarChart2,  path: "/history", sub: null },  // coming soon
@@ -531,7 +538,7 @@ export default function TopNav({ activeTab, onTabChange }) {
 
               {/* Settings */}
               <button className="pm-nav-btn" title="Settings" aria-label="Settings"
-                onClick={() => console.info("[PlusMinus] Settings — coming soon")}>
+                onClick={() => navigate("/settings")}>
                 <Settings size={13} strokeWidth={1.8} />
               </button>
 
