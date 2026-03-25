@@ -7,7 +7,7 @@ import {
 import {
   ArrowUpDown, Download, Trash2, Plus, ChevronUp, ChevronDown,
   TrendingUp, Shield, DollarSign, Target, X, Info,
-  Zap, ExternalLink, AlertTriangle, AlertCircle, CheckCircle, Loader, Activity, Layers, PlayCircle, Clock,
+  Zap, ExternalLink, TriangleAlert, CircleAlert, CircleCheck, LoaderCircle, Activity, Layers, PlayCircle, Clock,
   Settings, Layers3, Bell, Share2,
 } from "lucide-react";
 import { TEAM_NAMES, ODDS_GAMES, TEAM_COLORS } from "../data";
@@ -907,7 +907,7 @@ export function Betting() {
       {/* Methodology Disclaimer */}
       <motion.div variants={item} className="pm-card p-4 mb-4 border border-draw/30 bg-draw/5">
         <div className="flex items-start gap-2.5">
-          <AlertCircle size={14} className="text-draw flex-shrink-0 mt-0.5" strokeWidth={2} />
+          <CircleAlert size={14} className="text-draw flex-shrink-0 mt-0.5" strokeWidth={2} />
           <div className="text-[11px] text-pitch-300 leading-relaxed">
             <span className="text-pitch-100 font-medium mb-1 block">Line Shopping & Edge Estimation</span>
             This tool is primarily for <strong className="text-pitch-100">line shopping</strong> across books to find the best available odds and arbitrage opportunities. <br/><br/>
@@ -2134,7 +2134,7 @@ export function BetTracker() {
                       disabled={isSaving}
                       className="pm-btn-primary flex items-center gap-1.5 text-[11px] py-1.5 px-4 disabled:opacity-50"
                     >
-                      {isSaving ? <Loader size={11} className="animate-spin" /> : <CheckCircle size={11} />}
+                      {isSaving ? <LoaderCircle size={11} className="animate-spin" /> : <CircleCheck size={11} />}
                       {isSaving ? "Saving…" : "Save Bet"}
                     </button>
                   </div>
@@ -2469,7 +2469,7 @@ export function AlertsPanel() {
           </div>
         </div>
         <button type="submit" disabled={isCreating} className="pm-btn-primary w-full py-2 flex items-center justify-center gap-2">
-          {isCreating ? <Loader size={14} className="animate-spin" /> : <Plus size={14} />}
+          {isCreating ? <LoaderCircle size={14} className="animate-spin" /> : <Plus size={14} />}
           Add Alert
         </button>
       </form>

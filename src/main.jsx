@@ -1,5 +1,5 @@
 import React, { Suspense } from "react";
-import { Loader } from "lucide-react";
+import { LoaderCircle } from "lucide-react";
 import ReactDOM from "react-dom/client";
 import { inject } from "@vercel/analytics";
 import { ClerkProvider } from "@clerk/clerk-react";
@@ -37,7 +37,7 @@ if (!rootEl) throw new Error("[PlusMinus] #root not found in index.html");
 
 const ClerkLoadingFallback = () => (
   <div className="min-h-screen bg-pitch-900 flex items-center justify-center">
-    <Loader className="animate-spin text-accent" />
+    <LoaderCircle className="animate-spin text-accent" />
   </div>
 );
 

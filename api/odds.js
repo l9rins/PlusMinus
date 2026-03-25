@@ -14,25 +14,9 @@
 
 const ODDS_BASE = "https://api.the-odds-api.com/v4";
 
-const TEAM_MAP = {
-  "Atlanta Hawks": "ATL", "Boston Celtics": "BOS",
-  "Brooklyn Nets": "BKN", "Charlotte Hornets": "CHA",
-  "Chicago Bulls": "CHI", "Cleveland Cavaliers": "CLE",
-  "Dallas Mavericks": "DAL", "Denver Nuggets": "DEN",
-  "Detroit Pistons": "DET", "Golden State Warriors": "GSW",
-  "Houston Rockets": "HOU", "Indiana Pacers": "IND",
-  "Los Angeles Clippers": "LAC", "Los Angeles Lakers": "LAL",
-  "Memphis Grizzlies": "MEM", "Miami Heat": "MIA",
-  "Milwaukee Bucks": "MIL", "Minnesota Timberwolves": "MIN",
-  "New Orleans Pelicans": "NOP", "New York Knicks": "NYK",
-  "Oklahoma City Thunder": "OKC", "Orlando Magic": "ORL",
-  "Philadelphia 76ers": "PHI", "Phoenix Suns": "PHX",
-  "Portland Trail Blazers": "POR", "Sacramento Kings": "SAC",
-  "San Antonio Spurs": "SAS", "Toronto Raptors": "TOR",
-  "Utah Jazz": "UTA", "Washington Wizards": "WAS",
-};
-
 import { setCORSHeaders, handleOptions } from "./_cors.js";
+import { TEAM_MAP } from "./_teams.js";
+
 import { createClient } from "@vercel/kv";
 
 const kv = createClient({
@@ -82,7 +66,7 @@ export default async function handler(req, res) {
     if (!upstream.ok) {
       console.warn(`[api/odds] Upstream error ${upstream.status}, trying cache fallback`);
       const cached = await kv.get("odds_cache");
-      if (cached) return res.status(200).json({ data: cached, stale: true });
+      if (cached && cached.data) return res.status(200).json({ data: cached.data, stale: true });
       return res.status(upstream.status).json({ error: `Odds API ${upstream.status}` });
     }
 
@@ -165,14 +149,14 @@ export default async function handler(req, res) {
       console.warn("[api/odds] Upstream timeout, trying cache fallback");
       try {
         const cached = await kv.get("odds_cache");
-        if (cached) return res.status(200).json({ data: cached, stale: true });
+        if (cached && cached.data) return res.status(200).json({ data: cached.data, stale: true });
       } catch (e) {}
       return res.status(503).json({ error: "Odds API timed out — retrying" });
     }
     console.error("[api/odds] Error:", err);
     try {
       const cached = await kv.get("odds_cache");
-      if (cached) return res.status(200).json({ data: cached, stale: true });
+      if (cached && cached.data) return res.status(200).json({ data: cached.data, stale: true });
     } catch (e) {}
     return res.status(502).json({ error: err.message });
   }

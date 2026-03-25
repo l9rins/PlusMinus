@@ -5,7 +5,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { AlertCircle, RefreshCw, Wifi, Key, Clock } from "lucide-react";
+import { CircleAlert, RotateCw, Wifi, Key, Clock } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ReferenceLine } from "recharts";
 import { oddsToImplied } from "../utils";
@@ -101,7 +101,7 @@ export function CardSkeleton({ height = 200 }) {
 // ── Spinner ───────────────────────────────────────────────────────
 export function Spinner({ size = 14, className = "" }) {
     return (
-        <RefreshCw
+        <RotateCw
             size={size}
             className={`text-pitch-400 animate-spin ${className}`}
             strokeWidth={1.8}
@@ -115,9 +115,9 @@ export function ErrorState({ message, onRetry, type = "generic" }) {
     const icons = {
         network: Wifi,
         auth: Key,
-        generic: AlertCircle,
+        generic: CircleAlert,
     };
-    const Icon = icons[type] || AlertCircle;
+    const Icon = icons[type] || CircleAlert;
 
     return (
         <motion.div
@@ -141,7 +141,7 @@ export function ErrorState({ message, onRetry, type = "generic" }) {
                      hover:text-accent transition-colors mt-1 px-3 py-1.5
                      rounded-md border border-pitch-600 hover:border-accent/30"
                 >
-                    <RefreshCw size={11} strokeWidth={1.8} />
+                    <RotateCw size={11} strokeWidth={1.8} />
                     Try again
                 </motion.button>
             )}

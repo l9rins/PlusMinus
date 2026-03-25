@@ -41,25 +41,8 @@ const MARKET_LABELS = {
     player_blocks_steals: "Blks+Stls",
 };
 
-const TEAM_MAP = {
-    "Atlanta Hawks": "ATL", "Boston Celtics": "BOS",
-    "Brooklyn Nets": "BKN", "Charlotte Hornets": "CHA",
-    "Chicago Bulls": "CHI", "Cleveland Cavaliers": "CLE",
-    "Dallas Mavericks": "DAL", "Denver Nuggets": "DEN",
-    "Detroit Pistons": "DET", "Golden State Warriors": "GSW",
-    "Houston Rockets": "HOU", "Indiana Pacers": "IND",
-    "Los Angeles Clippers": "LAC", "Los Angeles Lakers": "LAL",
-    "Memphis Grizzlies": "MEM", "Miami Heat": "MIA",
-    "Milwaukee Bucks": "MIL", "Minnesota Timberwolves": "MIN",
-    "New Orleans Pelicans": "NOP", "New York Knicks": "NYK",
-    "Oklahoma City Thunder": "OKC", "Orlando Magic": "ORL",
-    "Philadelphia 76ers": "PHI", "Phoenix Suns": "PHX",
-    "Portland Trail Blazers": "POR", "Sacramento Kings": "SAC",
-    "San Antonio Spurs": "SAS", "Toronto Raptors": "TOR",
-    "Utah Jazz": "UTA", "Washington Wizards": "WAS",
-};
-
 import { setCORSHeaders, handleOptions } from "./_cors.js";
+import { TEAM_MAP } from "./_teams.js";
 import { createClient } from "@vercel/kv";
 const kv = createClient({
   url:   process.env.KV_REST_API_URL,

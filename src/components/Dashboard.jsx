@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-    TrendingUp, TrendingDown, Target, BarChart2,
+    TrendingUp, TrendingDown, Target, ChartColumnBig,
     Zap, ChevronRight, Activity, DollarSign, Flame, Shield,
 } from "lucide-react";
 import { TEAM_NAMES, ODDS_GAMES, TEAM_COLORS } from "../data";
@@ -267,7 +267,7 @@ export default function Dashboard() {
                     <SummaryTile label="Games Today" value={gameCount || "—"} sub={gameCount === 0 ? "No games today" : liveCount > 0 ? `${liveCount} in progress` : "Tip-off tonight"} icon={Target} trend={liveCount > 0 ? "up" : null} badge={liveCount > 0 ? { label: "LIVE", cls: "bg-win/10 text-win border border-win/20" } : null} onClick={() => navigate("/scores")} />
                     <SummaryTile label="Top Model Edge" value={edgeDiff > 0 ? `+${edgeDiff.toFixed(1)}%` : "—"} sub={topEdge.matchup} icon={TrendingUp} trend="up" color={edgeDiff >= 10 ? "text-win" : edgeDiff >= 5 ? "text-draw" : "text-pitch-50"} onClick={() => navigate("/betting")} />
                     <SummaryTile label="Best Win Prob" value={bestProb.modelP > 0 ? `${bestProb.modelP}%` : "—"} sub={bestProb.fav !== "—" ? `${bestProb.fav} · ${bestProb.matchup}` : "No data"} icon={Zap} onClick={() => navigate("/betting")} />
-                    <SummaryTile label="Net P&L" value={betStats.total > 0 ? formatCurrency(betStats.pl) : "—"} sub={betSub} icon={BarChart2} color={betStats.pl > 0 ? "text-win" : betStats.pl < 0 ? "text-loss" : "text-pitch-50"} trend={betStats.pl > 0 ? "up" : betStats.pl < 0 ? "down" : null} onClick={() => navigate("/tracker")} />
+                    <SummaryTile label="Net P&L" value={betStats.total > 0 ? formatCurrency(betStats.pl) : "—"} sub={betSub} icon={ChartColumnBig} color={betStats.pl > 0 ? "text-win" : betStats.pl < 0 ? "text-loss" : "text-pitch-50"} trend={betStats.pl > 0 ? "up" : betStats.pl < 0 ? "down" : null} onClick={() => navigate("/tracker")} />
                 </div>
             </motion.div>
 
@@ -308,7 +308,7 @@ export default function Dashboard() {
                     <div className="grid grid-cols-2 gap-2">
                         {[
                             { label: "Line Shopping", path: "/betting", icon: TrendingUp, color: "text-accent" },
-                            { label: "Bet Tracker", path: "/tracker", icon: BarChart2, color: "text-win" },
+                            { label: "Bet Tracker", path: "/tracker", icon: ChartColumnBig, color: "text-win" },
                             { label: "Four Factors", path: "/analytics?tab=factors", icon: Activity, color: "text-draw" },
                             { label: "Players", path: "/players", icon: Zap, color: "text-pitch-300" },
                         ].map(item => (

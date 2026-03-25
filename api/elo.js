@@ -64,7 +64,7 @@ function currentSeasonStr() {
 
 // Elo helpers — K=20, home court = +100 points advantage
 const K = 20;
-const HOME_ADV = 100;
+const HOME_ADV = 35;
 
 function winProb(eloA, eloB) {
   return 1 / (1 + Math.pow(10, (eloB - eloA) / 400));

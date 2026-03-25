@@ -3,9 +3,9 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useVirtualizer, useWindowVirtualizer } from "@tanstack/react-virtual";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Search, SlidersHorizontal, ChevronDown, X, Loader,
+  Search, SlidersHorizontal, ChevronDown, X, LoaderCircle,
   GitCompare, TrendingUp, TrendingDown, Minus,
-  BarChart2, Zap, Target, ArrowUpDown,
+  ChartColumnBig, Zap, Target, ArrowUpDown,
 } from "lucide-react";
 import { TEAM_COLORS, TEAM_NAMES } from "../data";
 import { useEnrichedPlayerStats, usePlayerSearch, usePlayerGameLog, prefetchPlayerGameLog } from "../api";
@@ -168,7 +168,7 @@ function PlayerCard({ player, onCompare, comparePlayer, isComparing, sortKey, is
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                   <div>
                     <div className="pm-label mb-2 flex items-center gap-2">
-                      <BarChart2 size={10} /> Advanced metrics
+                      <ChartColumnBig size={10} /> Advanced metrics
                       {comparePlayer && <span className="text-[9px] text-pitch-500 font-normal"><span style={{ color }}>{player.name.split(" ").at(-1)}</span>{" vs "}<span style={{ color: cmpColor }}>{comparePlayer.name.split(" ").at(-1)}</span></span>}
                     </div>
                     <div className="mt-2 space-y-0">
@@ -193,7 +193,7 @@ function PlayerCard({ player, onCompare, comparePlayer, isComparing, sortKey, is
                       ))}
                     </div>
                     <div className="mt-1">
-                      <div className="pm-label mb-2 flex items-center gap-2"><Zap size={10} /> Last 5 games {formFetching && <Loader size={9} className="text-pitch-500 animate-spin ml-1" />}</div>
+                      <div className="pm-label mb-2 flex items-center gap-2"><Zap size={10} /> Last 5 games {formFetching && <LoaderCircle size={9} className="text-pitch-500 animate-spin ml-1" />}</div>
                       {gameLogForm?.length > 0 ? (
                         <div className="flex gap-1.5">
                           {gameLogForm.map((r, i) => (
@@ -322,7 +322,7 @@ export default function Players({ initialQuery = "" }) {
       <div className="flex flex-wrap items-center gap-2 mb-4">
         <div className="relative flex-1 min-w-[180px]">
           {isFetching
-            ? <Loader size={13} strokeWidth={1.8} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-accent animate-spin" />
+            ? <LoaderCircle size={13} strokeWidth={1.8} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-accent animate-spin" />
             : <Search size={13} strokeWidth={1.8} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-pitch-500" />}
           <input ref={inputRef} value={localQuery} onChange={e => { setLocalQuery(e.target.value); debouncedSetQuery(e.target.value); setFocusedIdx(-1); }}
             placeholder={isSearchMode ? "Searching all NBA players…" : "Search player…"}

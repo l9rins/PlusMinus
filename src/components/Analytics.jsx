@@ -21,7 +21,7 @@ import {
 import { useStandings, useLeagueTeamStats, useEnrichedPlayerStats, useEloData } from "../api";
 import { FreshnessTag, RowSkeleton, ErrorState } from "./ui";
 import { signed, reshapeNBAStats, lsGet, lsSet } from "../utils";
-import { TrendingUp, BarChart2, Zap, Award, Info, Star, Trophy } from "lucide-react";
+import { TrendingUp, ChartColumnBig, Zap, Award, Info, Star, Trophy } from "lucide-react";
 import PlayoffBracket from "./PlayoffBracket";
 
 // Constants mirrored from playoffWorker.js for display purposes
@@ -671,7 +671,7 @@ function MethodologyNote({ children }) {
 // ─── Tabs ─────────────────────────────────────────────────────
 const TABS = [
   { id: "power", label: "Power Index", icon: Award },
-  { id: "factors", label: "Four Factors", icon: BarChart2 },
+  { id: "factors", label: "Four Factors", icon: ChartColumnBig },
   { id: "elo", label: "Elo Ratings", icon: TrendingUp },
   { id: "quality", label: "Shot Quality", icon: Zap },
   { id: "playoff", label: "Playoff Sim", icon: Trophy },

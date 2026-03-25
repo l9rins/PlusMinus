@@ -135,6 +135,25 @@ export function useLeagueTeamStats() {
   });
 }
 
+export function useFourFactorsStats() {
+  return useQuery({
+    queryKey: ["nba", "fourFactorsStats"],
+    queryFn: async ({ signal }) => {
+      const season = currentSeason();
+      const data = await nbaFetch("leaguedashteamstats", {
+        Season: `${season}-${String(season + 1).slice(2)}`,
+        SeasonType: "Regular Season",
+        PerMode: "PerGame",
+        MeasureType: "Four Factors", // Fetches true TOV%, eFG%, ORB%, FTR
+      }, signal);
+      return data;
+    },
+    staleTime: 1000 * 60 * 10,
+    placeholderData: null,
+    retry: shouldRetry,
+  });
+}
+
 // ── League player stats ───────────────────────────────────────────
 export function useLeaguePlayerStats() {
   return useQuery({

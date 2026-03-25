@@ -13,7 +13,7 @@ import {
 } from "recharts";
 import {
     ArrowLeft, TrendingUp, TrendingDown, Minus,
-    Calendar, CheckCircle, XCircle, Clock
+    Calendar, CircleCheck, CircleX, Clock
 } from "lucide-react";
 import { TEAM_COLORS, TEAM_NAMES, PLAYERS, EAST_STANDINGS, WEST_STANDINGS } from "../data";
 import { useStandings, useTeamSchedule, useEnrichedPlayerStats } from "../api";
