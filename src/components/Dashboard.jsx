@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 import { TEAM_NAMES, ODDS_GAMES, TEAM_COLORS } from "../data";
 import { useStandings, useTodayGames, useOdds, mergeOddsIntoGames, useBets, useEloData } from "../api";
-import { formatCurrency, formatPct, lsGet, calcROI, eloWinProb } from "../utils";
+import { formatCurrency, formatPct, lsGet, calcROI, eloWinProb, kellyBet, DEFAULT_BANKROLL } from "../utils";
 import { TileSkeleton, RowSkeleton, ErrorState, FreshnessTag, Tooltip, TeamLink } from "./ui";
 
 const container = { hidden: {}, show: { transition: { staggerChildren: 0.04, delayChildren: 0.05 } } };
@@ -96,7 +96,7 @@ function MiniStandings({ teams, conf }) {
                 {teams.slice(0, 8).map((t, i) => {
                     const isPlayoff = i < 6;
                     const isPlayIn = i >= 6 && i <= 9;
-                    const color = useMemo(() => TEAM_COLORS[t.team] || "#546480", [t.team]);
+                    const color = TEAM_COLORS[t.team] || "#546480";
                     return (
                         <div key={`${t.team}-${i}`} className={`flex items-center gap-2 px-2 py-1.5 rounded-sm transition-colors hover:bg-pitch-700 cursor-pointer ${i === 6 ? "border-t border-dashed border-pitch-600 mt-1 pt-2.5" : ""}`}>
                             <span className="pm-number text-[10px] text-pitch-600 w-4 flex-shrink-0">{i + 1}</span>

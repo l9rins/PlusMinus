@@ -2,11 +2,11 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@clerk/clerk-react";
 
 export function useAlerts() {
-    const { getToken, isLoaded, isSignedIn } = useAuth();
+    const { getToken, isLoaded, isSignedIn, userId } = useAuth();
     const queryClient = useQueryClient();
 
     const fetchAlerts = async () => {
-        if (!isLoaded || !isSignedIn) return [];
+        if (!isLoaded || !isSignedIn || !userId) return [];
         const token = await getToken();
         if (!token) return [];
         
@@ -19,10 +19,10 @@ export function useAlerts() {
     };
 
     const query = useQuery({
-        queryKey: ["alerts"],
+        queryKey: ["alerts", userId],
         queryFn: fetchAlerts,
         staleTime: 60000,
-        enabled: isLoaded && isSignedIn,
+        enabled: isLoaded && isSignedIn && !!userId,
     });
 
     const createMutation = useMutation({
@@ -40,7 +40,7 @@ export function useAlerts() {
             return res.json();
         },
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ["alerts"] });
+            queryClient.invalidateQueries({ queryKey: ["alerts", userId] });
         }
     });
 
@@ -57,7 +57,7 @@ export function useAlerts() {
             return res.json();
         },
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ["alerts"] });
+            queryClient.invalidateQueries({ queryKey: ["alerts", userId] });
         }
     });
 

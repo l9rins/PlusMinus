@@ -20,11 +20,26 @@
 
 import { handleOptions, setCORSHeaders } from "./_cors.js";
 import { createClient } from "@vercel/kv";
+import { createClerkClient } from "@clerk/backend";
 
 const kv = createClient({
     url: process.env.KV_REST_API_URL,
     token: process.env.KV_REST_API_TOKEN,
 });
+
+const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
+
+async function getUserId(req) {
+    const auth = req.headers.authorization;
+    if (!auth?.startsWith("Bearer ")) return null;
+    try {
+        const token = auth.slice(7);
+        const { sub } = await clerk.verifyToken(token);
+        return sub;
+    } catch {
+        return null;
+    }
+}
 
 const LOG_KEY = "error_log:app";
 const MAX_ENTRIES = 100;
@@ -49,6 +64,9 @@ export default async function handler(req, res) {
 
     // ── POST: ingest an error ──────────────────────────────────────
     if (req.method === "POST") {
+        const userId = await getUserId(req);
+        if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
         try {
             const entry = sanitizeEntry(req.body ?? {});
 

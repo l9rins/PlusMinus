@@ -212,7 +212,28 @@ export default async function handler(req, res) {
     champPct:   0,
   })).sort((a, b) => b.elo - a.elo);
 
-  const stringToHash = JSON.stringify(EAST_STANDINGS) + JSON.stringify(WEST_STANDINGS);
+  const wl = {};
+  for (const g of allGames) {
+    wl[g.home] = wl[g.home] ?? { w: 0, l: 0 };
+    wl[g.away] = wl[g.away] ?? { w: 0, l: 0 };
+    if (g.homeWon) {
+      wl[g.home].w++;
+      wl[g.away].l++;
+    } else {
+      wl[g.home].l++;
+      wl[g.away].w++;
+    }
+  }
+
+  const getRecord = (abbr) => {
+    const r = wl[abbr] ?? { w: 0, l: 0 };
+    return { ...r, pct: (r.w + r.l) > 0 ? r.w / (r.w + r.l) : 0 };
+  };
+
+  const eastTeams = EAST_STANDINGS.map(t => ({ team: t.team, ...getRecord(t.team) })).sort((a, b) => b.pct - a.pct);
+  const westTeams = WEST_STANDINGS.map(t => ({ team: t.team, ...getRecord(t.team) })).sort((a, b) => b.pct - a.pct);
+
+  const stringToHash = JSON.stringify(eastTeams) + JSON.stringify(westTeams);
   let hash = 0;
   for (let i = 0; i < stringToHash.length; i++) hash = Math.imul(31, hash) + stringToHash.charCodeAt(i) | 0;
 
@@ -228,8 +249,8 @@ export default async function handler(req, res) {
     };
   });
 
-  const eastSeeds = buildSeeds(EAST_STANDINGS);
-  const westSeeds = buildSeeds(WEST_STANDINGS);
+  const eastSeeds = buildSeeds(eastTeams);
+  const westSeeds = buildSeeds(westTeams);
   const counts = {};
   [...eastSeeds, ...westSeeds].forEach(t => { counts[t.team] = { pi: 0, r1: 0, r2: 0, conf: 0, finals: 0, champ: 0 }; });
 

@@ -90,8 +90,9 @@ export default async function handler(req, res) {
         return res.status(500).json({ error: "ODDS_API_KEY not configured on server" });
     }
 
-    // Optional: filter to a specific event ID passed as ?eventId=...
-    const { eventId } = req.query;
+    // Optional: filter to a specific event ID passed as ?eventId=... or ?gameId=...
+    const { eventId, gameId } = req.query;
+    const resolvedEventId = eventId ?? gameId;
 
     try {
         // Step 1: get today's NBA event list so we have event IDs
@@ -103,8 +104,8 @@ export default async function handler(req, res) {
         const events = await eventsRes.json();
 
         // Filter to requested event or all of today's
-        const targetEvents = eventId
-            ? events.filter(e => e.id === eventId)
+        const targetEvents = resolvedEventId
+            ? events.filter(e => e.id === resolvedEventId)
             : events;
 
         if (!targetEvents.length) {
@@ -259,11 +260,8 @@ export default async function handler(req, res) {
           kv.set("props_snapshot:latest", result,       { ex: 7200 }),
         ]).catch(err => console.warn("[api/props] KV snapshot write failed:", err));
 
-        // Background: Fire line movement alerts
-        kv.keys("alerts:*").then(async keys => {
-            const promises = keys.map(k => checkAlerts(k.replace("alerts:", ""), result));
-            await Promise.allSettled(promises);
-        }).catch(err => console.warn("[api/props] Error checking alerts:", err));
+        // Background: Fire line movement alerts (TBD)
+        // kv.keys("alerts:*").then(...)
 
         // Update in-memory snapshot for same-Lambda subsequent calls
         // Removed `handler._prevSnapshot = result;` to purely rely on KV
@@ -271,13 +269,21 @@ export default async function handler(req, res) {
         // Cache for 10 minutes — props move slowly intraday
         res.setHeader("Cache-Control", "s-maxage=600, stale-while-revalidate=60");
         res.setHeader("Content-Type", "application/json");
+
+        // Persist to KV for fallback cache
+        await kv.set("props_cache", { ...result, _moves: moves, cachedAt: Date.now() }, { ex: 3600 }).catch(() => {});
+
         return res.status(200).json({ ...result, _moves: moves });
 
     } catch (err) {
         if (err.name === "TimeoutError") {
+            const cached = await kv.get("props_cache").catch(() => null);
+            if (cached) return res.status(200).json({ ...cached, stale: true });
             return res.status(503).json({ error: "Props API timed out — retrying" });
         }
         console.error("[api/props] Error:", err);
+        const cached = await kv.get("props_cache").catch(() => null);
+        if (cached) return res.status(200).json({ ...cached, stale: true });
         return res.status(502).json({ error: err.message });
     }
 }

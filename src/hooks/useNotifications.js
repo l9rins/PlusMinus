@@ -4,6 +4,9 @@
 // has granted notification permission. Shows browser notifications
 // via the Notifications API — no push subscription infra needed.
 //
+// NOTE: public/sw.js is already push-capable, but v1 relies on tab
+// polling. full background push (VAPID) is planned for v2.
+//
 // Usage (in App.jsx or AppInner):
 //   import { useNotifications } from "./hooks/useNotifications";
 //   function AppInner() {

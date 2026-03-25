@@ -40,7 +40,7 @@
       "headers": [
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self' 'unsafe-inline' https://*.clerk.accounts.dev https://challenges.cloudflare.com https://vercel.live; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; worker-src 'self' blob:; connect-src 'self' https://*.clerk.accounts.dev https://clerk-telemetry.com https://api.the-odds-api.com https://site.api.espn.com https://stats.nba.com https://api.balldontlie.io; img-src 'self' data: https:; frame-src https://challenges.cloudflare.com https://vercel.live"
+          "value": "default-src 'self'; script-src 'self' 'unsafe-inline' https://*.clerk.accounts.dev https://challenges.cloudflare.com https://vercel.live; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; worker-src 'self' blob:; connect-src 'self' https://*.clerk.accounts.dev https://clerk-telemetry.com https://site.api.espn.com https://stats.nba.com https://api.balldontlie.io; img-src 'self' data: https:; frame-src https://challenges.cloudflare.com https://vercel.live"
         }
       ]
     }

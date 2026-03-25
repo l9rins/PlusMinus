@@ -116,8 +116,10 @@ export default async function handler(req, res) {
     if (lastCall) {
         const elapsed = Date.now() - lastCall;
         if (elapsed < 10_000) {
+            const retryAfter = Math.ceil((10_000 - elapsed) / 1000);
+            res.setHeader("Retry-After", String(retryAfter));
             return res.status(429).json({
-                error: `Rate limited. Try again in ${Math.ceil((10_000 - elapsed) / 1000)}s.`,
+                error: `Rate limited. Try again in ${retryAfter}s.`,
             });
         }
     }

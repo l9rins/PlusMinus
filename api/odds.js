@@ -157,7 +157,7 @@ export default async function handler(req, res) {
     res.setHeader("Cache-Control", "s-maxage=900, stale-while-revalidate=60");
     res.setHeader("Content-Type", "application/json");
     
-    await kv.set("odds_cache", result);
+    await kv.set("odds_cache", { data: result, cachedAt: Date.now() });
 
     return res.status(200).json({ data: result });
   } catch (err) {

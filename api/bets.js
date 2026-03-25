@@ -117,7 +117,7 @@ export default async function handler(req, res) {
       }
 
       await kv.set(key, sanitizedBets);
-      return res.status(200).json({ ok: true });
+      return res.status(200).json({ ok: true, archived: bets.length - sanitizedBets.length });
     } catch (err) {
       console.error("[api/bets PUT]", err);
       return res.status(503).json({ error: "Storage unavailable — please try again." });
