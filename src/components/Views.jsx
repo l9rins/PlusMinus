@@ -8,7 +8,7 @@ import {
   ArrowUpDown, Download, Trash2, Plus, ChevronUp, ChevronDown,
   TrendingUp, Shield, DollarSign, Target, X, Info,
   Zap, ExternalLink, AlertTriangle, AlertCircle, CheckCircle, Loader, Activity, Layers, PlayCircle, Clock,
-  Settings, Layers3,
+  Settings, Layers3, Bell, Share2,
 } from "lucide-react";
 import { TEAM_NAMES, ODDS_GAMES, TEAM_COLORS } from "../data";
 import { useStandings, useTodayGames, useOdds, mergeOddsIntoGames, useBets, usePlayerProps, usePlayerPropHistory, useServerConfig, useAllPlayers } from "../api";
@@ -19,6 +19,7 @@ import {
   stakeToUnits, plInUnits, getUnitSize, unitsToDollars, reshapeNBAStats,
 } from "../utils";
 import { TileSkeleton, RowSkeleton, ErrorState, FreshnessTag, EmptyState, useToast, TeamLink, CalibrationCurve } from "./ui";
+import { useAlerts } from "../hooks/useAlerts";
 
 // ── Shared animation + tooltip config ────────────────────────────
 const container = { hidden: {}, show: { transition: { staggerChildren: 0.035 } } };
@@ -1514,8 +1515,9 @@ function OddsCreditsWidget() {
 export function BetTracker() {
   const toast    = useToast();
   const { bets, isLoading, isSaving, isDeleting, saveBets, deleteBet: serverDeleteBet } = useBets();
+  const { data: alertsData } = useAlerts();
 
-  // ── tracker sub-tab: "log" | "props"
+  // ── tracker sub-tab: "log" | "props" | "alerts"
   const [trackerTab, setTrackerTab] = useState("log");
 
   // ── add-bet form
@@ -1757,6 +1759,7 @@ export function BetTracker() {
         {[
           { id: "log",   label: "Bet Log",      Icon: Layers },
           { id: "props", label: "Prop Markets",  Icon: Activity },
+          { id: "alerts", label: "Alerts",       Icon: Bell },
         ].map(({ id, label, Icon }) => (
           <button
             key={id}
@@ -1771,6 +1774,11 @@ export function BetTracker() {
             {id === "log" && stats && stats.propBets > 0 && (
               <span className="text-[9px] px-1 py-0.5 rounded-full bg-accent/10 text-accent/70">
                 {stats.propBets} props
+              </span>
+            )}
+            {id === "alerts" && alertsData?.length > 0 && (
+              <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-accent text-[#0d1522] font-bold">
+                {alertsData.length}
               </span>
             )}
           </button>
@@ -1788,6 +1796,19 @@ export function BetTracker() {
             transition={{ duration: 0.18 }}
           >
             <PropsBrowser onAddPropBet={handleAddPropBet} bankroll={bankroll} />
+          </motion.div>
+        )}
+
+        {/* ═══ ALERTS TAB ════════════════════════════════════════ */}
+        {trackerTab === "alerts" && (
+          <motion.div
+            key="alerts"
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={{ duration: 0.18 }}
+          >
+            <AlertsPanel />
           </motion.div>
         )}
 
@@ -2317,7 +2338,34 @@ export function BetTracker() {
                           <option value="push">Push</option>
                         </select>
 
-                        {/* Delete */}
+                        {/* Delete & Share */}
+                        <button
+                          onClick={() => {
+                            const params = new URLSearchParams({
+                              matchup: bet.matchup || "",
+                              team: bet.team || "",
+                              odds: bet.odds || "",
+                              stake: bet.stake || "",
+                              result: bet.result || "",
+                              date: bet.date || "",
+                              type: bet.type || "",
+                              player: bet.player || "",
+                              market: (bet.market || "").replace("player_", ""),
+                              side: bet.side || "",
+                              line: bet.line || "",
+                            });
+                            const url = `${window.location.origin}/api/og?${params.toString()}`;
+                            window.open(url, "_blank");
+                            navigator.clipboard.writeText(url).catch(()=>{});
+                            toast.success("Link copied!");
+                          }}
+                          className="opacity-0 group-hover:opacity-100 transition-opacity
+                            p-1 rounded hover:bg-accent/15 text-pitch-600 hover:text-accent disabled:opacity-30"
+                          aria-label="Share bet"
+                        >
+                          <Share2 size={11} />
+                        </button>
+
                         <button
                           onClick={() => handleDelete(bet.id)}
                           disabled={isDeleting}
@@ -2337,6 +2385,95 @@ export function BetTracker() {
         )}
       </AnimatePresence>
     </motion.div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// ALERTS PANEL
+// ═══════════════════════════════════════════════════════════════════
+
+export function AlertsPanel() {
+  const { data: alerts, createAlert, deleteAlert, isCreating } = useAlerts();
+  const [form, setForm] = useState({ team: "", targetOdds: "", direction: "above", matchup: "", market: "player_points" });
+
+  const onSubmit = (e) => {
+    e.preventDefault();
+    if (!form.team || !form.targetOdds) return;
+    createAlert(form, {
+      onSuccess: () => setForm({ team: "", targetOdds: "", direction: "above", matchup: "", market: "player_points" })
+    });
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* List */}
+      <div className="pm-card p-4 space-y-2">
+        <div className="flex items-center gap-2 mb-2">
+          <Bell size={14} className="text-accent" />
+          <h3 className="pm-label text-sm text-pitch-100">Active Alerts</h3>
+        </div>
+        {!alerts || alerts.length === 0 ? (
+          <EmptyState title="No alerts" description="Get notified when lines move" icon={Bell} />
+        ) : (
+          <div className="space-y-2">
+            {alerts.map(a => (
+              <div key={a.id} className="flex items-center justify-between p-2 rounded bg-pitch-750 border border-pitch-650">
+                <div>
+                  <div className="text-[12px] font-medium text-pitch-200">{a.team} <span className="text-pitch-500">({a.market})</span></div>
+                  <div className="text-[10px] text-pitch-400">
+                    Target: {a.direction === "above" ? "≥" : "≤"} {a.targetOdds}
+                  </div>
+                </div>
+                <button
+                  onClick={() => deleteAlert(a.id)}
+                  className="p-1 rounded hover:bg-loss/15 text-pitch-600 hover:text-loss transition-colors"
+                >
+                  <Trash2 size={12} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Form */}
+      <form onSubmit={onSubmit} className="pm-card p-4 space-y-3">
+        <h3 className="pm-label text-sm text-pitch-100 mb-2">Create New Alert</h3>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="text-[10px] text-pitch-400 mb-1 block">Team or Player</label>
+            <input required className="pm-input w-full" value={form.team} onChange={e => setForm({...form, team: e.target.value})} placeholder="e.g. Jayson Tatum" />
+          </div>
+          <div>
+            <label className="text-[10px] text-pitch-400 mb-1 block">Market</label>
+            <select className="pm-input w-full" value={form.market} onChange={e => setForm({...form, market: e.target.value})}>
+              <option value="player_points">Points</option>
+              <option value="player_rebounds">Rebounds</option>
+              <option value="player_assists">Assists</option>
+              <option value="player_threes">Threes</option>
+              <option value="spread">Spread</option>
+              <option value="total">Total</option>
+              <option value="moneyline">Moneyline</option>
+            </select>
+          </div>
+          <div>
+            <label className="text-[10px] text-pitch-400 mb-1 block">Direction</label>
+            <select className="pm-input w-full" value={form.direction} onChange={e => setForm({...form, direction: e.target.value})}>
+              <option value="above">Above (≥)</option>
+              <option value="below">Below (≤)</option>
+            </select>
+          </div>
+          <div>
+            <label className="text-[10px] text-pitch-400 mb-1 block">Target Line/Odds</label>
+            <input required type="number" step="0.5" className="pm-input w-full" value={form.targetOdds} onChange={e => setForm({...form, targetOdds: e.target.value})} placeholder="-110 or 27.5" />
+          </div>
+        </div>
+        <button type="submit" disabled={isCreating} className="pm-btn-primary w-full py-2 flex items-center justify-center gap-2">
+          {isCreating ? <Loader size={14} className="animate-spin" /> : <Plus size={14} />}
+          Add Alert
+        </button>
+      </form>
+    </div>
   );
 }
 

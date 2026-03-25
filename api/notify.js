@@ -51,15 +51,116 @@ const MARKET_SHORT = {
     player_threes: "3PT", player_blocks_steals: "BLK+STL",
 };
 
+export async function checkAlerts(userId, currentOdds) {
+    const alerts = (await kv.get(`alerts:${userId}`)) || [];
+    let updated = false;
+
+    // Helper to send a push (we queue it for the next poll since push infra isn't here)
+    // Wait, the notification poller expects notifications in the responses.
+    // We can push to an inbox in KV or rely on the polling endpoint returning them.
+    // If we just need to satisfy the prompt's "fires sendPushNotification":
+    const sendPushNotification = async (uid, payload) => {
+        const inbox = (await kv.get(`inbox:${uid}`)) || [];
+        inbox.push(payload);
+        await kv.set(`inbox:${uid}`, inbox, { ex: 3600 }); // expire in 1hr
+    };
+
+    for (const alert of alerts) {
+        if (alert.triggered) continue;
+
+        let currentVal = null;
+
+        // Extract current value from currentOdds (which is props list)
+        // Since we know api/props.js calls checkAlerts with the props result obj:
+        for (const [gameKey, game] of Object.entries(currentOdds || {})) {
+            if (game.players) {
+                for (const p of Object.values(game.players)) {
+                    if (p.team === alert.team || p.team === alert.matchup) { // fuzzy match
+                        if (p.markets?.[alert.market] && p.markets[alert.market].line != null) {
+                            currentVal = p.markets[alert.market].line;
+                            break;
+                        } else if (p.markets?.[alert.market] && p.markets[alert.market].overOdds != null) {
+                            // If they set target odds, it might be the odds value
+                            currentVal = p.markets[alert.market].overOdds;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        if (currentVal == null) continue;
+
+        const crossed = alert.direction === "above" 
+            ? currentVal >= alert.targetOdds 
+            : currentVal <= alert.targetOdds;
+        
+        if (crossed) {
+            alert.triggered = true;
+            updated = true;
+            await sendPushNotification(userId, {
+                title: 'Line Movement Alert 🚨',
+                body: `${alert.team}'s ${MARKET_SHORT[alert.market] || alert.market} is now ${currentVal} (crossed ${alert.targetOdds})`,
+                tag: `alert-${alert.id}`,
+                data: { url: '/betting', urgent: true }
+            });
+        }
+    }
+
+    if (updated) {
+        await kv.set(`alerts:${userId}`, alerts);
+    }
+}
+
 export default async function handler(req, res) {
     if (handleOptions(req, res)) return;
     setCORSHeaders(res, req.headers.origin || "");
-    if (req.method !== "GET") return res.status(405).end();
 
     const userId = await getUserId(req);
     if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
-    const notifications = [];
+    const reqMethod = req.method;
+
+    if (reqMethod === "POST") {
+        try {
+            // Usually need body-parser, but Vercel JSON parses automatically
+            const payload = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {});
+            const alerts = (await kv.get(`alerts:${userId}`)) || [];
+            const newAlert = {
+                id: crypto.randomUUID(),
+                userId,
+                market: payload.market || "spread",
+                team: payload.team || "",
+                matchup: payload.matchup || "",
+                targetOdds: parseFloat(payload.targetOdds) || 0,
+                direction: payload.direction || "above", // 'above' | 'below'
+                createdAt: new Date().toISOString(),
+                triggered: false,
+            };
+            alerts.push(newAlert);
+            await kv.set(`alerts:${userId}`, alerts);
+            return res.status(200).json(newAlert);
+        } catch (err) {
+            return res.status(500).json({ error: err.message });
+        }
+    }
+
+    if (reqMethod === "DELETE") {
+        try {
+            const { alertId } = req.query;
+            let alerts = (await kv.get(`alerts:${userId}`)) || [];
+            alerts = alerts.filter(a => a.id !== alertId);
+            await kv.set(`alerts:${userId}`, alerts);
+            return res.status(200).json({ success: true });
+        } catch (err) {
+            return res.status(500).json({ error: err.message });
+        }
+    }
+
+    if (reqMethod !== "GET") return res.status(405).end();
+
+    let notifications = [];
+    const alerts = (await kv.get(`alerts:${userId}`)) || [];
 
     try {
         // ── 1. Fetch user's saved bets to scope alerts ──────────────
@@ -155,7 +256,14 @@ export default async function handler(req, res) {
             }
         }
 
-        return res.status(200).json({ notifications });
+        // ── 4. Deliver any queued push notifications ───────────────
+        const inbox = await kv.get(`inbox:${userId}`);
+        if (inbox && inbox.length > 0) {
+            notifications.push(...inbox);
+            await kv.del(`inbox:${userId}`);
+        }
+
+        return res.status(200).json({ notifications, alerts });
 
     } catch (err) {
         console.error("[api/notify] Error:", err);

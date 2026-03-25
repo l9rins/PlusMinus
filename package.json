@@ -22,6 +22,7 @@
     "@tanstack/react-virtual": "^3.13.23",
     "@vercel/analytics": "^2.0.1",
     "@vercel/kv": "^3.0.0",
+    "@vercel/og": "^0.11.1",
     "framer-motion": "^11.2.10",
     "lucide-react": "^0.400.0",
     "react": "^18.3.1",

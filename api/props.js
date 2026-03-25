@@ -60,6 +60,7 @@ const TEAM_MAP = {
 };
 
 import { setCORSHeaders, handleOptions } from "./_cors.js";
+import { checkAlerts } from "./notify.js";
 import { createClient } from "@vercel/kv";
 const kv = createClient({
   url:   process.env.KV_REST_API_URL,
@@ -264,6 +265,12 @@ export default async function handler(req, res) {
           kv.set("props_snapshot:prev",   handler._prevSnapshot, { ex: 7200 }),
           kv.set("props_snapshot:latest", result,                { ex: 7200 }),
         ]).catch(err => console.warn("[api/props] KV snapshot write failed:", err));
+
+        // Background: Fire line movement alerts
+        kv.keys("alerts:*").then(async keys => {
+            const promises = keys.map(k => checkAlerts(k.replace("alerts:", ""), result));
+            await Promise.allSettled(promises);
+        }).catch(err => console.warn("[api/props] Error checking alerts:", err));
 
         // Update in-memory snapshot for same-Lambda subsequent calls
         handler._prevSnapshot = result;
