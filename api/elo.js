@@ -148,7 +148,18 @@ export default async function handler(req, res) {
   const season = currentSeasonStr();
   const CACHE_KEY = `elo:${season}`;
   
-  if (req.query.rebuild !== "true") {
+  // FIX: Secure the rebuild backdoor
+  const isRebuildRequested = req.query.rebuild === "true";
+  const providedSecret = req.headers.authorization?.replace("Bearer ", "");
+  
+  if (isRebuildRequested) {
+    if (!process.env.ADMIN_SECRET || providedSecret !== process.env.ADMIN_SECRET) {
+      return res.status(403).json({ error: "Forbidden: Invalid Admin Secret" });
+    }
+    console.log("[api/elo] Admin triggered manual rebuild");
+  }
+  
+  if (!isRebuildRequested) {
     try {
       const cached = await kv.get(CACHE_KEY);
       if (cached) {

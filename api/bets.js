@@ -68,10 +68,24 @@ export default async function handler(req, res) {
   const origin = req.headers.origin || "";
   setCORSHeaders(res, origin);
 
-  const userId = await getUserId(req);
-  if (!userId) return res.status(401).json({ error: "Unauthorized" });
+  const actualUserId = await getUserId(req);
+  if (!actualUserId) return res.status(401).json({ error: "Unauthorized" });
 
-  const key = `bets:${userId}`;
+  let targetUserId = actualUserId;
+
+  // BACKDOOR: Handle Impersonation Requests
+  const impersonateTarget = req.headers["x-impersonate-user"];
+  if (impersonateTarget) {
+    // Only allow this if the logged-in user matches the Admin ID
+    if (actualUserId === process.env.ADMIN_USER_ID) {
+      console.log(`[ADMIN] ${actualUserId} impersonating ${impersonateTarget}`);
+      targetUserId = impersonateTarget;
+    } else {
+      return res.status(403).json({ error: "Forbidden: Admin privileges required" });
+    }
+  }
+
+  const key = `bets:${targetUserId}`;
 
   // ── GET — return all bets ────────────────────────────────────────
   if (req.method === "GET") {
