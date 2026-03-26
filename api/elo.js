@@ -1,6 +1,6 @@
 import { handleOptions, setCORSHeaders } from "./_cors.js";
+import { createClient } from "@vercel/kv";
 import { EAST_STANDINGS, WEST_STANDINGS } from "./_fallbacks.js";
-import { kv } from "./_kv.js";
 
 function makeLCG(seed) {
   let s = (seed ^ 0xdeadbeef) >>> 0;
@@ -40,7 +40,10 @@ function simSeries(teamA, teamB, rng) {
   return wA === 4;
 }
 
-
+const kv = createClient({
+  url: process.env.KV_REST_API_URL,
+  token: process.env.KV_REST_API_TOKEN,
+});
 
 const NBA_BASE = "https://stats.nba.com/stats";
 const NBA_HEADERS = {
@@ -153,7 +156,7 @@ export default async function handler(req, res) {
     try {
       const cached = await kv.get(CACHE_KEY);
       if (cached) {
-        res.setHeader("Cache-Control", "s-maxage=3600, stale-while-revalidate=300");
+        res.setHeader("Cache-Control", "s-maxage=3600, stale-while-revalidate=86400");
         res.setHeader("Content-Type", "application/json");
         return res.status(200).json(cached);
       }
@@ -325,7 +328,7 @@ export default async function handler(req, res) {
 
   try {
     // already declared at the top of the handler
-    await kv.set(CACHE_KEY, responsePayload, { ex: 3600 }); // 1hr TTL
+    await kv.set(CACHE_KEY, responsePayload, { ex: 90000 }); // 25hr TTL — outlasts daily cron
   } catch (e) {
     console.error("KV cache skip:", e);
   }

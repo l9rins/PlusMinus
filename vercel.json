@@ -1,17 +1,31 @@
 {
   "functions": {
-    "api/stream.js":   { "maxDuration": 300 },
-    "api/paper.js":    { "maxDuration": 30  },
-    "api/injuries.js": { "maxDuration": 15  },
-    "api/webhooks.js": { "maxDuration": 10  }
+    "api/stream.js": {
+      "maxDuration": 300
+    },
+    "api/paper.js": {
+      "maxDuration": 30
+    },
+    "api/injuries.js": {
+      "maxDuration": 15
+    },
+    "api/webhooks.js": {
+      "maxDuration": 10
+    }
   },
   "crons": [
     {
       "path": "/api/elo?rebuild=true",
-      "schedule": "0 * * * *"
+      "schedule": "0 6 * * *"
     },
-    { "path": "/api/paper?action=settle", "schedule": "0 8 * * *" },
-    { "path": "/api/refs", "schedule": "0 16 * * *" }
+    {
+      "path": "/api/paper?action=settle",
+      "schedule": "0 8 * * *"
+    },
+    {
+      "path": "/api/refs",
+      "schedule": "0 16 * * *"
+    }
   ],
   "rewrites": [
     {
@@ -27,20 +41,32 @@
     {
       "source": "/assets/(.*)",
       "headers": [
-        { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
       ]
     },
     {
       "source": "/api/og",
       "headers": [
-        { "key": "Cache-Control", "value": "public, max-age=3600" }
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=3600"
+        }
       ]
     },
     {
       "source": "/api/(.*)",
       "headers": [
-        { "key": "X-Content-Type-Options", "value": "nosniff" },
-        { "key": "X-Frame-Options",        "value": "DENY" }
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        }
       ]
     },
     {
