@@ -14,12 +14,14 @@ export function useSSE({ onAlert }) {
   const connect = useCallback(async () => {
     if (!isMounted.current) return;
 
-    // Always fetch a fresh token — never reuse the previous one
     let token;
     try {
-      token = await getToken({ skipCache: true });
+      // Reverted to default — Clerk handles rotation/caching internally
+      token = await getToken();
     } catch (err) {
       console.error("[SSE] Failed to get token:", err);
+      // Retry after delay rather than giving up
+      retryTimer.current = setTimeout(connect, RETRY_DELAY_MS);
       return;
     }
 
@@ -60,10 +62,10 @@ export function useSSE({ onAlert }) {
       }
 
       retryCount.current += 1;
-      const delay = RETRY_DELAY_MS * retryCount.current; // Back-off: 3s, 6s, 9s…
+      const delay = RETRY_DELAY_MS * retryCount.current;
       console.log(`[SSE] Reconnecting in ${delay}ms (attempt ${retryCount.current})`);
 
-      // Key fix: always call connect() which fetches a NEW token, not just a new EventSource
+      // Key fix: always call connect() to refresh the EventSource cleanly
       retryTimer.current = setTimeout(connect, delay);
     };
   }, [getToken, onAlert]);
