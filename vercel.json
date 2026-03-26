@@ -1,17 +1,8 @@
 {
   "functions": {
-    "api/stream.js": {
-      "maxDuration": 300
-    },
-    "api/paper.js": {
-      "maxDuration": 30
-    },
-    "api/injuries.js": {
-      "maxDuration": 15
-    },
-    "api/webhooks.js": {
-      "maxDuration": 10
-    }
+    "api/stream.js": { "maxDuration": 300 },
+    "api/public.js": { "maxDuration": 60  },
+    "api/private.js": { "maxDuration": 60 }
   },
   "crons": [
     {
@@ -28,10 +19,23 @@
     }
   ],
   "rewrites": [
-    {
-      "source": "/api/bets/:id",
-      "destination": "/api/bets?id=:id"
-    },
+    { "source": "/api/config",   "destination": "/api/public?route=config" },
+    { "source": "/api/nba",      "destination": "/api/public?route=nba" },
+    { "source": "/api/espn",     "destination": "/api/public?route=espn" },
+    { "source": "/api/bdl",      "destination": "/api/public?route=bdl" },
+    { "source": "/api/elo",      "destination": "/api/public?route=elo" },
+    { "source": "/api/injuries", "destination": "/api/public?route=injuries" },
+    { "source": "/api/refs",     "destination": "/api/public?route=refs" },
+    
+    { "source": "/api/bets/:id", "destination": "/api/private?route=bets&id=:id" },
+    { "source": "/api/bets",     "destination": "/api/private?route=bets" },
+    { "source": "/api/paper",    "destination": "/api/private?route=paper" },
+    { "source": "/api/webhooks", "destination": "/api/private?route=webhooks" },
+    { "source": "/api/notify",   "destination": "/api/private?route=notify" },
+    { "source": "/api/odds",     "destination": "/api/private?route=odds" },
+    { "source": "/api/props",    "destination": "/api/private?route=props" },
+    { "source": "/api/log",      "destination": "/api/private?route=log" },
+
     {
       "source": "/((?!api/|manifest\\.json|favicon\\.|og-image\\.|@|src/|node_modules/|virtual:).*)",
       "destination": "/index.html"
@@ -41,41 +45,26 @@
     {
       "source": "/assets/(.*)",
       "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=31536000, immutable"
-        }
+        { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
       ]
     },
     {
       "source": "/api/og",
       "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=3600"
-        }
+        { "key": "Cache-Control", "value": "public, max-age=3600" }
       ]
     },
     {
       "source": "/api/(.*)",
       "headers": [
-        {
-          "key": "X-Content-Type-Options",
-          "value": "nosniff"
-        },
-        {
-          "key": "X-Frame-Options",
-          "value": "DENY"
-        }
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "X-Frame-Options",        "value": "DENY" }
       ]
     },
     {
       "source": "/(.*)",
       "headers": [
-        {
-          "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self' 'unsafe-inline' https://*.clerk.accounts.dev https://challenges.cloudflare.com https://vercel.live; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; worker-src 'self' blob:; connect-src 'self' https://*.clerk.accounts.dev https://clerk-telemetry.com https://site.api.espn.com; img-src 'self' data: https:; frame-src https://challenges.cloudflare.com https://vercel.live"
-        }
+        { "key": "Content-Security-Policy", "value": "default-src 'self'; script-src 'self' 'unsafe-inline' https://*.clerk.accounts.dev https://challenges.cloudflare.com https://vercel.live; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; worker-src 'self' blob:; connect-src 'self' https://*.clerk.accounts.dev https://clerk-telemetry.com https://site.api.espn.com; img-src 'self' data: https:; frame-src https://challenges.cloudflare.com https://vercel.live" }
       ]
     }
   ]
