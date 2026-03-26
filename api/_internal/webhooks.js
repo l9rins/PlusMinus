@@ -1,7 +1,7 @@
 // api/webhooks.js — Store/retrieve user webhook URLs
-import { handleOptions, setCORSHeaders } from "./_cors.js";
-import { getUserId } from "./_auth.js";
-import { kv } from "./_kv.js";
+import { handleOptions, setCORSHeaders } from "../_cors.js";
+import { getUserId } from "../_auth.js";
+import { kv } from "../_kv.js";
 
 
 // Validate Discord webhook URL format

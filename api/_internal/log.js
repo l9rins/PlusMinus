@@ -18,9 +18,9 @@
 //     }),
 //   });
 
-import { handleOptions, setCORSHeaders } from "./_cors.js";
-import { getUserId } from "./_auth.js";
-import { kv } from "./_kv.js";
+import { handleOptions, setCORSHeaders } from "../_cors.js";
+import { getUserId } from "../_auth.js";
+import { kv } from "../_kv.js";
 import crypto from "crypto";
 
 const LOG_KEY = "error_log:app";

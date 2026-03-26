@@ -8,7 +8,7 @@ const ALLOWED_ORIGINS = new Set([
   "http://localhost:3055",
 ]);
 
-const VERCEL_PREVIEW_RE = /^https:\/\/plusminus-[a-zA-Z0-9-]+\.vercel\.app$/;
+const VERCEL_PREVIEW_RE = /^https:\/\/(plusminus|plus-minus)-[a-zA-Z0-9-]+\.vercel\.app$/;
 
 export function isAllowedOrigin(origin) {
   if (!origin) return false;

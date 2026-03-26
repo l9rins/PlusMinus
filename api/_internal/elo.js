@@ -1,6 +1,6 @@
-import { handleOptions, setCORSHeaders } from "./_cors.js";
+import { handleOptions, setCORSHeaders } from "../_cors.js";
 import { createClient } from "@vercel/kv";
-import { EAST_STANDINGS, WEST_STANDINGS } from "./_fallbacks.js";
+import { EAST_STANDINGS, WEST_STANDINGS } from "../_fallbacks.js";
 
 function makeLCG(seed) {
   let s = (seed ^ 0xdeadbeef) >>> 0;
@@ -54,7 +54,7 @@ const NBA_HEADERS = {
 
 const ABBR_FIX = { SA: "SAS", WSH: "WAS", NY: "NYK", GS: "GSW", NO: "NOP", PHO: "PHX" };
 
-import { currentSeasonStr } from "./_utils.js";
+import { currentSeasonStr } from "../_utils.js";
 
 // Elo helpers — K=20, home court = +100 points advantage
 const K = 20;

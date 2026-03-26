@@ -8,7 +8,7 @@
 //     error verbosity. Neither field is consumed by any frontend component;
 //     only hasBdl and hasOdds are read by useServerConfig().
 
-import { setCORSHeaders, handleOptions } from "./_cors.js";
+import { setCORSHeaders, handleOptions } from "../_cors.js";
 
 export default function handler(req, res) {
   if (handleOptions(req, res)) return;

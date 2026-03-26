@@ -14,9 +14,9 @@
 
 const ODDS_BASE = "https://api.the-odds-api.com/v4";
 
-import { setCORSHeaders, handleOptions } from "./_cors.js";
-import { TEAM_MAP } from "./_teams.js";
-import { kv } from "./_kv.js";
+import { setCORSHeaders, handleOptions } from "../_cors.js";
+import { TEAM_MAP } from "../_teams.js";
+import { kv } from "../_kv.js";
 
 // FIX: guard against zero / non-numeric input (mirrors the fix in utils.js)
 function toImplied(american) {

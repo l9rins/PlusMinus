@@ -88,7 +88,8 @@ export default async function handler(req, res) {
   setCORSHeaders(res, req.headers.origin || "");
   res.setHeader("Access-Control-Allow-Credentials", "true");
 
-  if (req.method !== "GET") return res.status(405).end();
+  if (req.method !== "GET" && req.method !== "HEAD") return res.status(405).end();
+  if (req.method === "HEAD") return res.status(200).end();
 
   const userId = await getUserIdFromQuery(req);
   if (!userId) return res.status(401).json({ error: "Unauthorized" });

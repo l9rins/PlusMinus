@@ -41,9 +41,9 @@ const MARKET_LABELS = {
     player_blocks_steals: "Blks+Stls",
 };
 
-import { setCORSHeaders, handleOptions } from "./_cors.js";
-import { TEAM_MAP } from "./_teams.js";
-import { kv } from "./_kv.js";
+import { setCORSHeaders, handleOptions } from "../_cors.js";
+import { TEAM_MAP } from "../_teams.js";
+import { kv } from "../_kv.js";
 
 function toDecimal(american) {
     const n = Number(american);
@@ -52,7 +52,7 @@ function toDecimal(american) {
     return 1 - 100 / n;
 }
 
-import { currentSeasonStr } from "./_utils.js";
+import { currentSeasonStr } from "../_utils.js";
 
 const NBA_HEADERS = {
   "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
