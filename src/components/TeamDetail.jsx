@@ -15,7 +15,7 @@ import {
     ArrowLeft, TrendingUp, TrendingDown, Minus,
     Calendar, CircleCheck, CircleX, Clock
 } from "lucide-react";
-import { RowSkeleton, ErrorState } from "./ui";
+import { RowSkeleton, ErrorState, AnimatedNumber, MorphingDialog, MorphingDialogTrigger, MorphingDialogContent, MorphingDialogClose, MorphingDialogContainer, Tooltip as PMTooltip } from "./ui";
 import { signed } from "../utils";
 import LineupTable from "./LineupTable";
 import { TEAM_IDS, TEAM_COLORS, TEAM_NAMES, PLAYERS, EAST_STANDINGS, WEST_STANDINGS } from "../data";
@@ -94,7 +94,9 @@ function StatTile({ label, value, sub, color }) {
     return (
         <motion.div variants={item} className="pm-tile p-3 text-center">
             <div className="pm-label mb-1">{label}</div>
-            <div className={`font-mono text-xl font-bold tabular-nums ${color || "text-pitch-50"}`}>{value ?? "—"}</div>
+            <div className={`font-mono text-xl font-bold tabular-nums ${color || "text-pitch-50"}`}>
+                {typeof value === 'number' ? <AnimatedNumber value={value} /> : (value ?? "—")}
+            </div>
             {sub && <div className="text-[10px] text-pitch-500 mt-0.5">{sub}</div>}
         </motion.div>
     );
@@ -315,55 +317,89 @@ export default function TeamDetail() {
                         </motion.div>
 
                         {/* Star player card */}
-                        <motion.div variants={item} className="pm-card p-4">
-                            <div className="pm-label mb-3">Star Player</div>
-                            {starPlayer ? (
-                                <div>
-                                    <div className="flex items-center gap-3 mb-4">
-                                        <div className="w-11 h-11 rounded-xl flex items-center justify-center text-sm font-bold flex-shrink-0"
-                                            style={{ background: `${color}20`, color, border: `1px solid ${color}40` }}>
-                                            {starPlayer.name.split(" ").map(w => w[0]).join("").slice(0, 2)}
-                                        </div>
-                                        <div>
-                                            <div className="text-sm font-semibold text-pitch-100">{starPlayer.name}</div>
-                                            <div className="text-[10px] text-pitch-400">{starPlayer.pos} · Age {starPlayer.age}</div>
-                                        </div>
-                                    </div>
-                                    <div className="grid grid-cols-3 gap-2 mb-3">
-                                        {[
-                                            { lbl: "PTS", val: starPlayer.pts },
-                                            { lbl: "AST", val: starPlayer.ast },
-                                            { lbl: "REB", val: starPlayer.reb },
-                                        ].map(s => (
-                                            <div key={s.lbl} className="bg-pitch-750 rounded-md p-2 text-center border border-pitch-650">
-                                                <div className="font-mono font-bold text-sm text-pitch-100 tabular-nums">{s.val}</div>
-                                                <div className="text-[9px] text-pitch-500 uppercase tracking-widest mt-0.5">{s.lbl}</div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                    <div className="space-y-1.5">
-                                        {[
-                                            { lbl: "PER", val: starPlayer.per, barVal: starPlayer.per, max: 35 },
-                                            { lbl: "TS%", val: starPlayer.ts, barVal: starPlayer.ts, max: 75 },
-                                            { lbl: "BPM", val: starPlayer.bpm, barVal: Math.max(0, (starPlayer.bpm ?? 0) + 5), max: 17 },
-                                        ].map(s => (
-                                            <div key={s.lbl} className="flex items-center gap-2">
-                                                <span className="text-[10px] text-pitch-500 w-7">{s.lbl}</span>
-                                                <div className="flex-1 h-1.5 bg-pitch-700 rounded-full overflow-hidden">
-                                                    <motion.div className="h-full rounded-full"
-                                                        style={{ background: color, opacity: 0.8 }}
-                                                        initial={{ width: 0 }}
-                                                        animate={{ width: `${Math.min(100, (s.barVal / s.max) * 100)}%` }}
-                                                        transition={{ duration: 0.7 }} />
+                        <motion.div variants={item}>
+                             <MorphingDialog transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}>
+                                <MorphingDialogTrigger className="w-full">
+                                    <div className="pm-card p-4 h-full cursor-pointer hover:bg-pitch-800/50 transition-colors">
+                                        <div className="pm-label mb-3">Star Player</div>
+                                        {starPlayer ? (
+                                            <div>
+                                                <div className="flex items-center gap-3 mb-4">
+                                                    <div className="w-11 h-11 rounded-xl flex items-center justify-center text-sm font-bold flex-shrink-0"
+                                                        style={{ background: `${color}20`, color, border: `1px solid ${color}40` }}>
+                                                        {starPlayer.name.split(" ").map(w => w[0]).join("").slice(0, 2)}
+                                                    </div>
+                                                    <div>
+                                                        <div className="text-sm font-semibold text-pitch-100">{starPlayer.name}</div>
+                                                        <div className="text-[10px] text-pitch-400">{starPlayer.pos} · Age {starPlayer.age}</div>
+                                                    </div>
                                                 </div>
-                                                <span className="font-mono text-[10px] text-pitch-300 w-6 text-right tabular-nums">{s.val}</span>
+                                                <div className="grid grid-cols-3 gap-2 mb-3">
+                                                    {[
+                                                        { lbl: "PTS", val: starPlayer.pts },
+                                                        { lbl: "AST", val: starPlayer.ast },
+                                                        { lbl: "REB", val: starPlayer.reb },
+                                                    ].map(s => (
+                                                        <div key={s.lbl} className="bg-pitch-750 rounded-md p-2 text-center border border-pitch-650">
+                                                            <div className="font-mono font-bold text-sm text-pitch-100 tabular-nums">{s.val}</div>
+                                                            <div className="text-[9px] text-pitch-500 uppercase tracking-widest mt-0.5">{s.lbl}</div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                                <div className="text-[10px] text-pitch-600 text-center mt-2 italic">Click for advanced telemetry</div>
                                             </div>
-                                        ))}
+                                        ) : (
+                                            <div className="text-pitch-500 text-sm text-center py-4">No player data</div>
+                                        )}
                                     </div>
-                                </div>
-                            ) : (
-                                <div className="text-pitch-500 text-sm text-center py-4">No player data</div>
-                            )}
+                                </MorphingDialogTrigger>
+                                <MorphingDialogContainer>
+                                    <MorphingDialogContent className="max-w-md">
+                                        {starPlayer && (
+                                            <div className="px-6 py-6 border-t border-pitch-700/40">
+                                                <div className="flex items-center gap-4 mb-6">
+                                                    <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-xl font-bold flex-shrink-0"
+                                                        style={{ background: `${color}20`, color, border: `1.5px solid ${color}40` }}>
+                                                        {starPlayer.name.split(" ").map(w => w[0]).join("").slice(0, 2)}
+                                                    </div>
+                                                    <div>
+                                                        <div className="text-xl font-bold text-pitch-50">{starPlayer.name}</div>
+                                                        <div className="text-[11px] text-pitch-400 mt-0.5">{starPlayer.pos} · Age {starPlayer.age}</div>
+                                                    </div>
+                                                </div>
+                                                <div className="space-y-4">
+                                                    <div className="pm-label">ADVANCED METRICS</div>
+                                                    <div className="space-y-2.5">
+                                                        {[
+                                                            { lbl: "PER", val: starPlayer.per, max: 35 },
+                                                            { lbl: "TS%", val: starPlayer.ts, max: 75 },
+                                                            { lbl: "BPM", val: starPlayer.bpm, max: 15, barVal: Math.max(0, (starPlayer.bpm ?? 0) + 5) },
+                                                        ].map(s => (
+                                                            <div key={s.lbl}>
+                                                                <div className="flex justify-between text-[10px] mb-1">
+                                                                    <span className="text-pitch-500">{s.lbl}</span>
+                                                                    <span className="text-pitch-200 font-mono">{s.val}</span>
+                                                                </div>
+                                                                <div className="h-1.5 bg-pitch-700 rounded-full overflow-hidden">
+                                                                    <motion.div className="h-full rounded-full"
+                                                                        style={{ background: color }}
+                                                                        initial={{ width: 0 }}
+                                                                        animate={{ width: `${Math.min(100, ((s.barVal ?? s.val) / s.max) * 100)}%` }}
+                                                                        transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }} />
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                    <div className="mt-8 p-3 rounded-lg bg-pitch-900/50 border border-pitch-700/50 text-[10px] text-pitch-500 leading-relaxed italic">
+                                                        Telemetry sourced via NBA Advanced Stats API. Ratings adjusted for league-wide efficiency variance.
+                                                    </div>
+                                                </div>
+                                                <MorphingDialogClose />
+                                            </div>
+                                        )}
+                                    </MorphingDialogContent>
+                                </MorphingDialogContainer>
+                             </MorphingDialog>
                         </motion.div>
                     </div>
 

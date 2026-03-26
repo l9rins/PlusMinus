@@ -12,14 +12,14 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   ResponsiveContainer, RadarChart, Radar, PolarGrid,
   PolarAngleAxis, PolarRadiusAxis, BarChart, Bar,
-  XAxis, YAxis, Tooltip, Cell, AreaChart, Area,
+  XAxis, YAxis, Tooltip as RechartsTooltip, Cell, AreaChart, Area,
   CartesianGrid, ReferenceLine,
 } from "recharts";
 import {
   EAST_STANDINGS, WEST_STANDINGS, PLAYERS, TEAM_NAMES, TEAM_COLORS,
 } from "../data";
 import { useStandings, useLeagueTeamStats, useEnrichedPlayerStats, useEloData, useFourFactorsStats } from "../api";
-import { FreshnessTag, RowSkeleton, ErrorState } from "./ui";
+import { FreshnessTag, RowSkeleton, ErrorState, Tooltip } from "./ui";
 import { signed, reshapeNBAStats, lsGet, lsSet, calcPercentile } from "../utils";
 import { TrendingUp, BarChart2, Zap, Award, Info, Star, Trophy } from "lucide-react";
 import PlayoffBracket from "./PlayoffBracket";
@@ -160,7 +160,7 @@ function PlayoffSimView({ data }) {
               <CartesianGrid strokeDasharray="3 3" stroke="#1e2a38" vertical={false} />
               <XAxis dataKey="team" tick={{ fill: "#546480", fontSize: 10, fontFamily: "Bebas Neue, sans-serif" }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fill: "#546480", fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={v => `${v}%`} />
-              <Tooltip {...tooltipStyle} formatter={(v, name) => [`${v.toFixed(1)}%`,
+              <RechartsTooltip {...tooltipStyle} formatter={(v, name) => [`${v.toFixed(1)}%`,
               name === "champ" ? "Championship" : name === "finals" ? "+ Finals" : "+ Conf Finals"]} />
               <Bar dataKey="conf" stackId="a" radius={[0, 0, 0, 0]}>
                 {chartData.map(e => <Cell key={e.team} fill={e.color} fillOpacity={0.18} />)}
@@ -217,7 +217,9 @@ function PlayoffSimView({ data }) {
               <th className="px-3 py-2.5 text-left pm-label">Team</th>
               <th className="px-3 py-2.5 text-left pm-label">Seed</th>
               {COLS.map(c => (
-                <th key={c.key} title={c.tip} className="px-3 py-2.5 text-left pm-label whitespace-nowrap">{c.label}</th>
+                <th key={c.key} className="px-3 py-2.5 text-left pm-label whitespace-nowrap">
+                   <Tooltip content={c.tip}>{c.label}</Tooltip>
+                </th>
               ))}
             </tr>
           </thead>
@@ -339,7 +341,7 @@ function FourFactorsView({ data }) {
               <XAxis dataKey="team" tick={{ fill: "#546480", fontSize: 10, fontFamily: "Bebas Neue, sans-serif" }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fill: "#546480", fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={v => `${v > 0 ? "+" : ""}${v}`} />
               <ReferenceLine y={0} stroke="#2e3a50" strokeWidth={1} />
-              <Tooltip {...tooltipStyle} formatter={v => [`${v > 0 ? "+" : ""}${v}`, "Net RTG"]} />
+              <RechartsTooltip {...tooltipStyle} formatter={v => [`${v > 0 ? "+" : ""}${v}`, "Net RTG"]} />
               <Bar dataKey="netRtg" radius={[4, 4, 0, 0]}>
                 {barData.map(e => <Cell key={e.team} fill={e.color} fillOpacity={0.85} />)}
               </Bar>
@@ -352,12 +354,16 @@ function FourFactorsView({ data }) {
           <thead>
             <tr className="border-b border-pitch-650">
               {headers.map(h => (
-                <th key={h.label} title={h.tip} onClick={() => h.sortable && setSortKey(h.key)}
+                <th key={h.label} onClick={() => h.sortable && setSortKey(h.key)}
                   className={`px-3 py-2.5 text-left pm-label font-medium whitespace-nowrap
                     ${h.sortable ? "cursor-pointer hover:text-accent/80 transition-colors select-none" : ""}
                     ${sortKey === h.key ? "text-accent" : ""}`}>
-                  {h.label}
-                  {h.tip && <span className="ml-0.5 text-pitch-600" title={h.tip}>?</span>}
+                  <Tooltip content={h.tip}>
+                    <span className="inline-flex items-center gap-1">
+                      {h.label}
+                      {h.tip && <span className="text-pitch-600 opacity-50">?</span>}
+                    </span>
+                  </Tooltip>
                   {sortKey === h.key ? (h.key === "tov" ? " ↑" : " ↓") : ""}
                 </th>
               ))}
@@ -480,7 +486,7 @@ function EloView({ data }) {
               <YAxis domain={["auto", "auto"]} tick={{ fill: "#546480", fontSize: 10 }} axisLine={false} tickLine={false} />
               <ReferenceLine y={1500} stroke="#2e3a50" strokeDasharray="4 2" strokeWidth={1}
                 label={{ value: "avg", position: "right", fill: "#3d4f6a", fontSize: 9 }} />
-              <Tooltip {...tooltipStyle} />
+              <RechartsTooltip {...tooltipStyle} />
               {selectedTeams.map(team => {
                 const td = data.find(t => t.team === team);
                 return <Area key={team} type="monotone" dataKey={team}
@@ -565,7 +571,7 @@ function ShotQualityView({ data, isUsingFallback }) {
                 <PolarRadiusAxis angle={30} domain={[0, 100]} tick={{ fill: "#3d4f6a", fontSize: 9 }} axisLine={false} tickCount={4} />
                 <Radar name={primary.team} dataKey="value" stroke={primary.color} fill={primary.color} fillOpacity={0.2} strokeWidth={2} />
                 {comparison && <Radar name={comparison.team} dataKey="compare" stroke={comparison.color} fill={comparison.color} fillOpacity={0.1} strokeWidth={2} strokeDasharray="4 2" />}
-                <Tooltip {...tooltipStyle} formatter={v => [`${Number(v).toFixed(0)}`, ""]} />
+                <RechartsTooltip {...tooltipStyle} formatter={v => [`${Number(v).toFixed(0)}`, ""]} />
               </RadarChart>
             </ResponsiveContainer>
           </div>

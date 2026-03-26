@@ -8,7 +8,7 @@ import {
 import { TEAM_NAMES, ODDS_GAMES, TEAM_COLORS } from "../data";
 import { useStandings, useTodayGames, useOdds, mergeOddsIntoGames, useBets, useEloData } from "../api";
 import { formatCurrency, formatPct, lsGet, calcROI, calcPL, eloWinProb, kellyBet, DEFAULT_BANKROLL } from "../utils";
-import { TileSkeleton, RowSkeleton, ErrorState, FreshnessTag, Tooltip, TeamLink, AnimatedNumber } from "./ui";
+import { TileSkeleton, RowSkeleton, ErrorState, FreshnessTag, Tooltip, TeamLink, AnimatedNumber, MagneticButton } from "./ui";
 import GameWinProb from "./GameWinProb";
 import RefCallout from "./RefCallout";
 
@@ -88,7 +88,11 @@ function MiniStandings({ teams, conf }) {
         <div>
             <div className="flex items-center justify-between mb-2">
                 <div className="pm-label">{conf}</div>
-                <button onClick={() => navigate("/standings")} className="text-[9px] text-pitch-500 hover:text-accent transition-colors flex items-center gap-0.5">Full <ChevronRight size={9} /></button>
+                <MagneticButton strength={0.2} onClick={() => navigate("/standings")}>
+                    <div className="text-[9px] text-pitch-500 hover:text-accent transition-colors flex items-center gap-0.5 px-2 py-1 bg-pitch-750/50 rounded-md border border-pitch-700/50">
+                        Full <ChevronRight size={9} />
+                    </div>
+                </MagneticButton>
             </div>
             <div className="space-y-0">
                 {teams.slice(0, 8).map((t, i) => {
@@ -111,11 +115,13 @@ function MiniStandings({ teams, conf }) {
     );
 }
 
-function SummaryTile({ label, value, sub, icon: Icon, trend, color, onClick, badge }) {
+function SummaryTile({ label, value, sub, icon: Icon, trend, color, onClick, badge, tooltip }) {
     return (
         <motion.div variants={tile} className={`pm-tile p-4 ${onClick ? "cursor-pointer" : ""}`} onClick={onClick} whileHover={onClick ? { scale: 1.01 } : undefined}>
             <div className="flex items-start justify-between mb-2.5">
-                <div className="pm-label">{label}</div>
+                <Tooltip content={tooltip}>
+                    <div className="pm-label truncate pr-2">{label}</div>
+                </Tooltip>
                 {Icon && <div className="w-7 h-7 rounded-md bg-pitch-750 border border-pitch-600 flex items-center justify-center flex-shrink-0"><Icon size={13} strokeWidth={1.8} className="text-pitch-400" /></div>}
             </div>
             <div className={`pm-number text-3xl ${color || "text-pitch-50"}`}>{value}</div>
@@ -137,7 +143,9 @@ function KellyTile({ topEdge, bankroll }) {
     return (
         <motion.div variants={tile} className="pm-tile p-4">
             <div className="flex items-start justify-between mb-2.5">
-                <div className="pm-label">Kelly Bet Size</div>
+                <Tooltip content="Optimal bet size based on model edge and bankroll risk management.">
+                    <div className="pm-label truncate pr-2">Kelly Bet Size</div>
+                </Tooltip>
                 <div className="w-7 h-7 rounded-md bg-pitch-750 border border-pitch-600 flex items-center justify-center">
                     <DollarSign size={13} strokeWidth={1.8} className="text-pitch-400" />
                 </div>
@@ -260,10 +268,10 @@ export default function Dashboard() {
                     </div>
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    <SummaryTile label="Games Today" value={gameCount || "—"} sub={gameCount === 0 ? "No games today" : liveCount > 0 ? `${liveCount} in progress` : "Tip-off tonight"} icon={Target} trend={liveCount > 0 ? "up" : null} badge={liveCount > 0 ? { label: "LIVE", cls: "bg-win/10 text-win border border-win/20" } : null} onClick={() => navigate("/scores")} />
-                    <SummaryTile label="Top Model Edge" value={edgeDiff > 0 ? `+${edgeDiff.toFixed(1)}%` : "—"} sub={topEdge.matchup} icon={TrendingUp} trend="up" color={edgeDiff >= 10 ? "text-win" : edgeDiff >= 5 ? "text-draw" : "text-pitch-50"} onClick={() => navigate("/betting")} />
-                    <SummaryTile label="Best Win Prob" value={bestProb.modelP > 0 ? `${bestProb.modelP}%` : "—"} sub={bestProb.fav !== "—" ? `${bestProb.fav} · ${bestProb.matchup}` : "No data"} icon={Zap} onClick={() => navigate("/betting")} />
-                    <SummaryTile label="Net P&L" value={betStats.total > 0 ? formatCurrency(betStats.pl) : "—"} sub={betSub} icon={BarChart2} color={betStats.pl > 0 ? "text-win" : betStats.pl < 0 ? "text-loss" : "text-pitch-50"} trend={betStats.pl > 0 ? "up" : betStats.pl < 0 ? "down" : null} onClick={() => navigate("/tracker")} />
+                    <SummaryTile label="Games Today" value={gameCount || "—"} sub={gameCount === 0 ? "No games today" : liveCount > 0 ? `${liveCount} in progress` : "Tip-off tonight"} icon={Target} trend={liveCount > 0 ? "up" : null} badge={liveCount > 0 ? { label: "LIVE", cls: "bg-win/10 text-win border border-win/20" } : null} onClick={() => navigate("/scores")} tooltip="Total NBA games scheduled for the current broadcast window." />
+                    <SummaryTile label="Top Model Edge" value={edgeDiff > 0 ? `+${edgeDiff.toFixed(1)}%` : "—"} sub={topEdge.matchup} icon={TrendingUp} trend="up" color={edgeDiff >= 10 ? "text-win" : edgeDiff >= 5 ? "text-draw" : "text-pitch-50"} onClick={() => navigate("/betting")} tooltip="Variance between predicted win probability and consensus market odds." />
+                    <SummaryTile label="Best Win Prob" value={bestProb.modelP > 0 ? `${bestProb.modelP}%` : "—"} sub={bestProb.fav !== "—" ? `${bestProb.fav} · ${bestProb.matchup}` : "No data"} icon={Zap} onClick={() => navigate("/betting")} tooltip="Highest confidence prediction across all scheduled matchups." />
+                    <SummaryTile label="Net P&L" value={betStats.total > 0 ? formatCurrency(betStats.pl) : "—"} sub={betSub} icon={BarChart2} color={betStats.pl > 0 ? "text-win" : betStats.pl < 0 ? "text-loss" : "text-pitch-50"} trend={betStats.pl > 0 ? "up" : betStats.pl < 0 ? "down" : null} onClick={() => navigate("/tracker")} tooltip="Cumulative profit or loss across all settled bets." />
                 </div>
             </motion.div>
 

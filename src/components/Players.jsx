@@ -10,7 +10,18 @@ import {
 import { TEAM_COLORS, TEAM_NAMES } from "../data";
 import { useEnrichedPlayerStats, usePlayerSearch, usePlayerGameLog, prefetchPlayerGameLog } from "../api";
 import { signed, netRatingTier, debounce } from "../utils";
-import { TileSkeleton, ErrorState, EmptyState } from "./ui";
+import {
+  TileSkeleton,
+  ErrorState,
+  EmptyState,
+  MorphingDialog,
+  MorphingDialogTrigger,
+  MorphingDialogContent,
+  MorphingDialogClose,
+  MorphingDialogContainer,
+  Tooltip,
+  MagneticButton
+} from "./ui";
 import { Badge } from "@/components/ui/badge";
 
 const POSITIONS = ["", "PG", "SG", "SF", "PF", "C"];
@@ -112,128 +123,152 @@ function PlayerCard({ player, onCompare, comparePlayer, isComparing, sortKey, is
   useEffect(() => { if (isKeyboardFocused) cardRef.current?.focus(); }, [isKeyboardFocused]);
 
   return (
-    <motion.div ref={cardRef} layout tabIndex={0} role="button" aria-expanded={expanded}
-      aria-label={`${player.name}, ${player.pos}, ${player.team}. ${player.pts} pts, ${player.ast} ast, ${player.reb} reb. Enter to expand.`}
-      onKeyDown={onKey} onClick={() => setExpanded(!expanded)} onMouseEnter={handleMouseEnter}
-      className={`pm-tile transition-all outline-none focus-visible:ring-2 focus-visible:ring-accent/50 cursor-pointer ${expanded ? "ring-1 ring-accent/30" : ""} ${isComparing ? "ring-1 ring-draw/40 bg-draw/5" : ""}`}>
+    <MorphingDialog transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}>
+      <MorphingDialogTrigger className="w-full">
+        <div ref={cardRef} tabIndex={0} role="button"
+          aria-label={`${player.name}, ${player.pos}, ${player.team}. ${player.pts} pts, ${player.ast} ast, ${player.reb} reb.`}
+          onKeyDown={onKey} onMouseEnter={handleMouseEnter}
+          className={`pm-tile transition-all outline-none focus-visible:ring-2 focus-visible:ring-accent/50 cursor-pointer ${isComparing ? "ring-1 ring-draw/40 bg-draw/5" : ""}`}>
 
-      <div className="p-3 flex items-center gap-3 min-w-0">
-        <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 text-xs font-bold relative"
-          style={{ background: `linear-gradient(135deg, ${color}30, ${color}10)`, color, border: `1px solid ${color}40`, boxShadow: `inset 0 1px 0 ${color}20` }}>
-          {initials}
-          {isComparing && <div className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-draw border border-pitch-800" />}
-        </div>
+          <div className="p-3 flex items-center gap-3 min-w-0">
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 text-xs font-bold relative"
+              style={{ background: `linear-gradient(135deg, ${color}30, ${color}10)`, color, border: `1px solid ${color}40`, boxShadow: `inset 0 1px 0 ${color}20` }}>
+              {initials}
+              {isComparing && <div className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-draw border border-pitch-800" />}
+            </div>
 
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-sm font-semibold text-pitch-100 truncate">{player.name}</span>
-            <TierBadge per={player.per} />
-          </div>
-          <div className="text-[10px] text-pitch-400 mt-0.5 flex items-center gap-1.5">
-            <span className="font-mono font-medium" style={{ color: `${color}cc` }}>{player.team}</span>
-            <span className="text-pitch-600">·</span><span>{player.pos}</span>
-            {player.age && <><span className="text-pitch-600">·</span><span>Age {player.age}</span></>}
-          </div>
-        </div>
-
-        {radar && <div className="hidden sm:block flex-shrink-0"><MiniRadar values={radar} color={color} size={52} /></div>}
-
-        {hasStat ? (
-          <div className="flex gap-3 sm:gap-4 flex-shrink-0">
-            {[{ lbl: "PTS", val: player.pts, active: sortKey === "pts" }, { lbl: "AST", val: player.ast, active: sortKey === "ast" }, { lbl: "REB", val: player.reb, active: sortKey === "reb" }].map(s => (
-              <div key={s.lbl} className="text-center">
-                <div className={`font-mono font-semibold text-sm tabular-nums ${s.active ? "text-accent" : "text-pitch-100"}`}>{s.val}</div>
-                <div className="text-[9px] text-pitch-500 uppercase tracking-widest">{s.lbl}</div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-sm font-semibold text-pitch-100 truncate">{player.name}</span>
+                <TierBadge per={player.per} />
               </div>
-            ))}
+              <div className="text-[10px] text-pitch-400 mt-0.5 flex items-center gap-1.5">
+                <span className="font-mono font-medium" style={{ color: `${color}cc` }}>{player.team}</span>
+                <span className="text-pitch-600">·</span><span>{player.pos}</span>
+                {player.age && <><span className="text-pitch-600">·</span><span>Age {player.age}</span></>}
+              </div>
+            </div>
+
+            {radar && <div className="hidden sm:block flex-shrink-0"><MiniRadar values={radar} color={color} size={52} /></div>}
+
+            {hasStat ? (
+              <div className="flex gap-3 sm:gap-4 flex-shrink-0">
+                {[{ lbl: "PTS", val: player.pts, active: sortKey === "pts" }, { lbl: "AST", val: player.ast, active: sortKey === "ast" }, { lbl: "REB", val: player.reb, active: sortKey === "reb" }].map(s => (
+                  <div key={s.lbl} className="text-center">
+                    <div className={`font-mono font-semibold text-sm tabular-nums ${s.active ? "text-accent" : "text-pitch-100"}`}>{s.val}</div>
+                    <div className="text-[9px] text-pitch-500 uppercase tracking-widest">{s.lbl}</div>
+                  </div>
+                ))}
+              </div>
+            ) : <span className="text-[10px] text-pitch-600 flex-shrink-0 italic">No stats</span>}
+
+            {hasAdv && onCompare && (
+              <MagneticButton strength={0.15} onClick={e => { e.stopPropagation(); onCompare(player); }}>
+                <div title={isComparing ? "Remove from comparison (C)" : "Compare (C)"}
+                  aria-label={isComparing ? "Remove from comparison" : "Add to comparison"}
+                  className={`p-1.5 rounded-md border transition-all ${isComparing ? "bg-draw/15 border-draw/40 text-draw shadow-sm" : "bg-pitch-750 border-pitch-600 text-pitch-400 hover:text-pitch-200 hover:border-pitch-500 hover:bg-pitch-700"}`}>
+                  <GitCompare size={11} strokeWidth={1.8} />
+                </div>
+              </MagneticButton>
+            )}
+            <ChevronDown size={14} strokeWidth={1.8} className="text-pitch-500 flex-shrink-0" />
           </div>
-        ) : <span className="text-[10px] text-pitch-600 flex-shrink-0 italic">No stats</span>}
+        </div>
+      </MorphingDialogTrigger>
 
-        {hasAdv && onCompare && (
-          <button tabIndex={-1} onClick={e => { e.stopPropagation(); onCompare(player); }}
-            title={isComparing ? "Remove from comparison (C)" : "Compare (C)"}
-            aria-label={isComparing ? "Remove from comparison" : "Add to comparison"}
-            className={`flex-shrink-0 p-1.5 rounded-md border transition-all ${isComparing ? "bg-draw/15 border-draw/40 text-draw shadow-sm" : "bg-pitch-750 border-pitch-600 text-pitch-400 hover:text-pitch-200 hover:border-pitch-500 hover:bg-pitch-700"}`}>
-            <GitCompare size={11} strokeWidth={1.8} />
-          </button>
-        )}
-        <ChevronDown size={14} strokeWidth={1.8} className={`text-pitch-500 transition-transform duration-200 flex-shrink-0 ${expanded ? "rotate-180" : ""}`} />
-      </div>
+      <MorphingDialogContainer>
+        <MorphingDialogContent className="max-w-xl">
+          <div className="px-6 py-6 border-t border-pitch-700/40">
+            <div className="flex items-center gap-4 mb-8">
+                <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-xl font-bold flex-shrink-0"
+                    style={{ background: `${color}20`, color, border: `1.5px solid ${color}40`, boxShadow: `inset 0 1px 0 ${color}20` }}>
+                    {initials}
+                </div>
+                <div>
+                    <div className="font-display text-2xl tracking-widest text-pitch-50">{player.name}</div>
+                    <div className="text-[11px] text-pitch-400 mt-1 flex items-center gap-2 font-mono">
+                        <span style={{ color }}>{player.team}</span>
+                        <span className="text-pitch-600">·</span>
+                        <span>{player.pos}</span>
+                        <span className="text-pitch-600">·</span>
+                        <span>AGE {player.age}</span>
+                    </div>
+                </div>
+            </div>
 
-      <AnimatePresence>
-        {expanded && (
-          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}
-            transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }} className="overflow-hidden" onClick={e => e.stopPropagation()}>
-            <div className="px-3 pb-4 border-t border-pitch-700 pt-4">
-              {hasAdv ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                  <div>
-                    <div className="pm-label mb-2 flex items-center gap-2">
-                      <BarChart2 size={10} /> Advanced metrics
-                      {comparePlayer && <span className="text-[9px] text-pitch-500 font-normal"><span style={{ color }}>{player.name.split(" ").at(-1)}</span>{" vs "}<span style={{ color: cmpColor }}>{comparePlayer.name.split(" ").at(-1)}</span></span>}
-                    </div>
-                    <div className="mt-2 space-y-0">
-                      <AttrBar label="PER" value={player.per} max={35} compareValue={comparePlayer?.per} compareColor={cmpColor} />
-                      <AttrBar label="TS%" value={player.ts} max={75} compareValue={comparePlayer?.ts} compareColor={cmpColor} />
-                      <AttrBar label="O-RTG" value={player.ortg} min={100} max={135} compareValue={comparePlayer?.ortg} compareColor={cmpColor} />
-                      <AttrBar label="D-RTG" value={player.drtg} min={100} max={125} invert compareValue={comparePlayer?.drtg} compareColor={cmpColor} />
-                    </div>
-                    {player.ortg && player.drtg && (
-                      <div className="mt-3 flex items-center gap-2">
-                        <span className="text-[10px] text-pitch-500">Net RTG</span>
-                        <span className={`font-mono text-sm font-semibold ${player.ortg - player.drtg >= 0 ? "text-win" : "text-loss"}`}>{signed(+(player.ortg - player.drtg).toFixed(1))}</span>
-                        <span className="text-[9px] text-pitch-600 uppercase tracking-wider">{netRatingTier(player.ortg - player.drtg)}</span>
+            {hasAdv ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
+                <div>
+                  <div className="pm-label mb-4 flex items-center gap-2">
+                    <BarChart2 size={12} /> ADVANCED TELEMETRY
+                  </div>
+                  <div className="space-y-1">
+                    <AttrBar label="PER" value={player.per} max={35} compareValue={comparePlayer?.per} compareColor={cmpColor} />
+                    <AttrBar label="TS%" value={player.ts} max={75} compareValue={comparePlayer?.ts} compareColor={cmpColor} />
+                    <AttrBar label="O-RTG" value={player.ortg} min={100} max={135} compareValue={comparePlayer?.ortg} compareColor={cmpColor} />
+                    <AttrBar label="D-RTG" value={player.drtg} min={100} max={125} invert compareValue={comparePlayer?.drtg} compareColor={cmpColor} />
+                  </div>
+                  {player.ortg && player.drtg && (
+                    <div className="mt-4 p-3 rounded-lg bg-pitch-900/50 border border-pitch-700/50">
+                      <div className="pm-label scale-75 origin-left opacity-60 mb-1">NET PERFORMANCE</div>
+                      <div className="flex items-center gap-3">
+                        <span className={`font-mono text-2xl font-bold ${player.ortg - player.drtg >= 0 ? "text-win" : "text-loss"}`}>{signed(+(player.ortg - player.drtg).toFixed(1))}</span>
+                        <span className="text-[10px] text-pitch-400 uppercase tracking-widest font-semibold">{netRatingTier(player.ortg - player.drtg)}</span>
                       </div>
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <div className="pm-label mb-4 flex items-center gap-2"><Target size={12} /> SEASON AVERAGES</div>
+                  <div className="grid grid-cols-3 gap-2 mb-6">
+                    {[{ lbl: "PTS", val: player.pts, h: sortKey === "pts" }, { lbl: "AST", val: player.ast, h: sortKey === "ast" }, { lbl: "REB", val: player.reb, h: sortKey === "reb" }, { lbl: "PER", val: player.per, h: sortKey === "per" }, { lbl: "TS%", val: player.ts != null ? `${player.ts}%` : null, h: sortKey === "ts" }].map(s => (
+                      <StatChip key={s.lbl} label={s.lbl} value={s.val} highlight={s.h} />
+                    ))}
+                  </div>
+                  <div className="mt-1">
+                    <div className="pm-label mb-3 flex items-center gap-2">
+                        <Zap size={12} /> RECENT FORM (L5)
+                        {formFetching && <LoaderCircle size={10} className="text-pitch-500 animate-spin ml-1" />}
+                    </div>
+                    {gameLogForm?.length > 0 ? (
+                      <div className="flex gap-2">
+                        {gameLogForm.map((r, i) => (
+                          <motion.span key={i} initial={{ opacity: 0, scale: 0.7 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: i * 0.06 }}
+                            className={`w-7 h-7 rounded flex items-center justify-center text-[10px] font-bold ${r === "W" ? "bg-win/15 text-win border border-win/30" : r === "L" ? "bg-loss/15 text-loss border border-loss/30" : "bg-pitch-600 text-pitch-400"}`}>
+                            {r}
+                          </motion.span>
+                        ))}
+                      </div>
+                    ) : !formFetching ? (
+                      <div className="text-[11px] text-pitch-600 italic">No recent games recorded.</div>
+                    ) : (
+                      <div className="flex gap-2">{Array.from({ length: 5 }).map((_, i) => <div key={i} className="w-7 h-7 rounded bg-pitch-750 animate-pulse" />)}</div>
                     )}
                   </div>
-                  <div>
-                    <div className="pm-label mb-2 flex items-center gap-2"><Target size={10} /> Season averages</div>
-                    <div className="grid grid-cols-3 gap-2 mb-4">
-                      {[{ lbl: "PTS", val: player.pts, h: sortKey === "pts" }, { lbl: "AST", val: player.ast, h: sortKey === "ast" }, { lbl: "REB", val: player.reb, h: sortKey === "reb" }, { lbl: "PER", val: player.per, h: sortKey === "per" }, { lbl: "TS%", val: player.ts != null ? `${player.ts}%` : null, h: sortKey === "ts" }].map(s => (
-                        <StatChip key={s.lbl} label={s.lbl} value={s.val} highlight={s.h} />
-                      ))}
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
+                <div>
+                  <div className="pm-label mb-4 flex items-center gap-2"><Target size={12} /> SEASON AVERAGES</div>
+                  {hasStat ? (
+                    <div className="grid grid-cols-3 gap-2">
+                      {[{ lbl: "PTS", val: player.pts }, { lbl: "AST", val: player.ast }, { lbl: "REB", val: player.reb }].map(s => <StatChip key={s.lbl} label={s.lbl} value={s.val} />)}
                     </div>
-                    <div className="mt-1">
-                      <div className="pm-label mb-2 flex items-center gap-2"><Zap size={10} /> Last 5 games {formFetching && <LoaderCircle size={9} className="text-pitch-500 animate-spin ml-1" />}</div>
-                      {gameLogForm?.length > 0 ? (
-                        <div className="flex gap-1.5">
-                          {gameLogForm.map((r, i) => (
-                            <motion.span key={i} initial={{ opacity: 0, scale: 0.7 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: i * 0.06 }}
-                              className={`w-6 h-6 rounded flex items-center justify-center text-[9px] font-bold ${r === "W" ? "bg-win/15 text-win border border-win/30" : r === "L" ? "bg-loss/15 text-loss border border-loss/30" : "bg-pitch-600 text-pitch-400"}`}>
-                              {r}
-                            </motion.span>
-                          ))}
-                        </div>
-                      ) : !formFetching ? (
-                        <div className="text-[10px] text-pitch-600 italic">No recent games</div>
-                      ) : (
-                        <div className="flex gap-1.5">{Array.from({ length: 5 }).map((_, i) => <div key={i} className="w-6 h-6 rounded bg-pitch-750 animate-pulse" />)}</div>
-                      )}
-                    </div>
+                  ) : <div className="text-[11px] text-pitch-500 italic">No season stats recorded.</div>}
+                </div>
+                <div className="flex items-end">
+                  <div className="text-[10px] text-pitch-500 leading-relaxed border border-pitch-700/50 bg-pitch-900/30 rounded-lg px-4 py-3 italic">
+                    Note: Advanced metrics (PER, BPM, VORP) are currently unavailable for high-frequency direct search players.
                   </div>
                 </div>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <div className="pm-label mb-2 flex items-center gap-2"><Target size={10} /> Season averages</div>
-                    {hasStat ? (
-                      <div className="grid grid-cols-3 gap-2">
-                        {[{ lbl: "PTS", val: player.pts }, { lbl: "AST", val: player.ast }, { lbl: "REB", val: player.reb }].map(s => <StatChip key={s.lbl} label={s.lbl} value={s.val} />)}
-                      </div>
-                    ) : <div className="text-[11px] text-pitch-500 italic">No stats this season.</div>}
-                  </div>
-                  <div className="flex items-end">
-                    <div className="text-[10px] text-pitch-600 leading-relaxed border border-pitch-700 rounded-md px-3 py-2">
-                      Advanced metrics (PER, BPM, VORP) unavailable on BDL free tier for searched players.
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </motion.div>
+              </div>
+            )}
+          </div>
+          <MorphingDialogClose />
+        </MorphingDialogContent>
+      </MorphingDialogContainer>
+    </MorphingDialog>
   );
 }
 

@@ -11,13 +11,22 @@ import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence, useMotionValue, useTransform, animate } from "framer-motion";
 import { ChevronRight, Check, Target, Activity } from "lucide-react";
 import { TEAM_COLORS, TEAM_NAMES } from "../data";
+import {
+  MorphingDialog,
+  MorphingDialogTrigger,
+  MorphingDialogContent,
+  MorphingDialogClose,
+  MorphingDialogContainer,
+  Tooltip,
+  MagneticButton
+} from "./ui";
 
 // ─── Motion constants ──────────────────────────────────────────
 // Tight expo-out easing — snaps into place like F1 telemetry
 const EASE_LOCK = [0.16, 1, 0.3, 1];
 const EASE_SHARP = [0.33, 1, 0.68, 1];
 const TWEEN_FAST = { duration: 0.25, ease: EASE_LOCK };
-const TWEEN_MED  = { duration: 0.4, ease: EASE_LOCK };
+const TWEEN_MED = { duration: 0.4, ease: EASE_LOCK };
 const TWEEN_DATA = { duration: 0.6, ease: EASE_SHARP };
 
 // ─── AnimatedValue ─────────────────────────────────────────────
@@ -305,176 +314,161 @@ export default function MatchupCard({
   lineups,       // { away: [...top3], home: [...top3] }
   onBet,         // (side) => void
 }) {
-  const [expanded, setExpanded] = useState(false);
-
-  const away = game?.away ?? "TBA";
-  const home = game?.home ?? "TBA";
-  const colorA = TEAM_COLORS[away] || "#546480";
-  const colorB = TEAM_COLORS[home] || "#f59e0b";
-  const awayOdds = odds?.awayOdds ?? -110;
-  const homeOdds = odds?.homeOdds ?? -110;
-  const spread = odds?.spread ?? null;
-  const isLive = game?.status === "live" || game?.status === "in-progress";
-
-  const sA = teamStats?.away;
-  const sB = teamStats?.home;
-
   return (
-    <motion.div
-      layout
-      className="border border-pitch-700/50 rounded-md bg-pitch-850 overflow-hidden"
-      style={{ boxShadow: "0 1px 3px rgba(0,0,0,0.3)" }}
-    >
-      {/* ── Team color accent line (2px) ───────────────────── */}
-      <div className="flex h-[2px]">
-        <div className="flex-1" style={{ background: colorA }} />
-        <div className="flex-1" style={{ background: colorB }} />
-      </div>
-
-      {/* ── Header row ─────────────────────────────────────── */}
-      <button
-        onClick={() => setExpanded(v => !v)}
-        className="w-full text-left px-4 py-3 hover:bg-pitch-800/50 transition-colors"
-      >
-        <div className="grid grid-cols-[1fr_auto_1fr] gap-3 items-center">
-          {/* Away */}
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="font-display text-2xl tracking-[4px]" style={{ color: colorA }}>{away}</span>
-              {isLive && game.awayScore != null && (
-                <AnimatedValue value={game.awayScore} className="font-mono text-lg font-bold text-pitch-50 tabular-nums" />
-              )}
-            </div>
-            <div className="text-[9px] text-pitch-600 uppercase tracking-[1.5px] mt-0.5">{TEAM_NAMES[away] ?? away}</div>
+    <MorphingDialog transition={TWEEN_DATA}>
+      <MorphingDialogTrigger className="w-full">
+        <div className="border border-pitch-700/50 rounded-md bg-pitch-850 overflow-hidden relative"
+             style={{ boxShadow: "0 1px 3px rgba(0,0,0,0.3)" }}>
+          {/* ── Team color accent line (2px) ───────────────────── */}
+          <div className="flex h-[2px]">
+            <div className="flex-1" style={{ background: colorA }} />
+            <div className="flex-1" style={{ background: colorB }} />
           </div>
 
-          {/* Center meta */}
-          <div className="flex flex-col items-center gap-1">
-            <div className="flex items-center gap-1.5">
-              {isLive && <div className="w-1.5 h-1.5 rounded-full bg-win animate-live-pulse" />}
-              <span className="font-mono text-[10px] text-pitch-500 tabular-nums">{isLive ? "LIVE" : game?.time ?? "TBD"}</span>
-            </div>
-            {spread != null && (
-              <span className="font-mono text-[10px] text-pitch-400 tabular-nums">{spread > 0 ? `+${spread}` : spread}</span>
-            )}
-            <motion.div
-              className="flex items-center gap-1 text-pitch-600"
-              animate={{ rotate: expanded ? 90 : 0 }}
-              transition={TWEEN_FAST}
-            >
-              <ChevronRight size={10} strokeWidth={2} />
-            </motion.div>
-          </div>
+          {/* ── Header row ─────────────────────────────────────── */}
+          <div className="w-full text-left px-4 py-3 hover:bg-pitch-800/50 transition-colors">
+            <div className="grid grid-cols-[1fr_auto_1fr] gap-3 items-center">
+              {/* Away */}
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="font-display text-2xl tracking-[4px]" style={{ color: colorA }}>{away}</span>
+                  {isLive && game.awayScore != null && (
+                    <AnimatedValue value={game.awayScore} className="font-mono text-lg font-bold text-pitch-50 tabular-nums" />
+                  )}
+                </div>
+                <div className="text-[9px] text-pitch-600 uppercase tracking-[1.5px] mt-0.5">{TEAM_NAMES[away] ?? away}</div>
+              </div>
 
-          {/* Home */}
-          <div className="text-right">
-            <div className="flex items-center gap-2 justify-end">
-              {isLive && game.homeScore != null && (
-                <AnimatedValue value={game.homeScore} className="font-mono text-lg font-bold text-pitch-50 tabular-nums" />
-              )}
-              <span className="font-display text-2xl tracking-[4px]" style={{ color: colorB }}>{home}</span>
+              {/* Center meta */}
+              <div className="flex flex-col items-center gap-1">
+                <div className="flex items-center gap-1.5">
+                  {isLive && <div className="w-1.5 h-1.5 rounded-full bg-win animate-live-pulse" />}
+                  <span className="font-mono text-[10px] text-pitch-500 tabular-nums">{isLive ? "LIVE" : game?.time ?? "TBD"}</span>
+                </div>
+                {spread != null && (
+                  <span className="font-mono text-[10px] text-pitch-400 tabular-nums">{spread > 0 ? `+${spread}` : spread}</span>
+                )}
+                <div className="flex items-center gap-1 text-pitch-600">
+                  <ChevronRight size={10} strokeWidth={2} />
+                </div>
+              </div>
+
+              {/* Home */}
+              <div className="text-right">
+                <div className="flex items-center gap-2 justify-end">
+                  {isLive && game.homeScore != null && (
+                    <AnimatedValue value={game.homeScore} className="font-mono text-lg font-bold text-pitch-50 tabular-nums" />
+                  )}
+                  <span className="font-display text-2xl tracking-[4px]" style={{ color: colorB }}>{home}</span>
+                </div>
+                <div className="text-[9px] text-pitch-600 uppercase tracking-[1.5px] mt-0.5">{TEAM_NAMES[home] ?? home}</div>
+              </div>
             </div>
-            <div className="text-[9px] text-pitch-600 uppercase tracking-[1.5px] mt-0.5">{TEAM_NAMES[home] ?? home}</div>
+
+            {/* Probability bar */}
+            <div className="mt-3">
+              <ProbBar probA={probA} colorA={colorA} colorB={colorB} />
+            </div>
           </div>
         </div>
+      </MorphingDialogTrigger>
 
-        {/* Probability bar */}
-        <div className="mt-3">
-          <ProbBar probA={probA} colorA={colorA} colorB={colorB} />
-        </div>
-      </button>
-
-      {/* ── Expanded panel ─────────────────────────────────── */}
-      <AnimatePresence>
-        {expanded && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.3, ease: EASE_LOCK }}
-            className="overflow-hidden"
-          >
-            <div className="border-t border-pitch-700/40">
-
-              {/* ── Star players ─────────────────────────────── */}
-              {(starA || starB) && (
-                <div className="px-4 py-3 border-b border-pitch-700/30">
-                  <div className="text-[8px] text-pitch-600 uppercase tracking-[2.5px] mb-2 flex items-center gap-1.5">
-                    <Target size={8} strokeWidth={2} />star players
-                  </div>
-                  <div className="grid grid-cols-[1fr_auto_1fr] gap-3 items-center">
-                    <PlayerStrip player={starA} color={colorA} align="left" />
-                    <div className="flex flex-col items-center">
-                      <div className="w-px h-4 bg-pitch-700" />
-                      {starA?.per && starB?.per && (
-                        <>
-                          <div className="text-[8px] text-pitch-700 uppercase tracking-[2px] my-0.5">per</div>
-                          <div className="font-mono text-[10px] tabular-nums font-medium"
-                            style={{ color: starA.per >= starB.per ? colorA : colorB }}>
-                            {starA.per > starB.per ? "+" : ""}{(starA.per - starB.per).toFixed(1)}
-                          </div>
-                        </>
-                      )}
-                      <div className="w-px h-4 bg-pitch-700" />
-                    </div>
-                    <PlayerStrip player={starB} color={colorB} align="right" />
-                  </div>
+      <MorphingDialogContainer>
+        <MorphingDialogContent className="max-w-xl">
+          <div className="p-0 border-t border-pitch-700/40">
+            {/* Re-render the summary header as a non-clickable title in the modal */}
+            <div className="px-4 py-4 bg-pitch-900/50 border-b border-pitch-700/50">
+                <div className="grid grid-cols-[1fr_auto_1fr] gap-3 items-center opacity-80 scale-95 origin-center">
+                    <div className="font-display text-xl tracking-[4px]" style={{ color: colorA }}>{away}</div>
+                    <div className="text-[10px] text-pitch-600 font-mono tracking-widest uppercase">matchup details</div>
+                    <div className="font-display text-xl tracking-[4px] text-right" style={{ color: colorB }}>{home}</div>
                 </div>
-              )}
+            </div>
 
-              {/* ── Stat duel grid ───────────────────────────── */}
-              {sA && sB && (
-                <div className="px-4 py-3 border-b border-pitch-700/30">
-                  <div className="text-[8px] text-pitch-600 uppercase tracking-[2.5px] mb-2 flex items-center gap-1.5">
-                    <Activity size={8} strokeWidth={2} />stat duel
-                  </div>
-                  <div className="space-y-0">
-                    <DuelRow label="NET" aVal={sA.netRtg} bVal={sB.netRtg} colorA={colorA} colorB={colorB} format={v => (v > 0 ? `+${v}` : v)} />
-                    <DuelRow label="eFG%" aVal={sA.efg} bVal={sB.efg} colorA={colorA} colorB={colorB} format={v => `${v}%`} />
-                    <DuelRow label="TOV%" aVal={sA.tov} bVal={sB.tov} colorA={colorA} colorB={colorB} invert format={v => `${v}%`} />
-                    <DuelRow label="PACE" aVal={sA.pace} bVal={sB.pace} colorA={colorA} colorB={colorB} />
-                  </div>
+            {/* ── Star players ─────────────────────────────── */}
+            {(starA || starB) && (
+              <div className="px-6 py-5 border-b border-pitch-700/30">
+                <div className="text-[9px] text-pitch-500 uppercase tracking-[2.5px] mb-4 flex items-center gap-1.5 font-semibold">
+                  <Target size={10} strokeWidth={2} />STAR PLAYERS
                 </div>
-              )}
-
-              {/* ── Lineups ──────────────────────────────────── */}
-              {(lineups?.away?.length > 0 || lineups?.home?.length > 0) && (
-                <div className="px-4 py-3 border-b border-pitch-700/30 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {lineups?.away?.length > 0 && (
-                    <div>
-                      <div className="text-[8px] uppercase tracking-[2.5px] mb-1" style={{ color: `${colorA}90` }}>
-                        {away} lineups
+                <div className="grid grid-cols-[1fr_auto_1fr] gap-6 items-center">
+                  <PlayerStrip player={starA} color={colorA} align="left" />
+                  <div className="flex flex-col items-center">
+                    <div className="w-px h-6 bg-pitch-700" />
+                    {starA?.per && starB?.per && (
+                      <div className="py-1">
+                        <Tooltip content="Efficiency gap between star players (PER)">
+                           <div className="font-mono text-[11px] tabular-nums font-bold"
+                             style={{ color: starA.per >= starB.per ? colorA : colorB }}>
+                             {starA.per > starB.per ? "+" : ""}{(starA.per - starB.per).toFixed(1)}
+                           </div>
+                        </Tooltip>
                       </div>
+                    )}
+                    <div className="w-px h-6 bg-pitch-700" />
+                  </div>
+                  <PlayerStrip player={starB} color={colorB} align="right" />
+                </div>
+              </div>
+            )}
+
+            {/* ── Stat duel grid ───────────────────────────── */}
+            {sA && sB && (
+              <div className="px-6 py-5 border-b border-pitch-700/30 bg-pitch-800/20">
+                <div className="text-[9px] text-pitch-500 uppercase tracking-[2.5px] mb-4 flex items-center gap-1.5 font-semibold">
+                  <Activity size={10} strokeWidth={2} />TEAM TELEMETRY
+                </div>
+                <div className="space-y-1">
+                  <DuelRow label="NET" aVal={sA.netRtg} bVal={sB.netRtg} colorA={colorA} colorB={colorB} format={v => (v > 0 ? `+${v}` : v)} />
+                  <DuelRow label="eFG%" aVal={sA.efg} bVal={sB.efg} colorA={colorA} colorB={colorB} format={v => `${v}%`} />
+                  <DuelRow label="TOV%" aVal={sA.tov} bVal={sB.tov} colorA={colorA} colorB={colorB} invert format={v => `${v}%`} />
+                  <DuelRow label="PACE" aVal={sA.pace} bVal={sB.pace} colorA={colorA} colorB={colorB} />
+                </div>
+              </div>
+            )}
+
+            {/* ── Lineups ──────────────────────────────────── */}
+            {(lineups?.away?.length > 0 || lineups?.home?.length > 0) && (
+              <div className="px-6 py-5 border-b border-pitch-700/30 grid grid-cols-1 sm:grid-cols-2 gap-8">
+                {lineups?.away?.length > 0 && (
+                  <div>
+                    <div className="text-[9px] uppercase tracking-[2.5px] mb-3 font-semibold" style={{ color: `${colorA}bb` }}>
+                      {away} UNIT PERFORMANCE
+                    </div>
+                    <div className="space-y-1">
                       {lineups.away.slice(0, 3).map((l, i) => (
                         <LineupRow key={i} lineup={l} color={colorA} delay={i * 0.05} />
                       ))}
                     </div>
-                  )}
-                  {lineups?.home?.length > 0 && (
-                    <div>
-                      <div className="text-[8px] uppercase tracking-[2.5px] mb-1" style={{ color: `${colorB}90` }}>
-                        {home} lineups
-                      </div>
+                  </div>
+                )}
+                {lineups?.home?.length > 0 && (
+                  <div>
+                    <div className="text-[9px] uppercase tracking-[2.5px] mb-3 font-semibold" style={{ color: `${colorB}bb` }}>
+                      {home} UNIT PERFORMANCE
+                    </div>
+                    <div className="space-y-1">
                       {lineups.home.slice(0, 3).map((l, i) => (
                         <LineupRow key={i} lineup={l} color={colorB} delay={i * 0.05} />
                       ))}
                     </div>
-                  )}
-                </div>
-              )}
+                  </div>
+                )}
+              </div>
+            )}
 
-              {/* ── Bet strip ────────────────────────────────── */}
-              <div className="px-4 py-3">
-                <div className="text-[8px] text-pitch-600 uppercase tracking-[2.5px] mb-2">moneyline</div>
-                <div className="flex gap-[1px]">
-                  <BetButton team={away} odds={awayOdds} spread={spread} color={colorA} side="away" onBet={onBet} />
-                  <BetButton team={home} odds={homeOdds} spread={spread} color={colorB} side="home" onBet={onBet} />
-                </div>
+            {/* ── Bet strip ────────────────────────────────── */}
+            <div className="px-6 py-6 bg-pitch-900/30">
+              <div className="text-[9px] text-pitch-500 uppercase tracking-[2.5px] mb-3 font-semibold">MARKET EXECUTION (MONEYLINE)</div>
+              <div className="flex gap-2">
+                <BetButton team={away} odds={awayOdds} spread={spread} color={colorA} side="away" onBet={onBet} />
+                <BetButton team={home} odds={homeOdds} spread={spread} color={colorB} side="home" onBet={onBet} />
               </div>
             </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </motion.div>
+          </div>
+          <MorphingDialogClose />
+        </MorphingDialogContent>
+      </MorphingDialogContainer>
+    </MorphingDialog>
   );
 }

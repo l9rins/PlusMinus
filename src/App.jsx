@@ -8,6 +8,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useQueryClient } from "@tanstack/react-query";
 import TopNav from "./components/TopNav";
 import { ToastContainer } from "./components/ui";
+import { TooltipProvider } from "./components/ui/tooltip";
 import { TEAM_COLORS } from "./data";
 import { invalidateErroredQueries } from "./api";
 
@@ -238,7 +239,8 @@ function AppInner() {
       </SignedOut>
 
       <SignedIn>
-        <div role="status" aria-live="polite" aria-atomic="true" className="sr-only">
+        <TooltipProvider>
+          <div role="status" aria-live="polite" aria-atomic="true" className="sr-only">
           {ROUTE_META[location.pathname]?.title} page
         </div>
 
@@ -281,6 +283,7 @@ function AppInner() {
             D·S·L·P·B·T·A·C &nbsp;shortcuts &nbsp;|&nbsp; / &nbsp;search
           </div>
         </div>
+        </TooltipProvider>
       </SignedIn>
     </div>
   );
