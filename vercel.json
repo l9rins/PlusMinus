@@ -64,7 +64,7 @@
     {
       "source": "/(.*)",
       "headers": [
-        { "key": "Content-Security-Policy", "value": "default-src 'self'; script-src 'self' 'unsafe-inline' https://*.clerk.accounts.dev https://challenges.cloudflare.com https://vercel.live; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; worker-src 'self' blob:; connect-src 'self' https://*.clerk.accounts.dev https://clerk-telemetry.com https://site.api.espn.com; img-src 'self' data: https:; frame-src https://challenges.cloudflare.com https://vercel.live" }
+        { "key": "Content-Security-Policy", "value": "default-src 'self'; script-src 'self' 'unsafe-inline' https://*.clerk.accounts.dev https://challenges.cloudflare.com https://vercel.live https://va.vercel-scripts.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; worker-src 'self' blob:; connect-src 'self' https://*.clerk.accounts.dev https://clerk-telemetry.com https://site.api.espn.com https://vitals.vercel-insights.com; img-src 'self' data: https:; frame-src https://challenges.cloudflare.com https://vercel.live" }
       ]
     }
   ]

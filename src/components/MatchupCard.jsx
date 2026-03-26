@@ -5,7 +5,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence, useMotionValue, useTransform, animate } from "framer-motion";
-import { ChevronRight, Check, Target, Activity, Flame, Shield, TrendingUp } from "lucide-react";
+import { ChevronRight, Check, Target, Activity, Flame, Shield, TrendingUp, Zap } from "lucide-react";
 import { TEAM_COLORS, TEAM_NAMES } from "../data";
 import {
   MorphingDialog,
@@ -38,9 +38,9 @@ function ProbBar({ probA, colorA, colorB }) {
   return (
     <div className="space-y-1.5">
       <div className="flex justify-between items-center px-1">
-        <span className="pm-number text-sm">{probA}%</span>
+        <span className="pm-number text-sm">{Number(probA).toFixed(1).replace(/\.0$/, '')}%</span>
         <span className="pm-label opacity-40">Model Edge</span>
-        <span className="pm-number text-sm">{(100 - probA)}%</span>
+        <span className="pm-number text-sm">{Number(100 - probA).toFixed(1).replace(/\.0$/, '')}%</span>
       </div>
       <div className="flex h-1 rounded overflow-hidden bg-[var(--neon-overlay)] border border-[var(--neon-border)]">
         <motion.div
@@ -163,7 +163,7 @@ function BetButton({ team, odds, spread, color, side, onBet }) {
         <span className={cn("text-lg font-bold tracking-tight uppercase", state === "idle" ? "text-[var(--neon-text)]" : "text-[var(--neon-green)]")}>{team}</span>
         {spread != null && (
           <span className={cn("text-[10px] font-bold uppercase tracking-widest mt-1", state === "idle" ? "text-[var(--neon-dim)]" : "text-[var(--neon-dim)]")}>
-            {side === "away" ? (spread > 0 ? `+${spread}` : spread) : (spread > 0 ? `-${spread}` : `+${Math.abs(spread)}`)}
+            {spread === 0 ? "PK" : side === "away" ? (spread > 0 ? `+${spread}` : spread) : (spread > 0 ? `-${spread}` : `+${Math.abs(spread)}`)}
           </span>
         )}
       </div>

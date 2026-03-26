@@ -311,6 +311,7 @@ export function calcPercentile(value, allValues, invert = false) {
   if (!allValues || allValues.length === 0) return { pct: 50, color: "bg-pitch-700 text-pitch-400", label: "—" };
 
   const sorted = [...allValues].filter(v => v != null).sort((a, b) => a - b);
+  if (sorted.length === 0) return { pct: 50, color: "bg-pitch-700 text-pitch-400", label: "—" };
   const rank   = sorted.filter(v => v < value).length;
   const rawPct = Math.round((rank / sorted.length) * 100);
   const pct    = invert ? 100 - rawPct : rawPct;

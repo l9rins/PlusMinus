@@ -547,6 +547,7 @@ export const queryClientConfig = {
   defaultOptions: {
     queries: {
       staleTime: 1000 * 60 * 5,
+      refetchOnWindowFocus: false, // Prevents aggressive re-fetching on tab switch
       retry: shouldRetry,
       retryDelay: (attempt, err) =>
         err?.retryAfter ? err.retryAfter * 1000 : Math.min(1000 * 2 ** attempt, 30000),
@@ -754,11 +755,11 @@ export function useTeamLineups(teamId, enabled = true) {
         const get = k => row[h.indexOf(k)];
         return {
           lineup:  get("GROUP_VALUE"),     // e.g. "Tatum - Brown - …"
-          min:     +get("MIN").toFixed(1),
-          netRtg:  +get("NET_RATING").toFixed(1),
-          ortg:    +get("OFF_RATING").toFixed(1),
-          drtg:    +get("DEF_RATING").toFixed(1),
-          pace:    +get("PACE").toFixed(1),
+          min:     +(get("MIN") || 0).toFixed(1),
+          netRtg:  +(get("NET_RATING") || 0).toFixed(1),
+          ortg:    +(get("OFF_RATING") || 0).toFixed(1),
+          drtg:    +(get("DEF_RATING") || 0).toFixed(1),
+          pace:    +(get("PACE") || 0).toFixed(1),
           gp:      get("GP"),
         };
       }).filter(l => l.min >= 5).sort((a, b) => b.netRtg - a.netRtg);
