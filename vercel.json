@@ -19,7 +19,7 @@
       "destination": "/api/bets?id=:id"
     },
     {
-      "source": "/((?!api/|manifest\\.json|favicon\\.|og-image\\.).*)",
+      "source": "/((?!api/|manifest\\.json|favicon\\.|og-image\\.|@|src/|node_modules/|virtual:).*)",
       "destination": "/index.html"
     }
   ],
