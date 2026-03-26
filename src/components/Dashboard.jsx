@@ -1,21 +1,32 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
     TrendingUp, TrendingDown, Target, BarChart2,
     Zap, ChevronRight, Activity, DollarSign, Flame, Shield,
+    ArrowUpRight, Users, Bell, Search, Filter,
 } from "lucide-react";
 import { TEAM_NAMES, ODDS_GAMES, TEAM_COLORS } from "../data";
 import { useStandings, useTodayGames, useOdds, mergeOddsIntoGames, useBets, useEloData } from "../api";
 import { formatCurrency, formatPct, lsGet, calcROI, calcPL, eloWinProb, kellyBet, DEFAULT_BANKROLL } from "../utils";
 import { TileSkeleton, RowSkeleton, ErrorState, FreshnessTag, Tooltip, TeamLink, AnimatedNumber, MagneticButton } from "./ui";
+import { 
+    PremiumCard, 
+    PremiumCardHeader, 
+    PremiumCardTitle, 
+    PremiumCardDescription, 
+    PremiumCardContent 
+} from "./ui/premium-card";
+import { Badge } from "./ui/badge";
 import GameWinProb from "./GameWinProb";
 import RefCallout from "./RefCallout";
+import { cn } from "../lib/utils";
 
-const container = { hidden: {}, show: { transition: { staggerChildren: 0.04, delayChildren: 0.05 } } };
-const tile = { hidden: { opacity: 0, y: 14, scale: 0.98 }, show: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.28, ease: [0.25, 0.46, 0.45, 0.94] } } };
+const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.1 } } };
+const item = { hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 } };
 
 function GameTile({ game, eloMap }) {
+    const navigate = useNavigate();
     const memoized = useMemo(() => {
         const fav = (game.homeP === null || game.awayP === null) ? null : game.homeP >= game.awayP ? "home" : "away";
         const isFinal = game.status === "final";
@@ -27,135 +38,97 @@ function GameTile({ game, eloMap }) {
         const confidence = (game.homeP === null || game.awayP === null)
             ? "none"
             : favP >= 70 ? "high" : favP >= 58 ? "mid" : "low";
-        const awayName = TEAM_NAMES[game.away] || game.away;
-        const homeName = TEAM_NAMES[game.home] || game.home;
-        return { fav, isFinal, isLive, isScheduled, awayColor, homeColor, confidence, awayName, homeName };
+        return { fav, isFinal, isLive, isScheduled, awayColor, homeColor, confidence };
     }, [game]);
-    const { fav, isFinal, isLive, isScheduled, awayColor, homeColor, confidence, awayName, homeName } = memoized;
+    
+    const { fav, isFinal, isLive, isScheduled, awayColor, homeColor, confidence } = memoized;
 
     return (
-        <motion.div variants={tile} className="pm-tile p-3 group">
-            <div className="flex items-center justify-between mb-2.5">
-                <span className="pm-label">{game.time}</span>
-                <div className="flex items-center gap-1.5">
-                    {isFinal && <span className="pm-badge bg-pitch-700 text-pitch-400 border border-pitch-600">Final</span>}
-                    {isLive && <span className="pm-live-badge pm-badge"><span className="pm-live-dot" />{game.period ? `Q${game.period}` : "Live"}</span>}
-                    {isScheduled && confidence === "high" && (
-                        <Tooltip content="High model confidence">
-                            <span className="pm-badge bg-accent/10 text-accent border border-accent/20 flex items-center gap-1"><Flame size={8} /> Edge</span>
-                        </Tooltip>
-                    )}
-                    {isScheduled && confidence !== "high" && <span className="pm-badge bg-pitch-700 text-pitch-400 border border-pitch-600">Tonight</span>}
+        <PremiumCard className="p-5 h-full flex flex-col justify-between group cursor-pointer" onClick={() => navigate("/scores")}>
+            <div>
+                <div className="flex items-center justify-between mb-6">
+                    <span className="text-[10px] font-bold text-morphin-muted uppercase tracking-[2px]">{game.time}</span>
+                    <div className="flex items-center gap-2">
+                        {isLive && <Badge variant="destructive" className="animate-pulse bg-loss text-white border-none text-[9px]">LIVE</Badge>}
+                        {isFinal && <Badge variant="secondary" className="text-[9px]">FINAL</Badge>}
+                        {isScheduled && confidence === "high" && <Badge className="bg-win text-white border-none text-[9px] flex items-center gap-1"><Flame size={10} /> EDGE</Badge>}
+                    </div>
+                </div>
+
+                <div className="flex items-center justify-between gap-4 mb-4">
+                    <div className="flex flex-col items-center flex-1">
+                        <div className="w-12 h-12 rounded-2xl bg-morphin-ghost flex items-center justify-center mb-3 group-hover:scale-110 transition-transform shadow-sm" style={{ borderBottom: `3px solid ${awayColor}` }}>
+                             <span className="font-display font-bold text-lg">{game.away}</span>
+                        </div>
+                        <span className={cn("text-2xl font-display font-bold", fav === "away" ? "text-morphin-text" : "text-morphin-muted")}>
+                             {isLive || isFinal ? game.awayScore : (game.awayP ? `${game.awayP}%` : "—")}
+                        </span>
+                    </div>
+
+                    <div className="text-[10px] font-bold text-morphin-muted uppercase tracking-widest pt-4">VS</div>
+
+                    <div className="flex flex-col items-center flex-1">
+                        <div className="w-12 h-12 rounded-2xl bg-morphin-ghost flex items-center justify-center mb-3 group-hover:scale-110 transition-transform shadow-sm" style={{ borderBottom: `3px solid ${homeColor}` }}>
+                             <span className="font-display font-bold text-lg">{game.home}</span>
+                        </div>
+                        <span className={cn("text-2xl font-display font-bold", fav === "home" ? "text-morphin-text" : "text-morphin-muted")}>
+                             {isLive || isFinal ? game.homeScore : (game.homeP ? `${game.homeP}%` : "—")}
+                        </span>
+                    </div>
                 </div>
             </div>
-            <div className="flex items-center gap-2 mb-3">
-                <div className="flex-1 text-center">
-                    <div className={`font-display text-xl tracking-wider leading-none mb-0.5 ${fav === "away" ? "" : "text-pitch-300"}`} style={{ color: fav === "away" && fav !== null ? awayColor : undefined }}>{game.away}</div>
-                    <div className="text-[10px] text-pitch-500 truncate px-1">{awayName}</div>
-                    {(isFinal || isLive) ? <AnimatedNumber value={game.awayScore ?? 0} className="pm-number text-lg mt-1 text-pitch-100" />
-                        : game.awayP !== null
-                            ? <div className="pm-number text-sm mt-1 text-pitch-400">{game.awayP}%</div>
-                            : <div className="pm-number text-sm mt-1 text-pitch-600">—</div>}
-                </div>
-                <div className="flex flex-col items-center gap-0.5">
-                    <div className="text-pitch-600 text-xs font-mono">{isFinal || isLive ? "—" : "vs"}</div>
-                    {isScheduled && game.spread !== "—" && <div className="text-[9px] text-pitch-600">{game.spread}</div>}
-                </div>
-                <div className="flex-1 text-center">
-                    <div className={`font-display text-xl tracking-wider leading-none mb-0.5 ${fav === "home" ? "" : "text-pitch-300"}`} style={{ color: fav === "home" && fav !== null ? homeColor : undefined }}>{game.home}</div>
-                    <div className="text-[10px] text-pitch-500 truncate px-1">{homeName}</div>
-                    {(isFinal || isLive) ? <AnimatedNumber value={game.homeScore ?? 0} className="pm-number text-lg mt-1 text-pitch-100" />
-                        : game.homeP !== null
-                            ? <div className="pm-number text-sm mt-1 text-pitch-400">{game.homeP}%</div>
-                            : <div className="pm-number text-sm mt-1 text-pitch-600">—</div>}
-                </div>
+
+            <div className="mt-4 pt-4 border-t border-morphin-border">
+                 <div className="flex justify-between items-center text-[11px] font-semibold text-morphin-muted">
+                    <span>{game.spread !== "—" ? `Spread: ${game.spread}` : "No Spread"}</span>
+                    <span>{game.total !== "—" ? `O/U: ${game.total}` : ""}</span>
+                 </div>
             </div>
-                <div className="mt-4 pt-3 border-t border-pitch-750/50 space-y-3">
-                    <GameWinProb game={game} eloMap={eloMap} />
-                    <RefCallout matchup={`${game.away} @ ${game.home}`} />
-                </div>
-            <div className="flex justify-between text-[10px] text-pitch-500">
-                <span>{game.spread !== "—" ? <span>Spread: <span className="text-pitch-300">{game.spread}</span></span> : "—"}</span>
-                <span>{game.total !== "—" ? <span>O/U: <span className="text-pitch-300">{game.total}</span></span> : null}</span>
-            </div>
-        </motion.div>
+        </PremiumCard>
     );
 }
 
 function MiniStandings({ teams, conf }) {
-    const navigate = useNavigate();
     return (
-        <div>
-            <div className="flex items-center justify-between mb-2">
-                <div className="pm-label">{conf}</div>
-                <MagneticButton strength={0.2} onClick={() => navigate("/standings")}>
-                    <div className="text-[9px] text-pitch-500 hover:text-accent transition-colors flex items-center gap-0.5 px-2 py-1 bg-pitch-750/50 rounded-md border border-pitch-700/50">
-                        Full <ChevronRight size={9} />
-                    </div>
-                </MagneticButton>
-            </div>
-            <div className="space-y-0">
-                {teams.slice(0, 8).map((t, i) => {
-                    const isPlayoff = i < 6;
-                    const isPlayIn = i >= 6 && i <= 9;
-                    const color = TEAM_COLORS[t.team] || "#546480";
-                    return (
-                        <div key={`${t.team}-${i}`} className={`flex items-center gap-2 px-2 py-1.5 rounded-sm transition-colors hover:bg-pitch-700 cursor-pointer ${i === 6 ? "border-t border-dashed border-pitch-600 mt-1 pt-2.5" : ""}`}>
-                            <span className="pm-number text-[10px] text-pitch-600 w-4 flex-shrink-0">{i + 1}</span>
-                            <div className="w-1.5 h-1.5 rounded-full flex-shrink-0 opacity-80" style={{ background: color }} />
-                            <TeamLink abbr={t.team} className={`font-display text-sm tracking-wider flex-1 block ${i === 0 ? "text-accent" : isPlayoff ? "text-pitch-200" : "text-pitch-400"}`}>{t.team}</TeamLink>
-                            {t.streak && <span className={`text-[9px] font-mono hidden sm:inline ${t.streak.startsWith("W") ? "text-win/60" : t.streak.startsWith("L") ? "text-loss/60" : "text-pitch-500"}`}>{t.streak}</span>}
-                            <span className="pm-number text-[10px] text-pitch-400 flex-shrink-0">{t.w}-{t.l}</span>
-                            {isPlayIn && <span className="text-[8px] text-draw border border-draw/30 bg-draw/10 px-1 py-0.5 rounded flex-shrink-0">PI</span>}
+        <div className="space-y-3">
+            <div className="text-[10px] font-bold text-morphin-muted uppercase tracking-[3px] mb-4">{conf} Conference</div>
+            {teams.slice(0, 5).map((t, i) => (
+                <div key={t.team} className="flex items-center justify-between group">
+                    <div className="flex items-center gap-3">
+                        <span className="text-[10px] font-bold text-morphin-muted w-4">{i + 1}</span>
+                        <div className="w-6 h-6 rounded-lg bg-morphin-ghost flex items-center justify-center border border-morphin-border text-[9px] font-bold group-hover:bg-morphin-border transition-colors">
+                            {t.team}
                         </div>
-                    );
-                })}
-            </div>
+                        <TeamLink abbr={t.team} className="text-xs font-bold text-morphin-text hover:text-morphin-accent transition-colors">{t.team}</TeamLink>
+                    </div>
+                    <span className="text-[11px] font-mono font-bold text-morphin-muted">{t.w}-{t.l}</span>
+                </div>
+            ))}
         </div>
     );
 }
 
-function SummaryTile({ label, value, sub, icon: Icon, trend, color, onClick, badge, tooltip }) {
+function SummaryStat({ label, value, sub, icon: Icon, trend, trendValue, onClick }) {
     return (
-        <motion.div variants={tile} className={`pm-tile p-4 ${onClick ? "cursor-pointer" : ""}`} onClick={onClick} whileHover={onClick ? { scale: 1.01 } : undefined}>
-            <div className="flex items-start justify-between mb-2.5">
-                <Tooltip content={tooltip}>
-                    <div className="pm-label truncate pr-2">{label}</div>
-                </Tooltip>
-                {Icon && <div className="w-7 h-7 rounded-md bg-pitch-750 border border-pitch-600 flex items-center justify-center flex-shrink-0"><Icon size={13} strokeWidth={1.8} className="text-pitch-400" /></div>}
-            </div>
-            <div className={`pm-number text-3xl ${color || "text-pitch-50"}`}>{value}</div>
-            {(sub || trend || badge) && (
-                <div className="flex items-center gap-1.5 mt-2">
-                    {trend === "up" && <TrendingUp size={11} className="text-win flex-shrink-0" />}
-                    {trend === "down" && <TrendingDown size={11} className="text-loss flex-shrink-0" />}
-                    {badge && <span className={`pm-badge text-[9px] px-1.5 py-0.5 ${badge.cls}`}>{badge.label}</span>}
-                    {sub && <span className="text-[11px] text-pitch-500 truncate">{sub}</span>}
+        <PremiumCard className="p-6 cursor-pointer hover:bg-morphin-ghost/50 transition-all border-none bg-transparent shadow-none" onClick={onClick}>
+            <div className="flex items-start justify-between mb-4">
+                <div className="w-10 h-10 rounded-2xl bg-white border border-morphin-border flex items-center justify-center text-morphin-muted shadow-sm">
+                    <Icon size={18} strokeWidth={2.5} />
                 </div>
-            )}
-        </motion.div>
-    );
-}
-
-function KellyTile({ topEdge, bankroll }) {
-    const odds = topEdge.bestFavOdds ?? -110;
-    const kelly = kellyBet(topEdge.modelP / 100, odds, bankroll);
-    return (
-        <motion.div variants={tile} className="pm-tile p-4">
-            <div className="flex items-start justify-between mb-2.5">
-                <Tooltip content="Optimal bet size based on model edge and bankroll risk management.">
-                    <div className="pm-label truncate pr-2">Kelly Bet Size</div>
-                </Tooltip>
-                <div className="w-7 h-7 rounded-md bg-pitch-750 border border-pitch-600 flex items-center justify-center">
-                    <DollarSign size={13} strokeWidth={1.8} className="text-pitch-400" />
-                </div>
+                {trend && (
+                    <div className={cn("flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-full", 
+                        trend === "up" ? "bg-win/10 text-win" : "bg-loss/10 text-loss")}>
+                        {trend === "up" ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
+                        {trendValue}
+                    </div>
+                )}
             </div>
-            <div className="pm-number text-3xl text-pitch-50">{kelly > 0 ? formatCurrency(kelly) : "—"}</div>
-            <div className="flex items-center gap-1.5 mt-2">
-                <Shield size={10} className="text-pitch-500 flex-shrink-0" />
-                <span className="text-[11px] text-pitch-500">½-Kelly · {topEdge.matchup} · {odds > 0 ? `+${odds}` : odds}</span>
+            <div className="space-y-1">
+                <span className="text-[10px] font-bold text-morphin-muted uppercase tracking-[2px]">{label}</span>
+                <div className="text-3xl font-display font-black text-morphin-text leading-tight">{value}</div>
+                <div className="text-[11px] font-medium text-morphin-muted truncate">{sub}</div>
             </div>
-        </motion.div>
+        </PremiumCard>
     );
 }
 
@@ -166,7 +139,9 @@ export default function Dashboard() {
     const { data: oddsData } = useOdds();
     const { data: eloApiData } = useEloData();
     const { bets } = useBets();
-    const today = new Date().toLocaleDateString("en-US", { weekday: "short", month: "long", day: "numeric", year: "numeric", timeZone: "America/New_York" });
+    
+    const today = new Date().toLocaleDateString("en-US", { weekday: "short", month: "long", day: "numeric" });
+    
     const rawGameList = games.data || [];
     const gameList = useMemo(() => mergeOddsIntoGames(rawGameList, oddsData) || [], [rawGameList, oddsData]);
     const eastList = standings.data?.east || [];
@@ -183,21 +158,7 @@ export default function Dashboard() {
         return { total: bets.length, wins, losses, pending, pl };
     }, [bets]);
 
-    // FIX: bankroll zero/negative guard.
-    //
-    // Previous: Number(lsGet("bankroll")) || DEFAULT_BANKROLL
-    // Bug: Number(0) is falsy, so a user who intentionally sets bankroll=0
-    // (empty/cleared state) silently gets DEFAULT_BANKROLL instead.
-    // Number("invalid") is NaN which is also falsy — that case was fine.
-    // But Number(-50) is truthy and would pass through as a negative bankroll,
-    // causing kellyBet to return 0 (already guarded there, but defensive here too).
-    //
-    // Fix: explicit isFinite + positive check. Only use DEFAULT_BANKROLL when
-    // the stored value is missing, non-numeric, or non-positive.
-    const storedBankroll = Number(lsGet("bankroll"));
-    const bankroll = Number.isFinite(storedBankroll) && storedBankroll > 0
-        ? storedBankroll
-        : DEFAULT_BANKROLL;
+    const bankroll = Number(lsGet("bankroll")) || DEFAULT_BANKROLL;
 
     const elos = useMemo(() => {
         const allTeams = [...(standings.data?.east || []), ...(standings.data?.west || [])];
@@ -214,12 +175,10 @@ export default function Dashboard() {
         if (odds && Object.keys(odds).length > 0) {
             const cards = Object.entries(odds).map(([key, o]) => {
                 const [away, home] = key.split("@");
-                
                 const homeElo = elos[home] || 1500;
                 const awayElo = elos[away] || 1500;
                 const homeWinP = eloWinProb(awayElo, homeElo, true) * 100;
                 const awayWinP = eloWinProb(homeElo, awayElo, false) * 100;
-                
                 const favIsHome = homeWinP >= awayWinP;
                 const modelP = favIsHome ? homeWinP : awayWinP;
                 const marketP = (favIsHome ? o.consHomeP : o.consAwayP) ?? (favIsHome ? o.homeP : o.awayP);
@@ -231,11 +190,11 @@ export default function Dashboard() {
                     edge: isNaN(modelP - marketP) ? 0 : modelP - marketP,
                 };
             });
-      return cards.reduce((best, g) => g.edge > best.edge ? g : best,
-        { matchup: "—", fav: "—", modelP: 0, impliedP: 0, bestFavOdds: null, edge: 0 });
-    }
-    return { matchup: "—", fav: "—", modelP: 0, impliedP: 0, bestFavOdds: null, edge: 0 };
-  }, [oddsData, elos]);
+            return cards.reduce((best, g) => g.edge > best.edge ? g : best,
+                { matchup: "—", fav: "—", modelP: 0, impliedP: 0, bestFavOdds: null, edge: 0 });
+        }
+        return { matchup: "—", fav: "—", modelP: 0, impliedP: 0, bestFavOdds: null, edge: 0 };
+    }, [oddsData, elos]);
 
     const bestProb = useMemo(() => {
         const odds = oddsData?.data || oddsData;
@@ -246,85 +205,144 @@ export default function Dashboard() {
                 const awayElo = elos[away] || 1500;
                 const homeWinP = eloWinProb(awayElo, homeElo, true) * 100;
                 const awayWinP = eloWinProb(homeElo, awayElo, false) * 100;
-                
-                return { matchup: `${away} @ ${home}`, fav: homeWinP >= awayWinP ? home : away, modelP: Math.max(homeWinP, awayWinP) }; 
+                return { matchup: `${away} @ ${home}`, fav: homeWinP >= awayWinP ? home : away, modelP: Math.round(Math.max(homeWinP, awayWinP)) }; 
             });
-      return cards.reduce((best, g) => g.modelP > best.modelP ? g : best, { matchup: "—", fav: "—", modelP: 0 });
-    }
-    return { matchup: "—", fav: "—", modelP: 0 };
-  }, [oddsData, elos]);
+            return cards.reduce((best, g) => g.modelP > best.modelP ? g : best, { matchup: "—", fav: "—", modelP: 0 });
+        }
+        return { matchup: "—", fav: "—", modelP: 0 };
+    }, [oddsData, elos]);
 
-    const betSub = betStats.total > 0 ? `${betStats.wins}W · ${betStats.losses}L · ${betStats.pending} open` : "No bets logged yet";
     const edgeDiff = topEdge.modelP - topEdge.impliedP;
 
     return (
-        <motion.div variants={container} initial="hidden" animate="show" exit={{ opacity: 0, y: -6 }} className="grid grid-cols-12 gap-3">
-            <motion.div variants={tile} className="col-span-12">
-                <div className="flex items-center justify-between mb-2">
-                    <div className="pm-label">{today}</div>
-                    <div className="flex items-center gap-2">
-                        {oddsData?.stale && <span className="text-[9px] text-draw/70 hidden sm:inline-block border border-draw/30 bg-draw/10 px-1.5 py-0.5 rounded cursor-help" title="Using cached odds.">Stale Odds</span>}
-                        <FreshnessTag isFetching={games.isFetching || standings.isFetching} dataUpdatedAt={games.dataUpdatedAt} />
-                    </div>
+        <div className="max-w-[1400px] mx-auto px-6 py-10">
+            {/* Header / Top Stats */}
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
+                <div>
+                    <h1 className="font-display text-5xl font-black text-morphin-text tracking-tight mb-2">Overview</h1>
+                    <p className="text-morphin-muted font-semibold tracking-[4px] uppercase text-xs">{today}</p>
                 </div>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    <SummaryTile label="Games Today" value={gameCount || "—"} sub={gameCount === 0 ? "No games today" : liveCount > 0 ? `${liveCount} in progress` : "Tip-off tonight"} icon={Target} trend={liveCount > 0 ? "up" : null} badge={liveCount > 0 ? { label: "LIVE", cls: "bg-win/10 text-win border border-win/20" } : null} onClick={() => navigate("/scores")} tooltip="Total NBA games scheduled for the current broadcast window." />
-                    <SummaryTile label="Top Model Edge" value={edgeDiff > 0 ? `+${edgeDiff.toFixed(1)}%` : "—"} sub={topEdge.matchup} icon={TrendingUp} trend="up" color={edgeDiff >= 10 ? "text-win" : edgeDiff >= 5 ? "text-draw" : "text-pitch-50"} onClick={() => navigate("/betting")} tooltip="Variance between predicted win probability and consensus market odds." />
-                    <SummaryTile label="Best Win Prob" value={bestProb.modelP > 0 ? `${bestProb.modelP}%` : "—"} sub={bestProb.fav !== "—" ? `${bestProb.fav} · ${bestProb.matchup}` : "No data"} icon={Zap} onClick={() => navigate("/betting")} tooltip="Highest confidence prediction across all scheduled matchups." />
-                    <SummaryTile label="Net P&L" value={betStats.total > 0 ? formatCurrency(betStats.pl) : "—"} sub={betSub} icon={BarChart2} color={betStats.pl > 0 ? "text-win" : betStats.pl < 0 ? "text-loss" : "text-pitch-50"} trend={betStats.pl > 0 ? "up" : betStats.pl < 0 ? "down" : null} onClick={() => navigate("/tracker")} tooltip="Cumulative profit or loss across all settled bets." />
+                <div className="flex items-center gap-3">
+                    <button className="flex items-center gap-2 px-6 py-3 bg-morphin-ghost rounded-2xl hover:bg-morphin-border transition-all text-xs font-bold uppercase tracking-widest text-morphin-text shadow-sm border border-morphin-border/50">
+                        <Filter size={16} strokeWidth={2.5} />
+                        Customize
+                    </button>
+                    <button className="flex items-center gap-2 px-6 py-3 bg-black text-white rounded-2xl hover:bg-morphin-accent transition-all text-xs font-bold uppercase tracking-widest shadow-xl shadow-black/10">
+                        <ArrowUpRight size={16} strokeWidth={2.5} />
+                        Pro Analytics
+                    </button>
                 </div>
+            </div>
+
+            <motion.div variants={container} initial="hidden" animate="show" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
+                <SummaryStat 
+                    label="Games Scheduled" 
+                    value={gameCount || "0"} 
+                    sub={liveCount > 0 ? `${liveCount} Live Matches` : "Tip-off tonight"} 
+                    icon={Target} 
+                    trend={liveCount > 0 ? "up" : null}
+                    trendValue="LIVE"
+                    onClick={() => navigate("/scores")}
+                />
+                <SummaryStat 
+                    label="Top Model Edge" 
+                    value={edgeDiff > 0 ? `+${edgeDiff.toFixed(1)}%` : "0.0%"} 
+                    sub={topEdge.matchup} 
+                    icon={TrendingUp} 
+                    trend="up"
+                    trendValue="ALPHA"
+                    onClick={() => navigate("/betting")}
+                />
+                <SummaryStat 
+                    label="Highest Win Prob" 
+                    value={bestProb.modelP > 0 ? `${bestProb.modelP}%` : "—"} 
+                    sub={bestProb.fav !== "—" ? `${bestProb.fav} Highlight` : "Calculating..."} 
+                    icon={Zap} 
+                    onClick={() => navigate("/scores")}
+                />
+                <SummaryStat 
+                    label="Portfolio P&L" 
+                    value={betStats.total > 0 ? formatCurrency(betStats.pl) : "$0.00"} 
+                    sub={`${betStats.wins}W · ${betStats.losses}L`} 
+                    icon={BarChart2} 
+                    trend={betStats.pl >= 0 ? "up" : "down"}
+                    trendValue={betStats.total > 0 ? `${Math.round((betStats.wins/betStats.total)*100)}% WR` : "0% WR"}
+                    onClick={() => navigate("/tracker")}
+                />
             </motion.div>
 
-            <div className="col-span-12 lg:col-span-8">
-                <div className="flex items-center justify-between mb-2">
-                    <div className="pm-label">Today's Games{liveCount > 0 && <span className="ml-2 pm-badge bg-win/10 text-win border border-win/20 inline-flex items-center gap-1"><span className="pm-live-dot" />{liveCount} live</span>}</div>
-                    <button onClick={() => navigate("/scores")} className="flex items-center gap-1 text-[10px] text-pitch-500 hover:text-accent transition-colors">View all <ChevronRight size={10} /></button>
-                </div>
-                {games.isError ? (
-                    <ErrorState message="Couldn't load today's games." onRetry={() => games.refetch()} type="network" />
-                ) : games.isLoading ? (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">{Array.from({ length: 6 }).map((_, i) => <TileSkeleton key={i} lines={4} />)}</div>
-                ) : gameList.length === 0 ? (
-                    <div className="pm-card p-12 text-center"><Activity size={28} className="text-pitch-700 mx-auto mb-3" /><div className="text-sm text-pitch-500">No games scheduled today.</div></div>
-                ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"><AnimatePresence>{gameList.slice(0, 6).map(g => <GameTile key={g.id} game={g} eloMap={elos} />)}</AnimatePresence></div>
-                )}
-                {gameList.length > 6 && <button onClick={() => navigate("/scores")} className="mt-3 w-full pm-btn-ghost text-center justify-center">+{gameList.length - 6} more games <ChevronRight size={13} /></button>}
-            </div>
-
-            <div className="col-span-12 lg:col-span-4 space-y-3">
-                {oddsData && Object.keys(oddsData).length > 0 && topEdge.modelP > 0 && <KellyTile topEdge={topEdge} bankroll={bankroll} />}
-                <motion.div variants={tile} className="pm-card p-4">
-                    <div className="flex items-center justify-between mb-3">
-                        <div className="pm-label">Standings</div>
-                        <button onClick={() => navigate("/standings")} className="text-[10px] text-pitch-500 hover:text-accent transition-colors flex items-center gap-0.5">Full table <ChevronRight size={10} /></button>
+            {/* Bento Grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                
+                {/* Main: Today's Games */}
+                <div className="lg:col-span-8 space-y-6">
+                    <div className="flex items-center justify-between px-2">
+                        <h2 className="text-xl font-black text-morphin-text tracking-tight">Today's Slate</h2>
+                        <button onClick={() => navigate("/scores")} className="text-[10px] font-bold text-morphin-muted uppercase tracking-[3px] hover:text-morphin-accent transition-colors">See Performance <ChevronRight size={14} className="inline" /></button>
                     </div>
-                    {standings.isError ? <ErrorState message="Couldn't load standings." onRetry={() => standings.refetch()} /> : standings.isLoading ? <RowSkeleton rows={8} /> : (
-                        <div className="space-y-4">
-                            <MiniStandings teams={eastList} conf="Eastern" />
-                            <div className="pm-divider" />
-                            <MiniStandings teams={westList} conf="Western" />
+                    {games.isLoading ? (
+                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {[1,2,3,4].map(i => <div key={i} className="h-64 rounded-3xl bg-morphin-ghost animate-pulse" />)}
+                         </div>
+                    ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {gameList.slice(0, 4).map(g => (
+                                <GameTile key={g.id} game={g} eloMap={elos} />
+                            ))}
                         </div>
                     )}
-                </motion.div>
-                <motion.div variants={tile} className="pm-card p-4">
-                    <div className="pm-label mb-3">Quick access</div>
-                    <div className="grid grid-cols-2 gap-2">
-                        {[
-                            { label: "Line Shopping", path: "/betting", icon: TrendingUp, color: "text-accent" },
-                            { label: "Bet Tracker", path: "/tracker", icon: BarChart2, color: "text-win" },
-                            { label: "Four Factors", path: "/analytics?tab=factors", icon: Activity, color: "text-draw" },
-                            { label: "Players", path: "/players", icon: Zap, color: "text-pitch-300" },
-                        ].map(item => (
-                            <button key={item.path} onClick={() => navigate(item.path)}
-                                className="flex items-center gap-2 px-3 py-2.5 rounded-lg bg-pitch-750 border border-pitch-700 hover:border-pitch-500 hover:bg-pitch-700 transition-all group text-left">
-                                <item.icon size={13} strokeWidth={1.8} className={`${item.color} flex-shrink-0`} />
-                                <span className="text-[11px] text-pitch-300 group-hover:text-pitch-100 transition-colors font-medium">{item.label}</span>
+                    {gameList.length > 4 && (
+                        <button 
+                            onClick={() => navigate("/scores")}
+                            className="w-full py-6 rounded-3xl border-2 border-dashed border-morphin-border text-morphin-muted hover:text-morphin-text hover:border-morphin-text transition-all font-bold text-sm tracking-widest uppercase"
+                        >
+                            +{gameList.length - 4} More Matchups
+                        </button>
+                    )}
+                </div>
+
+                {/* Sidebar: Standings & Quick Access */}
+                <div className="lg:col-span-4 space-y-6">
+                    <PremiumCard className="p-8">
+                        <div className="flex items-center justify-between mb-8">
+                            <h2 className="text-lg font-black text-morphin-text tracking-tight">Standings</h2>
+                            <button onClick={() => navigate("/standings")} className="p-2 hover:bg-morphin-ghost rounded-xl transition-colors text-morphin-muted">
+                                <ArrowUpRight size={18} />
                             </button>
-                        ))}
-                    </div>
-                </motion.div>
+                        </div>
+                        {standings.isLoading ? (
+                             <div className="space-y-4 animate-pulse">
+                                {[1,2,3,4,5].map(i => <div key={i} className="h-4 bg-morphin-ghost rounded" />)}
+                             </div>
+                        ) : (
+                            <div className="space-y-10">
+                                <MiniStandings teams={eastList} conf="East" />
+                                <MiniStandings teams={westList} conf="West" />
+                            </div>
+                        )}
+                    </PremiumCard>
+
+                    <PremiumCard className="p-8 bg-morphin-ghost/30 border-none shadow-none">
+                         <h2 className="text-lg font-black text-morphin-text tracking-tight mb-6">Quick Links</h2>
+                         <div className="grid grid-cols-2 gap-3">
+                            {[
+                                { label: "Odds Edge", icon: TrendingUp, path: "/betting", color: "text-win" },
+                                { label: "Stat Lab", icon: Activity, path: "/analytics", color: "text-morphin-accent" },
+                                { label: "Rosters", icon: Users, path: "/players", color: "text-loss" },
+                                { label: "History", icon: Bell, path: "/tracker", color: "text-draw" },
+                            ].map(link => (
+                                <button key={link.label} onClick={() => navigate(link.path)} className="flex flex-col gap-4 p-5 bg-white rounded-2xl border border-morphin-border hover:shadow-xl hover:scale-105 transition-all group text-left">
+                                    <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center bg-morphin-ghost transition-colors", link.color)}>
+                                        <link.icon size={16} strokeWidth={2.5} />
+                                    </div>
+                                    <span className="text-[11px] font-bold text-morphin-text uppercase tracking-widest">{link.label}</span>
+                                </button>
+                            ))}
+                         </div>
+                    </PremiumCard>
+                </div>
+
             </div>
-        </motion.div>
+        </div>
     );
 }

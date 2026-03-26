@@ -38,10 +38,10 @@ function teamSeed(abbr, index) {
 }
 
 const tooltipStyle = {
-  contentStyle: { background: "rgba(18,22,33,0.95)", border: "1px solid #2e3a50", borderRadius: 8, fontSize: 11, padding: "8px 12px" },
-  labelStyle: { color: "#7d91ab", marginBottom: 4 },
-  itemStyle: { color: "#c8d5e8" },
-  cursor: { stroke: "#2e3a50", strokeWidth: 1 },
+  contentStyle: { background: "rgba(255,255,255,0.95)", border: "1px solid #e5e5e5", borderRadius: "1rem", fontSize: 11, padding: "12px 16px", boxShadow: "0 10px 15px -3px rgba(0,0,0,0.1)" },
+  labelStyle: { color: "#0a0a0a", fontWeight: "800", marginBottom: 6, textTransform: "uppercase", letterSpacing: "1px" },
+  itemStyle: { color: "#666666", fontWeight: "500" },
+  cursor: { stroke: "#e5e5e5", strokeWidth: 1 },
 };
 
 
@@ -137,9 +137,9 @@ function PlayoffSimView({ data }) {
       {/* Header */}
       <motion.div variants={item} className="flex flex-wrap items-center justify-between gap-3 mb-4">
         <div>
-          <div className="pm-label">Monte Carlo Playoff Simulation</div>
-          <div className="text-[10px] text-pitch-500 mt-0.5">
-            10,000 simulations · Elo-based win probability · Play-in tournament included
+          <div className="text-[10px] font-bold text-morphin-muted uppercase tracking-[3px]">Monte Carlo Playoff Simulation</div>
+          <div className="text-3xl font-display font-black text-morphin-text mt-1">
+            10,000 simulations · Elo-based win probability
           </div>
         </div>
         <div className="flex gap-1.5">
@@ -152,14 +152,13 @@ function PlayoffSimView({ data }) {
 
       {/* Stacked bar chart */}
       <motion.div variants={item} className="pm-card p-4 mb-4">
-        <div className="pm-label mb-1">Championship probability · top 16</div>
-        <div className="text-[10px] text-pitch-600 mb-3">Bars stacked: championship / finals / conf finals</div>
+        <div className="text-[10px] font-bold text-morphin-muted mb-4 uppercase tracking-[2px]">Championship probability · top 16</div>
         <div style={{ height: 200 }}>
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={chartData} barCategoryGap="18%">
-              <CartesianGrid strokeDasharray="3 3" stroke="#1e2a38" vertical={false} />
-              <XAxis dataKey="team" tick={{ fill: "#546480", fontSize: 10, fontFamily: "Bebas Neue, sans-serif" }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fill: "#546480", fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={v => `${v}%`} />
+              <CartesianGrid strokeDasharray="3 3" stroke="#e5e5e5" vertical={false} />
+              <XAxis dataKey="team" tick={{ fill: "#666666", fontSize: 10, fontWeight: "bold" }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fill: "#666666", fontSize: 10, fontWeight: "bold" }} axisLine={false} tickLine={false} tickFormatter={v => `${v}%`} />
               <RechartsTooltip {...tooltipStyle} formatter={(v, name) => [`${v.toFixed(1)}%`,
               name === "champ" ? "Championship" : name === "finals" ? "+ Finals" : "+ Conf Finals"]} />
               <Bar dataKey="conf" stackId="a" radius={[0, 0, 0, 0]}>
@@ -332,15 +331,15 @@ function FourFactorsView({ data }) {
   ];
   return (
     <motion.div variants={container} initial="hidden" animate="show">
-      <motion.div variants={item} className="pm-card p-4 mb-4">
-        <div className="pm-label mb-3">Net rating by team · Top 15</div>
+      <div className="pm-card p-8 mb-6">
+        <div className="text-[10px] font-bold text-morphin-muted mb-6 uppercase tracking-[2px]">Net rating by team · Top 15</div>
         <div style={{ height: 190 }}>
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={barData} barCategoryGap="22%">
-              <CartesianGrid strokeDasharray="3 3" stroke="#1e2a38" vertical={false} />
-              <XAxis dataKey="team" tick={{ fill: "#546480", fontSize: 10, fontFamily: "Bebas Neue, sans-serif" }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fill: "#546480", fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={v => `${v > 0 ? "+" : ""}${v}`} />
-              <ReferenceLine y={0} stroke="#2e3a50" strokeWidth={1} />
+              <CartesianGrid strokeDasharray="3 3" stroke="#e5e5e5" vertical={false} />
+              <XAxis dataKey="team" tick={{ fill: "#666666", fontSize: 10, fontWeight: "600" }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fill: "#666666", fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={v => `${v > 0 ? "+" : ""}${v}`} />
+              <ReferenceLine y={0} stroke="#e5e5e5" strokeWidth={1} />
               <RechartsTooltip {...tooltipStyle} formatter={v => [`${v > 0 ? "+" : ""}${v}`, "Net RTG"]} />
               <Bar dataKey="netRtg" radius={[4, 4, 0, 0]}>
                 {barData.map(e => <Cell key={e.team} fill={e.color} fillOpacity={0.85} />)}
@@ -480,12 +479,12 @@ function EloView({ data }) {
                   );
                 })}
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#1a2233" vertical={false} />
-              <XAxis dataKey="game" tick={{ fill: "#546480", fontSize: 10 }} axisLine={false} tickLine={false}
-                label={{ value: "Games", position: "insideBottomRight", offset: -4, fill: "#3d4f6a", fontSize: 9 }} />
-              <YAxis domain={["auto", "auto"]} tick={{ fill: "#546480", fontSize: 10 }} axisLine={false} tickLine={false} />
-              <ReferenceLine y={1500} stroke="#2e3a50" strokeDasharray="4 2" strokeWidth={1}
-                label={{ value: "avg", position: "right", fill: "#3d4f6a", fontSize: 9 }} />
+              <CartesianGrid strokeDasharray="3 3" stroke="#eeeeee" vertical={false} />
+              <XAxis dataKey="game" tick={{ fill: "#666666", fontSize: 10, fontWeight: "bold" }} axisLine={false} tickLine={false}
+                label={{ value: "Games", position: "insideBottomRight", offset: -4, fill: "#999999", fontSize: 9 }} />
+              <YAxis domain={["auto", "auto"]} tick={{ fill: "#666666", fontSize: 10, fontWeight: "bold" }} axisLine={false} tickLine={false} />
+              <ReferenceLine y={1500} stroke="#e5e5e5" strokeDasharray="4 2" strokeWidth={1}
+                label={{ value: "avg", position: "right", fill: "#999999", fontSize: 9 }} />
               <RechartsTooltip {...tooltipStyle} />
               {selectedTeams.map(team => {
                 const td = data.find(t => t.team === team);
@@ -566,11 +565,11 @@ function ShotQualityView({ data, isUsingFallback }) {
           <div style={{ height: 280 }}>
             <ResponsiveContainer width="100%" height="100%">
               <RadarChart data={primary.radar.map((r, i) => ({ ...r, compare: comparison?.radar[i]?.value ?? 0 }))}>
-                <PolarGrid stroke="#2e3a50" />
-                <PolarAngleAxis dataKey="factor" tick={{ fill: "#7d91ab", fontSize: 10 }} />
-                <PolarRadiusAxis angle={30} domain={[0, 100]} tick={{ fill: "#3d4f6a", fontSize: 9 }} axisLine={false} tickCount={4} />
-                <Radar name={primary.team} dataKey="value" stroke={primary.color} fill={primary.color} fillOpacity={0.2} strokeWidth={2} />
-                {comparison && <Radar name={comparison.team} dataKey="compare" stroke={comparison.color} fill={comparison.color} fillOpacity={0.1} strokeWidth={2} strokeDasharray="4 2" />}
+                <PolarGrid stroke="#e5e5e5" />
+                <PolarAngleAxis dataKey="factor" tick={{ fill: "#666666", fontSize: 10, fontWeight: "bold" }} />
+                <PolarRadiusAxis angle={30} domain={[0, 100]} tick={{ fill: "#999999", fontSize: 9 }} axisLine={false} tickCount={4} />
+                <Radar name={primary.team} dataKey="value" stroke={primary.color} fill={primary.color} fillOpacity={0.15} strokeWidth={2} />
+                {comparison && <Radar name={comparison.team} dataKey="compare" stroke={comparison.color} fill={comparison.color} fillOpacity={0.05} strokeWidth={2} strokeDasharray="4 2" />}
                 <RechartsTooltip {...tooltipStyle} formatter={v => [`${Number(v).toFixed(0)}`, ""]} />
               </RadarChart>
             </ResponsiveContainer>

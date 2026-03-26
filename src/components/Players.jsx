@@ -11,6 +11,11 @@ import { TEAM_COLORS, TEAM_NAMES } from "../data";
 import { useEnrichedPlayerStats, usePlayerSearch, usePlayerGameLog, prefetchPlayerGameLog } from "../api";
 import { signed, netRatingTier, debounce } from "../utils";
 import {
+  PremiumCard,
+  PremiumCardHeader,
+  PremiumCardTitle,
+  PremiumCardDescription,
+  PremiumCardContent,
   TileSkeleton,
   ErrorState,
   EmptyState,
@@ -23,6 +28,7 @@ import {
   MagneticButton
 } from "./ui";
 import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 
 const POSITIONS = ["", "PG", "SG", "SF", "PF", "C"];
 
@@ -70,23 +76,26 @@ function AttrBar({ label, value, max = 100, min = 0, invert = false, isSigned = 
   const bar = p >= 80 ? "bg-tier-elite" : p >= 65 ? "bg-tier-good" : p >= 50 ? "bg-tier-avg" : p >= 35 ? "bg-tier-poor" : "bg-tier-bad";
   const ease = { duration: 0.7, ease: [0.16, 1, 0.3, 1] };
   return (
-    <div className="flex items-center gap-2 mb-1.5">
-      <span className="text-[10px] text-pitch-400 w-14 flex-shrink-0">{label}</span>
-      <div className="flex-1 relative h-1.5 rounded-full bg-pitch-700 overflow-hidden">
-        <motion.div className={`absolute inset-y-0 left-0 rounded-full ${bar}`} initial={{ width: 0 }} animate={{ width: `${p}%` }} transition={{ ...ease, delay: 0.05 }} />
-        {cp !== null && <motion.div className="absolute inset-y-0 left-0 rounded-full opacity-35" style={{ background: compareColor || "#f59e0b" }} initial={{ width: 0 }} animate={{ width: `${cp}%` }} transition={{ ...ease, delay: 0.1 }} />}
+    <div className="flex items-center gap-3 mb-2.5 group">
+      <span className="text-[10px] font-bold text-morphin-muted w-14 flex-shrink-0 uppercase tracking-wider">{label}</span>
+      <div className="flex-1 relative h-2 rounded-full bg-morphin-ghost overflow-hidden border border-morphin-border/50">
+        <motion.div className={cn("absolute inset-y-0 left-0 rounded-full", bar)} initial={{ width: 0 }} animate={{ width: `${p}%` }} transition={{ ...ease, delay: 0.05 }} />
+        {cp !== null && <motion.div className="absolute inset-y-0 left-0 rounded-full opacity-40 border-r border-white/20" style={{ background: compareColor || "#000" }} initial={{ width: 0 }} animate={{ width: `${cp}%` }} transition={{ ...ease, delay: 0.1 }} />}
       </div>
-      <span className="font-mono text-[11px] text-pitch-200 w-8 text-right tabular-nums">{value}</span>
-      {compareValue != null && <span className="font-mono text-[11px] w-8 text-right tabular-nums" style={{ color: compareColor || "#f59e0b" }}>{compareValue}</span>}
+      <span className="font-display font-black text-xs text-morphin-text w-10 text-right tabular-nums">{value}</span>
+      {compareValue != null && <span className="font-display font-black text-xs w-10 text-right tabular-nums opacity-40" style={{ color: compareColor || "#000" }}>{compareValue}</span>}
     </div>
   );
 }
 
 function StatChip({ label, value, highlight }) {
   return (
-    <div className={`rounded-md p-2 text-center transition-colors ${highlight ? "bg-accent/10 border border-accent/20" : "bg-pitch-750 border border-pitch-650"}`}>
-      <div className={`font-mono font-semibold text-sm tabular-nums ${highlight ? "text-accent" : "text-pitch-100"}`}>{value ?? "—"}</div>
-      <div className="text-[9px] text-pitch-500 uppercase tracking-widest mt-0.5">{label}</div>
+    <div className={cn(
+      "rounded-2xl p-4 text-center transition-all border shadow-sm",
+      highlight ? "bg-black text-white border-black" : "bg-white border-morphin-border text-morphin-text hover:border-black"
+    )}>
+      <div className="font-display font-black text-2xl tabular-nums leading-none">{value ?? "—"}</div>
+      <div className={cn("text-[9px] font-bold uppercase tracking-[2px] mt-2", highlight ? "text-white/60" : "text-morphin-muted")}>{label}</div>
     </div>
   );
 }
@@ -128,7 +137,10 @@ function PlayerCard({ player, onCompare, comparePlayer, isComparing, sortKey, is
         <div ref={cardRef} tabIndex={0} role="button"
           aria-label={`${player.name}, ${player.pos}, ${player.team}. ${player.pts} pts, ${player.ast} ast, ${player.reb} reb.`}
           onKeyDown={onKey} onMouseEnter={handleMouseEnter}
-          className={`pm-tile transition-all outline-none focus-visible:ring-2 focus-visible:ring-accent/50 cursor-pointer ${isComparing ? "ring-1 ring-draw/40 bg-draw/5" : ""}`}>
+          className={cn(
+            "pm-tile p-4 transition-all outline-none focus-visible:ring-4 focus-visible:ring-black/5 cursor-pointer group",
+            isComparing && "border-black bg-black/[0.02]"
+          )}>
 
           <div className="p-3 flex items-center gap-3 min-w-0">
             <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 text-xs font-bold relative"
@@ -138,14 +150,14 @@ function PlayerCard({ player, onCompare, comparePlayer, isComparing, sortKey, is
             </div>
 
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-sm font-semibold text-pitch-100 truncate">{player.name}</span>
+              <div className="flex items-center gap-3 flex-wrap">
+                <span className="text-base font-black text-morphin-text truncate tracking-tight">{player.name}</span>
                 <TierBadge per={player.per} />
               </div>
-              <div className="text-[10px] text-pitch-400 mt-0.5 flex items-center gap-1.5">
-                <span className="font-mono font-medium" style={{ color: `${color}cc` }}>{player.team}</span>
-                <span className="text-pitch-600">·</span><span>{player.pos}</span>
-                {player.age && <><span className="text-pitch-600">·</span><span>Age {player.age}</span></>}
+              <div className="text-[10px] text-morphin-muted mt-1 flex items-center gap-2 font-bold uppercase tracking-widest">
+                <span style={{ color }}>{player.team}</span>
+                <span className="opacity-30">·</span><span>{player.pos}</span>
+                {player.age && <><span className="opacity-30">·</span><span>Age {player.age}</span></>}
               </div>
             </div>
 

@@ -4,15 +4,33 @@ export default {
     theme: {
         extend: {
             fontFamily: {
-                sans: ["DM Sans", "system-ui", "sans-serif"],
+                sans: ["Inter", "system-ui", "sans-serif"],
                 mono: ["DM Mono", "ui-monospace", "monospace"],
-                display: ["Bebas Neue", "sans-serif"],
+                display: ["Outfit", "sans-serif"],
             },
             fontSize: {
                 "2xs": ["0.625rem", { lineHeight: "0.875rem" }],
             },
             colors: {
-                // FM26-inspired deep navy-charcoal palette
+                // Morphin-inspired Crystal palette
+                morphin: {
+                    base: "#ffffff",
+                    ghost: "#f9f9f9",
+                    border: "#e5e5e5",
+                    text: "#0a0a0a",
+                    muted: "#666666",
+                    accent: "#000000",
+                },
+                // Keep status colors but make them more vibrant for light mode
+                win: {
+                    DEFAULT: "#10b981",
+                    muted: "rgba(16,185,129,0.1)",
+                },
+                loss: {
+                    DEFAULT: "#f43f5e",
+                    muted: "rgba(244,63,94,0.1)",
+                },
+                // ... other colors remain or are adjusted via HSL ...
                 pitch: {
                     950: "#06070a",   // deepest void
                     900: "#0a0b0d",   // main background
@@ -49,51 +67,6 @@ export default {
                     "20": "rgba(0,212,170,0.20)",
                     "30": "rgba(0,212,170,0.30)",
                 },
-                // Status colors — expanded with muted variants
-                win: {
-                    DEFAULT: "#22c55e",
-                    bright: "#4ade80",
-                    dim: "#16a34a",
-                    muted: "rgba(34,197,94,0.12)",
-                    "10": "rgba(34,197,94,0.10)",
-                    "20": "rgba(34,197,94,0.20)",
-                    "30": "rgba(34,197,94,0.30)",
-                },
-                loss: {
-                    DEFAULT: "#ef4444",
-                    bright: "#f87171",
-                    dim: "#dc2626",
-                    muted: "rgba(239,68,68,0.10)",
-                    "10": "rgba(239,68,68,0.10)",
-                    "20": "rgba(239,68,68,0.20)",
-                    "30": "rgba(239,68,68,0.30)",
-                },
-                draw: {
-                    DEFAULT: "#f59e0b",
-                    bright: "#fbbf24",
-                    dim: "#d97706",
-                    muted: "rgba(245,158,11,0.12)",
-                    "10": "rgba(245,158,11,0.10)",
-                    "20": "rgba(245,158,11,0.20)",
-                    "30": "rgba(245,158,11,0.30)",
-                },
-                // Performance tier colors (FM attribute style)
-                tier: {
-                    elite: "#00d4aa",
-                    good: "#4ade80",
-                    avg: "#facc15",
-                    poor: "#f97316",
-                    bad: "#ef4444",
-                },
-                // Chart/team palette extras
-                chart: {
-                    1: "#00d4aa",
-                    2: "#818cf8",
-                    3: "#f59e0b",
-                    4: "#f87171",
-                    5: "#34d399",
-                    6: "#a78bfa",
-                },
             },
             spacing: {
                 "0.5": "2px",
@@ -108,12 +81,13 @@ export default {
                 "30": "120px",
             },
             borderRadius: {
-                "sm": "4px",
-                "md": "6px",
-                "lg": "8px",
-                "xl": "12px",
-                "2xl": "16px",
-                "3xl": "20px",
+                "sm": "8px",
+                "md": "12px",
+                "lg": "16px",
+                "xl": "20px",
+                "2xl": "24px",
+                "3xl": "32px",
+                "4xl": "40px",
             },
             boxShadow: {
                 "tile": "0 1px 3px rgba(0,0,0,0.4), 0 1px 2px rgba(0,0,0,0.3)",

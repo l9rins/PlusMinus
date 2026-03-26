@@ -226,7 +226,7 @@ function AppInner() {
   const activeTab = ROUTE_META[location.pathname]?.tab || "dashboard";
 
   return (
-    <div className="min-h-screen bg-pitch-900">
+    <div className="min-h-screen">
       <SignedOut>
         <main role="main" className="min-h-screen flex items-center justify-center">
           <div className="text-center mb-8">

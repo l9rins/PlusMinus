@@ -8,29 +8,15 @@ const badgeVariants = cva(
     variants: {
       variant: {
         default:
-          "border-pitch-600/50 bg-pitch-800 text-pitch-300",
+          "border-morphin-border bg-morphin-ghost text-morphin-muted uppercase tracking-[1.2px]",
         win:
-          "border-win/25 bg-win/8 text-win",
+          "border-win/20 bg-win/8 text-win uppercase tracking-[1.2px]",
         loss:
-          "border-loss/25 bg-loss/8 text-loss",
-        draw:
-          "border-draw/25 bg-draw/8 text-draw",
+          "border-loss/20 bg-loss/8 text-loss uppercase tracking-[1.2px]",
         accent:
-          "border-accent/25 bg-accent/8 text-accent",
-        elite:
-          "border-tier-elite/30 bg-tier-elite/8 text-tier-elite",
-        good:
-          "border-tier-good/30 bg-tier-good/8 text-tier-good",
-        avg:
-          "border-tier-avg/30 bg-tier-avg/8 text-tier-avg",
-        poor:
-          "border-tier-poor/30 bg-tier-poor/8 text-tier-poor",
-        bad:
-          "border-tier-bad/30 bg-tier-bad/8 text-tier-bad",
-        live:
-          "border-win/25 bg-win/8 text-win gap-1",
+          "border-morphin-accent/20 bg-morphin-accent/8 text-morphin-accent uppercase tracking-[1.2px]",
         outline:
-          "border-pitch-600 text-pitch-400",
+          "border-morphin-border text-morphin-muted",
       },
     },
     defaultVariants: {

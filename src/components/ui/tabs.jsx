@@ -8,7 +8,7 @@ const TabsList = React.forwardRef(({ className, ...props }, ref) => (
   <TabsPrimitive.List
     ref={ref}
     className={cn(
-      "inline-flex items-center gap-1 rounded-md bg-pitch-850 border border-pitch-700/50 p-0.5",
+      "inline-flex h-9 items-center justify-center rounded-lg bg-morphin-ghost p-1 text-morphin-muted",
       className
     )}
     {...props}
@@ -20,15 +20,7 @@ const TabsTrigger = React.forwardRef(({ className, ...props }, ref) => (
   <TabsPrimitive.Trigger
     ref={ref}
     className={cn(
-      "inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3.5 py-1.5",
-      "text-[11px] font-medium uppercase tracking-[1.5px] text-pitch-500",
-      "transition-all duration-150 ease-[cubic-bezier(0.16,1,0.3,1)]",
-      "hover:text-pitch-300",
-      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50",
-      "disabled:pointer-events-none disabled:opacity-50",
-      "data-[state=active]:bg-pitch-750 data-[state=active]:text-pitch-50",
-      "data-[state=active]:border data-[state=active]:border-pitch-600/50",
-      "data-[state=active]:shadow-sm",
+      "inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1 text-xs font-display font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-white data-[state=active]:text-morphin-text data-[state=active]:shadow-sm",
       className
     )}
     {...props}

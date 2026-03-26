@@ -21,6 +21,14 @@ import {
   calcPropHitRate, hitRateTier
 } from "../utils";
 import { TileSkeleton, RowSkeleton, ErrorState, FreshnessTag, EmptyState, useToast, TeamLink, CalibrationCurve } from "./ui";
+import { 
+  PremiumCard, 
+  PremiumCardHeader, 
+  PremiumCardTitle, 
+  PremiumCardDescription, 
+  PremiumCardContent 
+} from "./ui/premium-card";
+import { Badge } from "./ui/badge";
 import { useAlerts } from "../hooks/useAlerts";
 import GameWinProb from "./GameWinProb";
 
@@ -139,8 +147,8 @@ export function Scores() {
     <motion.div variants={container} initial="hidden" animate="show" exit={{ opacity: 0, y: -4 }}>
       <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
         <div>
-          <div className="pm-label">{today}</div>
-          <div className="text-[11px] text-pitch-500 mt-0.5">{games.length} games</div>
+          <div className="text-[10px] font-bold text-morphin-muted uppercase tracking-[3px]">{today}</div>
+          <div className="text-3xl font-display font-black text-morphin-text mt-1">{games.length} Games Scheduled</div>
         </div>
         <div className="flex items-center gap-2">
           {oddsData?.stale && <span className="text-[9px] text-draw/70 hidden sm:inline-block border border-draw/30 bg-draw/10 px-1.5 py-0.5 rounded cursor-help">Stale Odds</span>}
@@ -159,18 +167,22 @@ export function Scores() {
           <button
             key={f.id}
             onClick={() => handleFilter(f.id)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-medium transition-all
-              ${filter === f.id
-                ? "bg-accent/15 text-accent border border-accent/30"
-                : "bg-pitch-800 text-pitch-400 border border-pitch-600 hover:border-pitch-500 hover:text-pitch-300"}`}
+            className={cn(
+               "flex items-center gap-2 px-4 py-2 rounded-full text-[11px] font-bold tracking-widest uppercase transition-all",
+               filter === f.id
+                 ? "bg-black text-white shadow-lg"
+                 : "bg-white border border-morphin-border text-morphin-muted hover:border-black hover:text-black"
+            )}
           >
             {f.dot && counts.live > 0 && (
-              <span className="w-1.5 h-1.5 rounded-full bg-win animate-live-pulse" />
+              <span className="w-1.5 h-1.5 rounded-full bg-win animate-pulse" />
             )}
             {f.label}
             {counts[f.id] > 0 && (
-              <span className={`text-[10px] px-1.5 py-0.5 rounded-full
-                ${filter === f.id ? "bg-accent/20 text-accent" : "bg-pitch-700 text-pitch-500"}`}>
+              <span className={cn(
+                "text-[9px] px-1.5 py-0.5 rounded-full font-black",
+                filter === f.id ? "bg-white/20 text-white" : "bg-morphin-ghost text-morphin-muted"
+              )}>
                 {counts[f.id]}
               </span>
             )}
@@ -195,35 +207,31 @@ export function Scores() {
           {filtered.map(g => {
             const isSelected = selected === g.id;
             return (
-              <motion.div
+              <PremiumCard
                 key={g.id}
-                variants={item}
                 layout
                 onClick={() => setSelected(isSelected ? null : g.id)}
-                className={`pm-tile p-4 ${isSelected ? "pm-accent-border" : ""}`}
+                className={cn(
+                  "p-6 cursor-pointer group",
+                  isSelected && "border-black shadow-xl"
+                )}
               >
-                {/* Header */}
-                <div className="flex justify-between items-center mb-3">
-                  <span className="pm-label">{g.time}</span>
-                  <div className="flex items-center gap-1.5">
+                <div className="flex justify-between items-center mb-6">
+                  <span className="text-[10px] font-bold text-morphin-muted uppercase tracking-[2px]">{g.time}</span>
+                  <div className="flex items-center gap-2">
                     {g.isFinal && (
-                      <span className="pm-badge bg-pitch-700 text-pitch-400 border border-pitch-600">Final</span>
+                      <Badge variant="secondary">Final</Badge>
                     )}
                     {g.isLive && (
-                      <span className="pm-badge bg-win/10 text-win border border-win/20 flex items-center gap-1">
-                        <span className="w-1.5 h-1.5 rounded-full bg-win animate-live-pulse inline-block" />
-                        {g.period ? `Q${g.period}` : "Live"}
-                      </span>
+                      <Badge variant="destructive" className="animate-pulse">Live</Badge>
                     )}
                     {g.status === "scheduled" && (
-                      <span className="pm-badge bg-pitch-750 text-pitch-400 border border-pitch-600">
-                        {g.spread !== "—" ? g.spread : "Tonight"}
-                      </span>
+                      <Badge variant="outline">Upcoming</Badge>
                     )}
                     {g.isArb && (
-                      <span className="pm-badge bg-win/15 text-win border border-win/30 flex items-center gap-0.5">
-                        <Zap size={8} /> ARB
-                      </span>
+                      <Badge variant="accent" className="flex items-center gap-1">
+                        <Zap size={10} /> ARB
+                      </Badge>
                     )}
                   </div>
                 </div>
@@ -368,7 +376,7 @@ export function Scores() {
                     </motion.div>
                   )}
                 </AnimatePresence>
-              </motion.div>
+              </PremiumCard>
             );
           })}
         </div>
@@ -438,11 +446,16 @@ export function Standings() {
   return (
     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
       <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-        <div className="flex gap-1.5">
+        <div className="flex gap-2">
           {[["east", "Eastern"], ["west", "Western"]].map(([id, label]) => (
             <button key={id} onClick={() => handleConf(id)}
-              className={`pm-tab ${conf === id ? "active" : ""}`}>
-              {label} Conference
+              className={cn(
+                "px-6 py-2.5 rounded-full text-xs font-bold tracking-widest uppercase transition-all",
+                conf === id 
+                  ? "bg-black text-white shadow-lg" 
+                  : "bg-white border border-morphin-border text-morphin-muted hover:border-black hover:text-black"
+              )}>
+              {label}
             </button>
           ))}
         </div>
@@ -452,10 +465,10 @@ export function Standings() {
       {isError ? (
         <ErrorState message="Couldn't load standings." onRetry={refetch} type="network" />
       ) : isLoading ? (
-        <div className="pm-card p-4"><RowSkeleton rows={15} /></div>
+        <div className="p-4"><RowSkeleton rows={15} /></div>
       ) : (
         <>
-          <div className="pm-card overflow-x-auto">
+          <div className="bg-white border border-morphin-border rounded-[2.5rem] overflow-hidden shadow-sm">
             <table className="w-full text-sm min-w-[700px]">
               <thead>
                 <tr className="border-b border-pitch-700">
@@ -693,41 +706,37 @@ export function Betting() {
         </motion.div>
       )}
 
-      {/* Edge cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-5">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-10">
         {displayCards.map((g, idx) => {
           const diff = isLive ? g.diff : (g.modelP - g.impliedP);
           const edge = g.edge;
           const isExpanded  = expandedCard === idx;
-          const favColor    = TEAM_COLORS[g.fav] || "#546480";
+          const favColor    = TEAM_COLORS[g.fav] || "#000000";
 
           const edgeMeta = {
-            high: { label: "★ HIGH EDGE", cls: "text-win border-win/30 bg-win/10" },
-            mid:  { label: "MOD EDGE",    cls: "text-draw border-draw/30 bg-draw/10" },
-            low:  { label: "SMALL",       cls: "text-pitch-400 border-pitch-600 bg-pitch-750" },
-            none: { label: "N/A",         cls: "text-pitch-600 border-pitch-700 bg-pitch-800" },
-          }[edge] || { label: "LOW", cls: "text-pitch-400 border-pitch-600 bg-pitch-750" };
+            high: { label: "High Edge", variant: "win" },
+            mid:  { label: "Med Edge", variant: "default" },
+            low:  { label: "Low", variant: "outline" },
+            none: { label: "N/A", variant: "outline" },
+          }[edge] || { label: "Low", variant: "outline" };
 
           return (
-            <motion.div key={g.matchup + idx} variants={item} className="pm-tile p-4">
+            <PremiumCard key={g.matchup + idx} className="p-8">
               {/* Arb Calculator */}
               {g.isArb && <ArbCalculator game={g} />}
 
-              {/* Card header */}
-              <div className="flex items-start justify-between mb-3">
+              <div className="flex items-start justify-between mb-8">
                 <div className="min-w-0">
-                  <div className="text-sm font-semibold text-pitch-100 truncate">{g.matchup}</div>
-                  <div className="text-[10px] text-pitch-500 mt-0.5 flex items-center gap-1.5">
+                  <div className="text-lg font-black text-morphin-text truncate tracking-tight">{g.matchup}</div>
+                  <div className="text-[10px] text-morphin-muted mt-1.5 flex items-center gap-2 font-bold uppercase tracking-widest">
                     <span>Fav:</span>
-                    <span className="font-medium" style={{ color: favColor }}>{g.fav}</span>
+                    <span className="text-black" style={{ color: favColor }}>{g.fav}</span>
                     {g.bookCount > 0 && (
-                      <span className="text-pitch-700">· {g.bookCount} books</span>
+                      <span className="opacity-40">· {g.bookCount} books</span>
                     )}
                   </div>
                 </div>
-                <span className={`pm-badge border ml-2 flex-shrink-0 ${edgeMeta.cls}`}>
-                  {edgeMeta.label}
-                </span>
+                <Badge variant={edgeMeta.variant}>{edgeMeta.label}</Badge>
               </div>
 
               {/* Stats */}
@@ -888,11 +897,11 @@ export function Betting() {
               )}
 
               {/* Footer */}
-              <div className="border-t border-pitch-700 pt-2.5 mt-2.5 flex justify-between text-[10px] text-pitch-500">
+              <div className="border-t border-morphin-border pt-4 mt-4 flex justify-between text-[10px] font-bold text-morphin-muted uppercase tracking-wider">
                 <span>{g.spread}</span>
                 <span>O/U {g.total}</span>
               </div>
-            </motion.div>
+            </PremiumCard>
           );
         })}
       </div>

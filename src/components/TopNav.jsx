@@ -5,10 +5,11 @@ import {
   LayoutDashboard, Users, BarChart3, Target,
   TrendingUp, Activity, ChevronDown, Search, Bell,
   Settings, X, Menu, Zap, ChevronRight, Sun, Moon,
-  GitCompare, BarChart2, Coins,
+  GitCompare, BarChart2, Coins, ArrowRight,
 } from "lucide-react";
 import { UserButton } from "@clerk/clerk-react";
 import { useTodayGames, useOdds } from "../api";
+import { cn } from "../lib/utils";
 
 // ── Nav definition ────────────────────────────────────────────────
 const NAV_ITEMS = [
@@ -51,7 +52,6 @@ const NAV_ITEMS = [
       { label: "Playoff Sim", path: "/analytics?tab=playoff", desc: "Monte Carlo bracket odds" },
     ],
   },
-  // ← NEW: Head-to-Head comparison page
   {
     label: "Compare", icon: GitCompare, path: "/compare",
     sub: [
@@ -66,39 +66,35 @@ const NAV_ITEMS = [
       { label: "Global Ranking", path: "/paper", desc: "Compete with users & model" },
     ],
   },
-  // { label: "History",   icon: BarChart2,  path: "/history", sub: null },  // coming soon
-  // { label: "Live Feed", icon: PlayCircle, path: "/pbp",     sub: null },  // coming soon
 ];
 
 // ── Sub-dropdown ──────────────────────────────────────────────────
 function SubMenu({ item, onNavigate, onClose }) {
   return (
     <motion.div
-      initial={{ opacity: 0, y: -6, scale: 0.97 }}
+      initial={{ opacity: 0, y: 10, scale: 0.98 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, y: -6, scale: 0.97 }}
-      transition={{ duration: 0.14, ease: [0.25, 0.46, 0.45, 0.94] }}
-      className="absolute top-full left-0 mt-1.5 min-w-[220px] z-50
-                 bg-pitch-800 border border-pitch-600 rounded-xl py-1.5
-                 shadow-card-lg overflow-hidden"
+      exit={{ opacity: 0, y: 10, scale: 0.98 }}
+      transition={{ duration: 0.2, ease: "easeOut" }}
+      className="absolute top-full left-0 mt-2 min-w-[280px] z-50
+                 bg-white border border-morphin-border rounded-2xl py-2
+                 shadow-[0_20px_50px_rgba(0,0,0,0.1)] overflow-hidden"
     >
-      <div className="absolute -top-1.5 left-4 w-3 h-3 bg-pitch-800
-                      border-l border-t border-pitch-600 rotate-45" />
       {item.sub.map((sub) => (
         <button
           key={sub.label}
           onClick={() => { onNavigate(sub.path); onClose(); }}
-          className="w-full text-left px-3 py-2.5 flex items-start gap-3
-                     hover:bg-pitch-750 transition-colors group"
+          className="w-full text-left px-5 py-3.5 flex items-start gap-4
+                     hover:bg-morphin-ghost transition-all group"
         >
-          <div className="w-1 h-1 rounded-full bg-pitch-500 group-hover:bg-accent
-                          mt-1.5 flex-shrink-0 transition-colors" />
+          <div className="w-1.5 h-1.5 rounded-full bg-morphin-border group-hover:bg-morphin-accent
+                          mt-2 flex-shrink-0 transition-colors" />
           <div>
-            <div className="text-xs font-medium text-pitch-200 group-hover:text-pitch-50 transition-colors">
+            <div className="text-sm font-semibold text-morphin-text group-hover:text-black transition-colors">
               {sub.label}
             </div>
             {sub.desc && (
-              <div className="text-[10px] text-pitch-500 mt-0.5">{sub.desc}</div>
+              <div className="text-[11px] text-morphin-muted mt-0.5 leading-relaxed">{sub.desc}</div>
             )}
           </div>
         </button>
@@ -120,80 +116,62 @@ function MobileDrawer({ open, onClose, activePath, onNavigate }) {
         <>
           <motion.div
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="fixed inset-0 bg-pitch-900/80 backdrop-blur-sm z-40"
+            className="fixed inset-0 bg-black/20 backdrop-blur-sm z-[100]"
             onClick={onClose}
           />
           <motion.div
             initial={{ x: "-100%" }} animate={{ x: 0 }} exit={{ x: "-100%" }}
-            transition={{ duration: 0.25, ease: [0.25, 0.46, 0.45, 0.94] }}
-            className="fixed top-0 left-0 bottom-0 w-72 z-50
-                       bg-pitch-850 border-r border-pitch-600 flex flex-col shadow-card-lg"
+            transition={{ type: "spring", damping: 25, stiffness: 200 }}
+            className="fixed top-0 left-0 bottom-0 w-80 z-[101] bg-white border-r border-morphin-border flex flex-col shadow-2xl"
           >
-            <div className="flex items-center justify-between px-4 h-14 border-b border-pitch-700">
+            <div className="flex items-center justify-between px-6 h-20 border-b border-morphin-border">
               <div className="flex items-center gap-2">
-                <span className="font-display text-2xl tracking-widest text-accent">±</span>
-                <div>
-                  <div className="font-display text-lg tracking-[3px] text-pitch-50">PLUSMINUS</div>
-                  <div className="text-[8px] tracking-[2px] text-pitch-500 uppercase">NBA Analytics</div>
-                </div>
+                <span className="font-display text-3xl font-bold text-morphin-accent">±</span>
+                <span className="font-display text-xl font-bold tracking-widest text-morphin-text uppercase">PlusMinus</span>
               </div>
-              <button onClick={onClose}
-                className="w-8 h-8 flex items-center justify-center rounded-md text-pitch-400
-                           hover:text-pitch-200 hover:bg-pitch-700 transition-colors">
-                <X size={16} strokeWidth={1.8} />
+              <button onClick={onClose} className="p-2 hover:bg-morphin-ghost rounded-full transition-colors">
+                <X size={20} className="text-morphin-muted" />
               </button>
             </div>
 
-            <nav className="flex-1 overflow-y-auto py-3 px-2">
+            <nav className="flex-1 overflow-y-auto py-6 px-4 space-y-1">
               {NAV_ITEMS.map((item) => {
                 const Icon = item.icon;
-                const isActive = activePath === item.path ||
-                  (item.path === "/betting" && activePath === "/tracker");
+                const isActive = activePath === item.path;
                 return (
-                  <div key={item.path} className="mb-1">
+                  <div key={item.path}>
                     <button
-                      onClick={() => { onNavigate(item.path); onClose(); }}
-                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg
-                        text-sm font-medium transition-all
-                        ${isActive
-                          ? "bg-accent/10 text-accent border border-accent/20"
-                          : "text-pitch-300 hover:text-pitch-100 hover:bg-pitch-700"}`}
+                      onClick={() => !item.sub && onNavigate(item.path)}
+                      className={cn(
+                        "w-full flex items-center justify-between px-4 py-3.5 rounded-xl text-sm font-semibold transition-all group",
+                        isActive 
+                          ? "bg-morphin-accent text-white shadow-lg" 
+                          : "text-morphin-muted hover:bg-morphin-ghost hover:text-morphin-text"
+                      )}
                     >
-                      <Icon size={16} strokeWidth={1.8} />
-                      {item.label}
+                      <div className="flex items-center gap-4">
+                        <Icon size={18} strokeWidth={2.5} />
+                        {item.label}
+                      </div>
+                      {item.sub && <ChevronDown size={14} className="opacity-50" />}
                     </button>
                     {item.sub && (
-                      <div className="mt-0.5 ml-4 border-l border-pitch-700 pl-3 space-y-0.5">
-                        {item.sub.map((sub) => (
-                          <button key={sub.label}
-                            onClick={() => { onNavigate(sub.path); onClose(); }}
-                            className={`w-full text-left px-2 py-1.5 rounded-md text-[11px]
-                              transition-colors ${activePath === sub.path || (sub.path.startsWith(activePath) && sub.path.includes("?"))
-                                ? "text-accent" : "text-pitch-400 hover:text-pitch-200"}`}
-                          >
-                            {sub.label}
-                          </button>
-                        ))}
-                      </div>
+                       <div className="ml-10 mt-1 space-y-1">
+                         {item.sub.map(sub => (
+                           <button 
+                             key={sub.label}
+                             onClick={() => { onNavigate(sub.path); onClose(); }}
+                             className="w-full text-left py-2 px-3 text-[13px] text-morphin-muted hover:text-morphin-accent transition-colors font-medium border-l border-morphin-border"
+                           >
+                             {sub.label}
+                           </button>
+                         ))}
+                       </div>
                     )}
                   </div>
                 );
               })}
             </nav>
-
-            <div className="px-4 py-3 border-t border-pitch-700">
-              <div className="pm-label mb-2">Keyboard shortcuts</div>
-              <div className="grid grid-cols-2 gap-1">
-                {[["D", "Dashboard"], ["S", "Scores"], ["L", "Live Feed"], ["P", "Players"], ["B", "Betting"], ["T", "Tracker"], ["A", "Analytics"], ["C", "Compare"], ["H", "History"]].map(([k, t]) => (
-                  <div key={k} className="flex items-center gap-2 text-[10px] text-pitch-500">
-                    <kbd className="bg-pitch-700 border border-pitch-600 rounded px-1.5 py-0.5
-                                    font-mono text-pitch-300">{k}</kbd>
-                    <span>{t}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
           </motion.div>
         </>
       )}
@@ -202,7 +180,7 @@ function MobileDrawer({ open, onClose, activePath, onNavigate }) {
 }
 
 // ── Main TopNav ───────────────────────────────────────────────────
-export default function TopNav({ activeTab, onTabChange }) {
+export default function TopNav() {
   const navigate = useNavigate();
   const location = useLocation();
   const [hoveredItem, setHoveredItem] = useState(null);
@@ -210,102 +188,35 @@ export default function TopNav({ activeTab, onTabChange }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [mobileOpen, setMobileOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
-  const [isLight, setIsLight] = useState(false);
-  const timeoutRef = useRef(null);
+  const [isLight, setIsLight] = useState(true);
   const searchInputRef = useRef(null);
 
   const { data: games } = useTodayGames();
   const { data: oddsData } = useOdds();
 
-  // FIX: Only refetch aggressively when there are live games.
-  // Previously refetchInterval was always 60s, hitting ESPN even on off-nights.
-  // useTodayGames already sets refetchInterval:60s internally — this comment
-  // is a reminder: to gate it properly you'd pass a custom refetchInterval
-  // based on liveCount into a wrapper hook. For now the existing behaviour is
-  // documented so the next developer knows where to add the gate.
-  const liveCount = (games || []).filter(g => g.status === "live").length;
-
   const notifications = useMemo(() => {
     const items = [];
-
-    // Live games
-    (games || [])
-      .filter(g => g.status === "live")
-      .forEach(g => items.push({
-        id: `live-${g.id}`,
-        icon: Activity,
-        text: `${g.away} @ ${g.home} — Q${g.period} · ${g.awayScore}–${g.homeScore}`,
-        time: "Live",
-        color: "text-win",
-        action: () => { navigate("/scores"); setNotifOpen(false); }
-      }));
-
-    // High-edge bets from real odds
-    const odds = oddsData?.data || oddsData;
-    if (odds) {
-      Object.entries(odds)
-        .map(([key, o]) => {
-          const [away, home] = key.split("@");
-          const favIsHome = o.homeP >= o.awayP;
-          const edge = (favIsHome ? o.homeP : o.awayP) - (favIsHome ? o.consHomeP : o.consAwayP);
-          return { away, home, edge, fav: favIsHome ? home : away };
-        })
-        .filter(g => g.edge >= 8)
-        .forEach(g => items.push({
-          id: `edge-${g.away}-${g.home}`,
-          icon: TrendingUp,
-          text: `High edge detected: ${g.fav} in ${g.away} @ ${g.home} (+${g.edge.toFixed(1)}%)`,
-          time: "Now",
-          color: "text-win",
-          action: () => { navigate("/betting"); setNotifOpen(false); }
-        }));
-    }
-
-    // Upcoming games
-    (games || [])
-      .filter(g => g.status === "scheduled")
-      .forEach(g => items.push({
-        id: `sched-${g.id}`,
-        icon: Zap,
-        text: `${g.away} @ ${g.home} tips off at ${g.time}`,
-        time: "Tonight",
-        color: "text-accent",
-        action: () => { navigate("/scores"); setNotifOpen(false); }
-      }));
-
+    (games || []).filter(g => g.status === "live").forEach(g => items.push({
+      id: `live-${g.id}`,
+      icon: Activity,
+      text: `${g.away} @ ${g.home} — Q${g.period}`,
+      time: "Live",
+      color: "text-win",
+      action: () => { navigate("/scores"); setNotifOpen(false); }
+    }));
     return items.slice(0, 5);
-  }, [games, oddsData, navigate]);
+  }, [games, navigate]);
 
-  useEffect(() => {
-    if (localStorage.getItem("pm-theme") === "light") {
-      document.documentElement.classList.add("light");
-      setIsLight(true);
-    }
-  }, []);
-
-  const toggleTheme = () => {
-    const next = !isLight;
-    setIsLight(next);
-    document.documentElement.classList.toggle("light", next);
-    if (next) localStorage.setItem("pm-theme", "light");
-    else localStorage.removeItem("pm-theme");
-  };
-
-  useEffect(() => () => clearTimeout(timeoutRef.current), []);
-
-  // "/" opens search
+  // Keyboard shortcuts
   useEffect(() => {
     const handler = (e) => {
-      const tag = e.target.tagName.toLowerCase();
-      if (tag === "input" || tag === "textarea" || tag === "select") return;
+      if (["input", "textarea", "select"].includes(e.target.tagName.toLowerCase())) return;
       if (e.key === "/" && !searchOpen) {
         e.preventDefault();
         setSearchOpen(true);
-        setTimeout(() => searchInputRef.current?.focus(), 50);
       }
       if (e.key === "Escape") {
         setSearchOpen(false);
-        setSearchQuery("");
         setNotifOpen(false);
       }
     };
@@ -313,114 +224,61 @@ export default function TopNav({ activeTab, onTabChange }) {
     return () => window.removeEventListener("keydown", handler);
   }, [searchOpen]);
 
-  const handleMouseEnter = useCallback((path) => {
-    clearTimeout(timeoutRef.current);
-    setHoveredItem(path);
-  }, []);
-
-  const handleMouseLeave = useCallback(() => {
-    timeoutRef.current = setTimeout(() => setHoveredItem(null), 130);
-  }, []);
-
-  const handlePathNavigate = useCallback((path) => {
-    navigate(path);
-  }, [navigate]);
-
-  const handleSearchKey = (e) => {
-    if (e.key === "Escape") { setSearchOpen(false); setSearchQuery(""); }
-    if (e.key === "Enter" && searchQuery.trim()) {
-      onTabChange("players", searchQuery.trim());
-      setSearchOpen(false);
-      setSearchQuery("");
-    }
-  };
-
-  const toggleSearch = () => {
-    const next = !searchOpen;
-    setSearchOpen(next);
-    if (next) setTimeout(() => searchInputRef.current?.focus(), 60);
-    else setSearchQuery("");
-  };
-
   return (
     <>
       <MobileDrawer
         open={mobileOpen}
         onClose={() => setMobileOpen(false)}
         activePath={location.pathname}
-        onNavigate={handlePathNavigate}
+        onNavigate={path => navigate(path)}
       />
 
-      <nav
-        className="sticky top-0 z-50 border-b border-pitch-600 glass-strong"
-        role="navigation"
-        aria-label="Main navigation"
-      >
-        <div className="max-w-[1400px] mx-auto px-4">
-          <div className="flex items-center h-12 gap-1">
-            {/* Mobile menu */}
-            <button
-              onClick={() => setMobileOpen(true)}
-              className="pm-nav-btn lg:hidden mr-1 flex-shrink-0"
-              aria-label="Open menu"
-            >
-              <Menu size={16} strokeWidth={1.8} />
-            </button>
-
-            {/* Logo */}
+      <nav className="sticky top-0 z-50 h-20 bg-white/80 backdrop-blur-xl border-b border-morphin-border flex items-center px-8">
+        <div className="max-w-[1600px] w-full mx-auto flex items-center justify-between">
+          
+          {/* Left: Logo & Nav */}
+          <div className="flex items-center gap-10">
             <button
               onClick={() => navigate("/")}
-              className="flex items-center gap-2 mr-3 flex-shrink-0 group"
-              aria-label="PlusMinus — dashboard"
+              className="flex items-center gap-3 active:scale-95 transition-transform"
             >
-              <span className="font-display text-2xl tracking-widest text-accent
-                               group-hover:text-accent-hover transition-colors leading-none">
-                ±
-              </span>
-              <div className="hidden sm:block">
-                <div className="font-display text-lg tracking-[3px] text-pitch-50
-                                group-hover:text-white transition-colors leading-none">
-                  PLUSMINUS
-                </div>
-                <div className="text-[8px] tracking-[2px] text-pitch-500 uppercase">NBA Analytics</div>
+              <div className="w-10 h-10 rounded-xl bg-black flex items-center justify-center shadow-2xl">
+                <span className="font-display text-2xl font-bold text-white">±</span>
               </div>
+              <span className="font-display text-xl font-bold tracking-widest text-morphin-text uppercase hidden md:block">PlusMinus</span>
             </button>
 
-            <div className="w-px h-5 bg-pitch-700 mx-1 hidden lg:block flex-shrink-0" />
-
-            {/* Desktop nav */}
-            <div className="hidden lg:flex items-center flex-1 overflow-x-auto scrollbar-none gap-0.5">
+            <div className="hidden lg:flex items-center gap-2">
               {NAV_ITEMS.map((item) => {
                 const Icon = item.icon;
-                const isActive = location.pathname === item.path ||
-                  (item.path === "/betting" && location.pathname === "/tracker");
+                const isActive = location.pathname === item.path || (item.path !== "/" && location.pathname.startsWith(item.path));
                 const isHovered = hoveredItem === item.path;
 
                 return (
                   <div
                     key={item.path}
-                    className="relative flex-shrink-0"
-                    onMouseEnter={() => item.sub && handleMouseEnter(item.path)}
-                    onMouseLeave={item.sub ? handleMouseLeave : undefined}
+                    className="relative"
+                    onMouseEnter={() => setHoveredItem(item.path)}
+                    onMouseLeave={() => setHoveredItem(null)}
                   >
                     <button
-                      onClick={() => navigate(item.path)}
-                      className={`pm-nav-btn ${isActive ? "active" : ""}`}
-                      aria-current={isActive ? "page" : undefined}
-                    >
-                      <Icon size={13} strokeWidth={1.8} />
-                      <span className="text-[12px] font-medium">{item.label}</span>
-                      {item.sub && (
-                        <ChevronDown size={10} strokeWidth={2}
-                          className={`transition-transform duration-150 ${isHovered ? "rotate-180" : ""}`} />
+                      onClick={() => !item.sub && navigate(item.path)}
+                      className={cn(
+                        "flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-semibold transition-all",
+                        isActive 
+                          ? "bg-morphin-ghost text-black" 
+                          : "text-morphin-muted hover:bg-morphin-ghost hover:text-morphin-text"
                       )}
+                    >
+                      <span>{item.label}</span>
+                      {item.sub && <ChevronDown size={14} className={cn("transition-transform", isHovered && "rotate-180")} />}
                     </button>
 
                     <AnimatePresence>
                       {isHovered && item.sub && (
                         <SubMenu
                           item={item}
-                          onNavigate={handlePathNavigate}
+                          onNavigate={navigate}
                           onClose={() => setHoveredItem(null)}
                         />
                       )}
@@ -429,172 +287,131 @@ export default function TopNav({ activeTab, onTabChange }) {
                 );
               })}
             </div>
+          </div>
 
-            {/* Right actions */}
-            <div className="flex items-center gap-0.5 ml-auto flex-shrink-0">
-              {/* Search */}
+          {/* Right: Actions */}
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setSearchOpen(true)}
+              className="p-3 rounded-full hover:bg-morphin-ghost text-morphin-muted hover:text-morphin-text transition-all active:scale-90"
+            >
+              <Search size={20} strokeWidth={2.5} />
+            </button>
+            
+            <div className="relative">
               <button
-                onClick={toggleSearch}
-                className={`pm-nav-btn ${searchOpen ? "text-accent bg-accent/10" : ""}`}
-                title="Search players  [/]"
-                aria-expanded={searchOpen}
+                onClick={() => setNotifOpen(!notifOpen)}
+                className="p-3 rounded-full hover:bg-morphin-ghost text-morphin-muted hover:text-morphin-text transition-all active:scale-90 relative"
               >
-                <AnimatePresence mode="wait">
-                  {searchOpen ? (
-                    <motion.span key="x" initial={{ rotate: -90, opacity: 0 }}
-                      animate={{ rotate: 0, opacity: 1 }} exit={{ rotate: 90, opacity: 0 }}
-                      transition={{ duration: 0.12 }}>
-                      <X size={13} strokeWidth={1.8} />
-                    </motion.span>
-                  ) : (
-                    <motion.span key="s" initial={{ rotate: 90, opacity: 0 }}
-                      animate={{ rotate: 0, opacity: 1 }} exit={{ rotate: -90, opacity: 0 }}
-                      transition={{ duration: 0.12 }}>
-                      <Search size={13} strokeWidth={1.8} />
-                    </motion.span>
-                  )}
-                </AnimatePresence>
-                {!searchOpen && (
-                  <span className="hidden xl:flex text-[10px] text-pitch-600 ml-0.5">/</span>
+                <Bell size={20} strokeWidth={2.5} />
+                {notifications.length > 0 && (
+                  <span className="absolute top-2.5 right-2.5 w-2.5 h-2.5 bg-morphin-accent rounded-full border-2 border-white ring-4 ring-morphin-accent/10" />
                 )}
               </button>
 
-              {/* Notifications */}
-              <div className="relative">
-                <button
-                  onClick={() => setNotifOpen(p => !p)}
-                  className={`pm-nav-btn relative ${notifOpen ? "text-accent bg-accent/10" : ""}`}
-                >
-                  <Bell size={13} strokeWidth={1.8} />
-                  {notifications.length > 0 && (
-                    <div className="absolute top-2 right-2 w-1.5 h-1.5 bg-accent rounded-full animate-pulse-glow" />
-                  )}
-                </button>
-
-                <AnimatePresence>
-                  {notifOpen && (
-                    <motion.div
-                      initial={{ opacity: 0, y: -6, scale: 0.97 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: -6, scale: 0.97 }}
-                      transition={{ duration: 0.14 }}
-                      className="absolute top-full right-0 mt-1.5 w-72 z-50
-                                 bg-pitch-800 border border-pitch-600 rounded-xl shadow-card-lg overflow-hidden"
-                    >
-                      <div className="px-4 py-3 border-b border-pitch-700 flex items-center justify-between">
-                        <span className="pm-label">Notifications</span>
-                        <button onClick={() => setNotifOpen(false)}
-                          className="text-pitch-500 hover:text-pitch-300 transition-colors">
-                          <X size={12} strokeWidth={1.8} />
-                        </button>
-                      </div>
-                      <div className="px-4 py-3 space-y-2.5">
-                        {notifications.length === 0 ? (
-                          <div className="text-[11px] text-pitch-500 text-center py-2 border border-pitch-700 border-dashed rounded-lg">
-                            No active game alerts or edges.
-                          </div>
-                        ) : notifications.map((n) => (
-                          <div key={n.id} onClick={n.action} className="flex items-start gap-2.5 cursor-pointer group">
-                            <div className={`w-7 h-7 rounded-md bg-pitch-700 flex items-center
-                                            justify-center flex-shrink-0 ${n.color}`}>
-                              <n.icon size={12} strokeWidth={1.8} />
-                            </div>
+              <AnimatePresence>
+                {notifOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10, scale: 0.98 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 10, scale: 0.98 }}
+                    className="absolute top-full right-0 mt-4 w-80 bg-white border border-morphin-border rounded-[2rem] shadow-2xl p-4 overflow-hidden"
+                  >
+                    <div className="flex items-center justify-between mb-4 px-2">
+                        <span className="text-[10px] font-bold uppercase tracking-[3px] text-morphin-muted">Live Alerts</span>
+                        <button onClick={() => setNotifOpen(false)} className="text-morphin-muted hover:text-morphin-text"><X size={14} /></button>
+                    </div>
+                    <div className="space-y-2">
+                       {notifications.length > 0 ? notifications.map(n => (
+                         <button key={n.id} onClick={n.action} className="w-full flex items-center gap-4 p-4 rounded-2xl hover:bg-morphin-ghost transition-colors text-left group">
+                            <div className="w-10 h-10 rounded-full bg-morphin-accent/10 flex items-center justify-center text-morphin-accent"><Activity size={18} /></div>
                             <div className="flex-1 min-w-0">
-                              <div className="text-[11px] text-pitch-200 leading-snug">{n.text}</div>
-                              <div className="text-[10px] text-pitch-500 mt-0.5">{n.time}</div>
+                               <div className="text-sm font-bold text-morphin-text truncate">{n.text}</div>
+                               <div className="text-[10px] font-medium text-morphin-muted uppercase tracking-wider">{n.time}</div>
                             </div>
-                            <ChevronRight size={10} className="text-pitch-600 group-hover:text-pitch-400
-                                                               mt-1 transition-colors flex-shrink-0" />
-                          </div>
-                        ))}
-                      </div>
-                      <div className="px-4 py-2.5 border-t border-pitch-700">
-                        <button
-                          onClick={() => { navigate("/scores"); setNotifOpen(false); }}
-                          className="w-full text-[10px] text-pitch-500 hover:text-accent
-                                     transition-colors text-center"
-                        >
-                          View live scores
-                        </button>
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-
-              {/* Theme toggle */}
-              <button className="pm-nav-btn" title="Toggle theme" aria-label="Toggle theme" onClick={toggleTheme}>
-                {isLight ? <Moon size={13} strokeWidth={1.8} /> : <Sun size={13} strokeWidth={1.8} />}
-              </button>
-
-              <UserButton
-                appearance={{
-                  elements: {
-                    avatarBox: "w-7 h-7",
-                    userButtonPopoverCard: "bg-pitch-800 border border-pitch-600",
-                  }
-                }}
-              />
-
-              {/* Settings */}
-              <button className="pm-nav-btn" title="Settings" aria-label="Settings"
-                onClick={() => navigate("/settings")}>
-                <Settings size={13} strokeWidth={1.8} />
-              </button>
-
-              {/* Live pill */}
-              <div className="flex items-center gap-1.5 ml-1.5 px-2 py-1 rounded-md
-                              bg-pitch-750 border border-pitch-600"
-                title="Data updates every 2 minutes">
-                <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse-glow" />
-                <span className="text-[9px] font-semibold tracking-[1.5px] text-accent uppercase
-                                 hidden xs:inline">
-                  Live
-                </span>
-              </div>
+                            <ChevronRight size={14} className="text-morphin-border group-hover:text-morphin-muted" />
+                         </button>
+                       )) : (
+                         <div className="text-center py-8 text-sm text-morphin-muted">No active alerts.</div>
+                       )}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
-          </div>
 
-          {/* Search bar */}
-          <AnimatePresence>
-            {searchOpen && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: 48, opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                transition={{ duration: 0.18 }}
-                className="overflow-hidden"
-              >
-                <div className="py-1.5 relative">
-                  <Search size={13} strokeWidth={1.8}
-                    className="absolute left-3 top-1/2 -translate-y-1/2 text-pitch-500 pointer-events-none" />
-                  <input
-                    ref={searchInputRef}
-                    value={searchQuery}
-                    onChange={e => setSearchQuery(e.target.value)}
-                    onKeyDown={handleSearchKey}
-                    placeholder="Search any NBA player — press Enter to navigate…"
-                    className="w-full bg-pitch-750 border border-pitch-600 rounded-lg
-                               pl-9 pr-24 py-2 text-sm text-pitch-100
-                               placeholder:text-pitch-500 focus:outline-none
-                               focus:border-accent/50 transition-colors"
-                  />
-                  <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
-                    {searchQuery && (
-                      <button onClick={() => setSearchQuery("")}
-                        className="text-pitch-600 hover:text-pitch-400 transition-colors">
-                        <X size={11} strokeWidth={1.8} />
-                      </button>
-                    )}
-                    <kbd className="bg-pitch-700 border border-pitch-600 rounded px-1.5 py-0.5
-                                    text-[9px] font-mono text-pitch-500">↵</kbd>
-                  </div>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+            <button
+               onClick={() => navigate("/settings")}
+               className="p-3 rounded-full hover:bg-morphin-ghost text-morphin-muted hover:text-morphin-text transition-all active:scale-90"
+            >
+              <Settings size={20} strokeWidth={2.5} />
+            </button>
+
+            <div className="h-8 w-px bg-morphin-border mx-2 hidden md:block" />
+
+            <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-white shadow-xl hover:scale-110 active:scale-95 transition-all cursor-pointer">
+              <UserButton />
+            </div>
+
+            <button
+              onClick={() => setMobileOpen(true)}
+              className="lg:hidden p-3 rounded-full hover:bg-morphin-ghost text-morphin-muted"
+            >
+              <Menu size={20} strokeWidth={2.5} />
+            </button>
+          </div>
         </div>
       </nav>
+
+      {/* Global Command/Search Overlay */}
+      <AnimatePresence>
+        {searchOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[200] bg-white/60 backdrop-blur-3xl flex items-start justify-center pt-[15vh] px-4"
+          >
+            <motion.div
+              initial={{ scale: 0.95, y: 30 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 30 }}
+              className="w-full max-w-3xl bg-white border border-morphin-border rounded-[2.5rem] shadow-[0_50px_150px_rgba(0,0,0,0.15)] overflow-hidden"
+            >
+              <div className="p-10 relative">
+                <Search size={32} className="absolute left-14 top-1/2 -translate-y-1/2 text-morphin-muted" />
+                <input
+                  ref={searchInputRef}
+                  autoFocus
+                  placeholder="Search rosters, matchups, or bets..."
+                  className="w-full h-24 pl-20 pr-24 bg-morphin-ghost rounded-[2rem] text-3xl font-bold text-morphin-text placeholder:text-morphin-muted focus:outline-none focus:ring-4 focus:ring-morphin-accent/5 transition-all"
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                />
+                <button 
+                  onClick={() => setSearchOpen(false)}
+                  className="absolute right-16 top-1/2 -translate-y-1/2 p-3 hover:bg-white rounded-2xl transition-colors shadow-sm"
+                >
+                  <X size={24} className="text-morphin-muted" />
+                </button>
+              </div>
+              <div className="px-10 pb-10">
+                 <div className="text-[10px] font-bold text-morphin-muted uppercase tracking-[4px] mb-6 mb-4">Quick Shortcuts</div>
+                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    {NAV_ITEMS.slice(0, 4).map(item => (
+                       <button key={item.path} onClick={() => { navigate(item.path); setSearchOpen(false); }} className="flex flex-col items-center gap-4 p-8 rounded-[2rem] hover:bg-morphin-ghost transition-all border border-transparent hover:border-morphin-border group active:scale-95">
+                          <div className="w-16 h-16 rounded-2xl bg-white border border-morphin-border flex items-center justify-center text-morphin-muted group-hover:text-morphin-accent transition-all shadow-sm">
+                             <item.icon size={28} />
+                          </div>
+                          <span className="text-[12px] font-bold text-morphin-text uppercase tracking-widest">{item.label}</span>
+                       </button>
+                    ))}
+                 </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </>
   );
 }
