@@ -1,94 +1,84 @@
-// src/hooks/useSSE.js — replaces useNotifications polling with SSE
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useCallback } from "react";
 import { useAuth } from "@clerk/clerk-react";
 
-export function useSSE({ onAlert, onOdds } = {}) {
-  const { getToken, isSignedIn } = useAuth();
-  const esRef       = useRef(null);
-  const retryRef    = useRef(0);
-  // Store callbacks in refs to avoid re-establishing the SSE connection
-  // when the parent component re-renders with new callback references.
-  const onAlertRef  = useRef(onAlert);
-  const onOddsRef   = useRef(onOdds);
-  const [connected, setConnected] = useState(false);
+const RETRY_DELAY_MS = 3000;
+const MAX_RETRIES = 5;
 
-  // Keep refs fresh without triggering reconnects
-  useEffect(() => { onAlertRef.current = onAlert; }, [onAlert]);
-  useEffect(() => { onOddsRef.current = onOdds; }, [onOdds]);
+export function useSSE({ onAlert }) {
+  const { getToken } = useAuth();
+  const eventSourceRef = useRef(null);
+  const retryCount = useRef(0);
+  const retryTimer = useRef(null);
+  const isMounted = useRef(true);
 
-  useEffect(() => {
-    if (!isSignedIn) return;
+  const connect = useCallback(async () => {
+    if (!isMounted.current) return;
 
-    let cancelled = false;
-
-    async function connect() {
-      if (cancelled) return;
-      if (esRef.current) { esRef.current.close(); esRef.current = null; }
-
-      const token = await getToken();
-      if (cancelled) return;
-
-      // Probe the endpoint first to catch 401/403 before opening SSE
-      try {
-        const probe = await fetch(`/api/stream?token=${encodeURIComponent(token)}`, {
-          method: "HEAD",
-          signal: AbortSignal.timeout(5000),
-        });
-        if (probe.status === 401 || probe.status === 403) {
-          console.warn("[useSSE] Auth failed, stopping reconnect");
-          return;
-        }
-      } catch { /* network down — fall through to SSE which will retry */ }
-
-      const url = `/api/stream?token=${encodeURIComponent(token)}`;
-      const es  = new EventSource(url);
-      esRef.current = es;
-
-      es.addEventListener("connected", () => {
-        setConnected(true);
-        retryRef.current = 0; // reset backoff on success
-      });
-
-      es.addEventListener("odds", e => {
-        try { onOddsRef.current?.(JSON.parse(e.data)); } catch { /* ignore parse error */ }
-      });
-
-      es.addEventListener("alert", e => {
-        try {
-          const alert = JSON.parse(e.data);
-          onAlertRef.current?.(alert);
-
-          // Trigger browser notification if permitted
-          if (Notification.permission === "granted") {
-            const dir = alert.move > 0 ? "📈" : "📉";
-            new Notification(`${dir} Line moved — ${alert.matchup}`, {
-              body: `${alert.side}: ${alert.from > 0 ? "+" : ""}${alert.from} → ${alert.to > 0 ? "+" : ""}${alert.to}`,
-              icon: "/icons/icon-192.png",
-              tag:  alert.tag,
-            });
-          }
-        } catch { /* ignore */ }
-      });
-
-      es.onerror = () => {
-        setConnected(false);
-        es.close();
-        esRef.current = null;
-        // Exponential backoff: 2s, 4s, 8s, up to 60s
-        const delay = Math.min(60_000, 2000 * Math.pow(2, retryRef.current));
-        retryRef.current += 1;
-        if (!cancelled) setTimeout(connect, delay);
-      };
+    // Always fetch a fresh token — never reuse the previous one
+    let token;
+    try {
+      token = await getToken({ skipCache: true });
+    } catch (err) {
+      console.error("[SSE] Failed to get token:", err);
+      return;
     }
 
+    if (!token || !isMounted.current) return;
+
+    // Clean up any existing connection before opening a new one
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
+      eventSourceRef.current = null;
+    }
+
+    const url = `/api/stream?token=${encodeURIComponent(token)}`;
+    const es = new EventSource(url);
+    eventSourceRef.current = es;
+
+    es.onopen = () => {
+      retryCount.current = 0; // Reset retry counter on successful connection
+    };
+
+    es.onmessage = (e) => {
+      try {
+        const data = JSON.parse(e.data);
+        if (data.type === "alert" && onAlert) onAlert(data);
+      } catch (err) {
+        console.error("[SSE] Parse error:", err);
+      }
+    };
+
+    es.onerror = () => {
+      es.close();
+      eventSourceRef.current = null;
+
+      if (!isMounted.current) return;
+
+      if (retryCount.current >= MAX_RETRIES) {
+        console.warn("[SSE] Max retries reached, giving up");
+        return;
+      }
+
+      retryCount.current += 1;
+      const delay = RETRY_DELAY_MS * retryCount.current; // Back-off: 3s, 6s, 9s…
+      console.log(`[SSE] Reconnecting in ${delay}ms (attempt ${retryCount.current})`);
+
+      // Key fix: always call connect() which fetches a NEW token, not just a new EventSource
+      retryTimer.current = setTimeout(connect, delay);
+    };
+  }, [getToken, onAlert]);
+
+  useEffect(() => {
+    isMounted.current = true;
     connect();
 
     return () => {
-      cancelled = true;
-      esRef.current?.close();
-      esRef.current = null;
+      isMounted.current = false;
+      clearTimeout(retryTimer.current);
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+        eventSourceRef.current = null;
+      }
     };
-  }, [isSignedIn, getToken]);
-
-  return { connected };
+  }, [connect]);
 }
