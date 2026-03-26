@@ -8,7 +8,7 @@ const TabsList = React.forwardRef(({ className, ...props }, ref) => (
   <TabsPrimitive.List
     ref={ref}
     className={cn(
-      "inline-flex h-9 items-center justify-center rounded-lg bg-morphin-ghost p-1 text-morphin-muted",
+      "inline-flex h-9 items-center justify-center rounded-lg bg-[var(--neon-raised)] border border-[var(--neon-border)] p-1 text-[var(--neon-muted)]",
       className
     )}
     {...props}
@@ -20,7 +20,11 @@ const TabsTrigger = React.forwardRef(({ className, ...props }, ref) => (
   <TabsPrimitive.Trigger
     ref={ref}
     className={cn(
-      "inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1 text-xs font-display font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-white data-[state=active]:text-morphin-text data-[state=active]:shadow-sm",
+      "inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1 text-xs font-sans font-semibold tracking-wide uppercase transition-all",
+      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--neon-green-border)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--neon-raised)]",
+      "disabled:pointer-events-none disabled:opacity-50",
+      "text-[var(--neon-muted)] hover:text-[var(--neon-text)] hover:bg-[var(--neon-overlay)]",
+      "data-[state=active]:bg-[var(--neon-green-faint)] data-[state=active]:text-[var(--neon-green)] data-[state=active]:border data-[state=active]:border-[var(--neon-green-border)]",
       className
     )}
     {...props}
@@ -32,7 +36,7 @@ const TabsContent = React.forwardRef(({ className, ...props }, ref) => (
   <TabsPrimitive.Content
     ref={ref}
     className={cn(
-      "mt-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50",
+      "mt-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--neon-green-border)] focus-visible:ring-offset-1",
       className
     )}
     {...props}

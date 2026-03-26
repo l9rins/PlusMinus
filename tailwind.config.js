@@ -4,9 +4,9 @@ export default {
     theme: {
         extend: {
             fontFamily: {
-                sans: ["Geist", "Geist Fallback", "ui-sans-serif", "system-ui", "sans-serif", "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji"],
-                mono: ["Geist Mono", "JetBrains Mono", "ui-monospace", "SFMono-Regular", "Roboto Mono", "Menlo", "Monaco", "Liberation Mono", "DejaVu Sans Mono", "Courier New", "monospace"],
-                display: ["Geist", "Geist Fallback", "ui-sans-serif", "system-ui", "sans-serif", "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji"],
+                sans: ["Inter", "ui-sans-serif", "system-ui", "sans-serif"],
+                mono: ["JetBrains Mono", "ui-monospace", "SFMono-Regular", "Menlo", "Monaco", "Courier New", "monospace"],
+                display: ["Inter", "ui-sans-serif", "system-ui", "sans-serif"], // display = Inter too
             },
             fontSize: {
                 "2xs": ["0.625rem", { lineHeight: "0.875rem" }],

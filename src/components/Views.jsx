@@ -42,11 +42,15 @@ const item = {
 
 const tooltipStyle = {
   contentStyle: {
-    background: "#161b28", border: "1px solid #2e3a50",
-    borderRadius: 8, fontSize: 11, boxShadow: "0 8px 32px rgba(0,0,0,0.5)",
+    background: "var(--neon-surface)",
+    border: "1px solid var(--neon-border-md)",
+    borderRadius: 8,
+    fontSize: 11,
+    fontFamily: "inherit",
+    boxShadow: "0 8px 32px rgba(0,0,0,0.5)",
   },
-  labelStyle: { color: "#7d91ab" },
-  itemStyle:  { color: "#00d4aa" },
+  labelStyle: { color: "var(--neon-muted)" },
+  itemStyle:  { color: "var(--neon-green)" },
 };
 
 // ── Book display names ────────────────────────────────────────────

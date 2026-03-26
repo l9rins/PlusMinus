@@ -4,7 +4,7 @@
    crisp borders, zero noise. Built for data, not marketing.
 ──────────────────────────────────────────────────────────────── */
 
-@import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -59,7 +59,7 @@
   html {
     background-color: var(--neon-bg);
     color: var(--neon-text);
-    font-family: "Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+    font-family: "Inter", ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
     -webkit-font-smoothing: antialiased;
     font-size: 15px;
   }
@@ -139,7 +139,7 @@
 
   /* ── Monospaced data values ─────────────────────────────────── */
   .pm-mono {
-    font-family: "Geist Mono", "JetBrains Mono", ui-monospace, SFMono-Regular, Roboto Mono, Menlo, Monaco, Liberation Mono, DejaVu Sans Mono, Courier New, monospace;
+    font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, "Courier New", monospace;
     font-size: 13px;
     font-weight: 500;
   }

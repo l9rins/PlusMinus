@@ -39,7 +39,7 @@ const PremiumCardHeader = ({ className, ...props }) => (
 const PremiumCardTitle = ({ className, ...props }) => (
   <h3
     className={cn(
-      "font-display text-base font-bold leading-none tracking-tight text-[var(--neon-text)]",
+      "font-sans text-base font-bold leading-none tracking-tight text-[var(--neon-text)]",
       className
     )}
     {...props}
@@ -49,7 +49,7 @@ const PremiumCardTitle = ({ className, ...props }) => (
 const PremiumCardDescription = ({ className, ...props }) => (
   <p
     className={cn(
-      "text-xs text-[var(--neon-muted)] font-mono",
+      "text-xs text-[var(--neon-muted)] font-sans",
       className
     )}
     {...props}

@@ -5,7 +5,7 @@ const Card = React.forwardRef(({ className, ...props }, ref) => (
   <div
     ref={ref}
     className={cn(
-      "rounded-2xl border border-morphin-border bg-morphin-base text-morphin-text shadow-sm transition-all duration-300 hover:shadow-md",
+      "rounded-xl border border-[var(--neon-border)] bg-[var(--neon-surface)] text-[var(--neon-text)] transition-all duration-200 hover:border-[var(--neon-border-md)] hover:bg-[var(--neon-raised)]",
       className
     )}
     {...props}
@@ -26,7 +26,7 @@ const CardTitle = React.forwardRef(({ className, ...props }, ref) => (
   <h3
     ref={ref}
     className={cn(
-      "font-display text-lg font-semibold leading-none tracking-tight",
+      "font-sans text-lg font-semibold leading-none tracking-tight text-[var(--neon-text)]",
       className
     )}
     {...props}
@@ -37,7 +37,7 @@ CardTitle.displayName = "CardTitle"
 const CardDescription = React.forwardRef(({ className, ...props }, ref) => (
   <p
     ref={ref}
-    className={cn("text-sm text-morphin-muted", className)}
+    className={cn("text-sm text-[var(--neon-muted)]", className)}
     {...props}
   />
 ))
@@ -57,12 +57,12 @@ const CardFooter = React.forwardRef(({ className, ...props }, ref) => (
 ))
 CardFooter.displayName = "CardFooter"
 
-// Special Morphin-inspired "Crystal" Card
-const CrystalCard = React.forwardRef(({ className, children, ...props }, ref) => (
+// NeonCard — dark glow variant (replaces CrystalCard for dark theme)
+const NeonCard = React.forwardRef(({ className, children, ...props }, ref) => (
   <Card
     ref={ref}
     className={cn(
-      "bg-white/60 backdrop-blur-xl border-white/40 shadow-[0_8px_32px_rgba(0,0,0,0.04)] hover:shadow-[0_12px_48px_rgba(0,0,0,0.06)] hover:-translate-y-0.5",
+      "border-[var(--neon-green-border)] shadow-[0_0_24px_var(--neon-green-faint)]",
       className
     )}
     {...props}
@@ -70,6 +70,10 @@ const CrystalCard = React.forwardRef(({ className, children, ...props }, ref) =>
     {children}
   </Card>
 ))
+NeonCard.displayName = "NeonCard"
+
+// Keep CrystalCard exported as an alias so existing imports don't break
+const CrystalCard = NeonCard
 CrystalCard.displayName = "CrystalCard"
 
-export { Card, CardHeader, CardFooter, CardTitle, CardDescription, CardContent, CrystalCard }
+export { Card, CardHeader, CardFooter, CardTitle, CardDescription, CardContent, NeonCard, CrystalCard }
