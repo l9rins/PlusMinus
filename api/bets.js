@@ -67,7 +67,15 @@ export default async function handler(req, res) {
     // Only allow this if the logged-in user matches the Admin ID
     const adminId = process.env.ADMIN_USER_ID;
     if (adminId && actualUserId === adminId) {
-      console.log(`[ADMIN] ${actualUserId} impersonating ${impersonateTarget}`);
+      const auditEntry = {
+        ts: new Date().toISOString(),
+        admin: actualUserId,
+        impersonated: impersonateTarget,
+        method: req.method,
+        path: req.url,
+      };
+      await kv.lpush("audit:impersonation", JSON.stringify(auditEntry))
+               .catch(() => {}); // fire-and-forget, don't block
       targetUserId = impersonateTarget;
     } else {
       return res.status(403).json({ error: "Forbidden: Admin privileges required" });
@@ -104,12 +112,17 @@ export default async function handler(req, res) {
     }
 
     try {
-      let sanitizedBets = bets.map(sanitizeBet);
+      // Sort newest-first by date before enforcing the limit
+      const sorted = [...bets].map(sanitizeBet).sort((a, b) =>
+        (b.date ?? "").localeCompare(a.date ?? "")
+      );
+      
+      let sanitizedBets = sorted;
       const archiveKey = `${key}:archive`;
 
       if (sanitizedBets.length > 400) {
         const toArchive = sanitizedBets.slice(400);
-        sanitizedBets = sanitizedBets.slice(0, 400);
+        sanitizedBets   = sanitizedBets.slice(0, 400);
         
         const existingArchive = (await kv.get(archiveKey)) || [];
         const archiveMap = new Map();

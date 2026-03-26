@@ -14,8 +14,9 @@
 //   paper:lb                 → [ { userId, displayName, balance, roi, bets } ]  (rebuilt on settle)
 
 import { handleOptions, setCORSHeaders } from "./_cors.js";
-import { createClerkClient } from "@clerk/backend";
+import { getUserId } from "./_auth.js";
 import { createClient } from "@vercel/kv";
+import { createClerkClient } from "@clerk/backend";
 
 const kv    = createClient({ url: process.env.KV_REST_API_URL, token: process.env.KV_REST_API_TOKEN });
 const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
@@ -23,16 +24,6 @@ const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
 const STARTING_BALANCE = 1000;
 const MIN_STAKE        = 10;
 const MAX_STAKE_PCT    = 0.25; // max 25% of bankroll per bet
-
-// ── Auth ──────────────────────────────────────────────────────
-async function getUserId(req) {
-  const auth = req.headers.authorization;
-  if (!auth?.startsWith("Bearer ")) return null;
-  try {
-    const { sub } = await clerk.verifyToken(auth.slice(7));
-    return sub;
-  } catch { return null; }
-}
 
 // ── Odds helpers (same as utils.js — duplicated server-side) ──
 function oddsToDecimal(american) {
@@ -69,7 +60,8 @@ export default async function handler(req, res) {
     ]);
     const board = (lb ?? [])
       .sort((a, b) => b.balance - a.balance)
-      .slice(0, 20);
+      .slice(0, 20)
+      .map(({ userId: _removed, ...pub }) => pub); // drop internal ID
     return res.status(200).json({ leaderboard: [modelStats, ...board] });
   }
 
@@ -154,6 +146,7 @@ export default async function handler(req, res) {
     await Promise.all([
       kv.set(bankrollKey, updatedBankroll, { ex: 60 * 60 * 24 * 365 }),
       kv.set(betsKey, updatedBets, { ex: 60 * 60 * 24 * 365 }),
+      kv.sadd("paper:users", userId),
     ]);
 
     return res.status(201).json({ bet: newBet, bankroll: updatedBankroll });
@@ -163,17 +156,18 @@ export default async function handler(req, res) {
   // Reads finished game results from BDL, matches pending paper bets,
   // credits winnings, rebuilds leaderboard.
   if (body.action === "settle") {
-    const cronSecret = req.headers["x-cron-secret"];
-    if (cronSecret !== process.env.CRON_SECRET) {
+    const provided = req.headers.authorization?.replace("Bearer ", "") ?? "";
+    const expected = process.env.CRON_SECRET ?? "";
+    if (!expected || provided !== expected) {
       return res.status(403).json({ error: "Forbidden" });
     }
 
-    // Scan all user bankroll keys — KV list pattern
-    const userKeys = await kv.keys("paper:bankroll:*");
-    const settled  = [];
+    // Use a set instead of KEYS scan for O(1) user lookup
+    const userIds = await kv.smembers("paper:users");
+    const settled = [];
 
-    for (const bkKey of userKeys) {
-      const uid = bkKey.replace("paper:bankroll:", "");
+    for (const uid of userIds) {
+      const bkKey = `paper:bankroll:${uid}`;
       const [bankroll, bets] = await Promise.all([
         kv.get(bkKey),
         kv.get(`paper:bets:${uid}`),
@@ -214,8 +208,8 @@ export default async function handler(req, res) {
 
     // Rebuild leaderboard from all users with > 0 bets
     const lbEntries = [];
-    for (const bkKey of userKeys) {
-      const uid = bkKey.replace("paper:bankroll:", "");
+    for (const uid of userIds) {
+      const bkKey = `paper:bankroll:${uid}`;
       const br  = await kv.get(bkKey);
       if (!br || br.totalBets === 0) continue;
 

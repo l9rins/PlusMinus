@@ -20,26 +20,7 @@
 
 import { handleOptions, setCORSHeaders } from "./_cors.js";
 import { createClient } from "@vercel/kv";
-import { createClerkClient } from "@clerk/backend";
-
-const kv = createClient({
-    url: process.env.KV_REST_API_URL,
-    token: process.env.KV_REST_API_TOKEN,
-});
-
-const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
-
-async function getUserId(req) {
-    const auth = req.headers.authorization;
-    if (!auth?.startsWith("Bearer ")) return null;
-    try {
-        const token = auth.slice(7);
-        const { sub } = await clerk.verifyToken(token);
-        return sub;
-    } catch {
-        return null;
-    }
-}
+import { getUserId } from "./_auth.js";
 
 const LOG_KEY = "error_log:app";
 const MAX_ENTRIES = 100;
@@ -94,7 +75,14 @@ export default async function handler(req, res) {
         if (!adminToken) return res.status(403).json({ error: "Admin access not configured" });
 
         const provided = req.headers["x-admin-token"] ?? req.query.token;
-        if (provided !== adminToken) return res.status(403).json({ error: "Forbidden" });
+        
+        import crypto from "crypto";
+        const providedBuf = Buffer.from(provided ?? "");
+        const expectedBuf = Buffer.from(adminToken ?? "");
+        
+        if (providedBuf.length !== expectedBuf.length || !crypto.timingSafeEqual(providedBuf, expectedBuf)) {
+            return res.status(403).json({ error: "Forbidden" });
+        }
 
         try {
             const log = (await kv.get(LOG_KEY)) ?? [];

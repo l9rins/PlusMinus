@@ -36,6 +36,7 @@ export default async function handler(req, res) {
   // official.nba.com or a data provider.
   const mockAssignments = {
     updatedAt: new Date().toISOString(),
+    mock: true,
     games: [
       { matchup: "NYK @ DEN", crew: ["Scott Foster", "Tony Brothers", "Bennie Adams"] },
       { matchup: "DAL @ OKC", crew: ["Zach Zarba", "James Capers", "Jacyn Goble"] },

@@ -56,7 +56,20 @@ export function useAlerts() {
             if (!res.ok) throw new Error("Failed to delete alert");
             return res.json();
         },
-        onSuccess: () => {
+        onMutate: async (alertId) => {
+            await queryClient.cancelQueries({ queryKey: ["alerts", userId] });
+            const previous = queryClient.getQueryData(["alerts", userId]);
+            queryClient.setQueryData(["alerts", userId],
+                (old) => (old ?? []).filter(a => a.id !== alertId)
+            );
+            return { previous };
+        },
+        onError: (_err, _id, context) => {
+            if (context?.previous !== undefined) {
+                queryClient.setQueryData(["alerts", userId], context.previous);
+            }
+        },
+        onSettled: () => {
             queryClient.invalidateQueries({ queryKey: ["alerts", userId] });
         }
     });

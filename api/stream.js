@@ -87,7 +87,7 @@ export default async function handler(req, res) {
   if (handleOptions(req, res)) return;
 
   // SSE requires specific CORS headers
-  res.setHeader("Access-Control-Allow-Origin", process.env.ALLOWED_ORIGIN || "*");
+  setCORSHeaders(res, req.headers.origin || "");
   res.setHeader("Access-Control-Allow-Credentials", "true");
 
   if (req.method !== "GET") return res.status(405).end();
@@ -126,32 +126,43 @@ export default async function handler(req, res) {
   }, HEARTBEAT_MS);
 
   // Poll for line movements
-  const pollTimer = setInterval(async () => {
-    const events  = await fetchCurrentOdds();
-    const newSnap = buildOddsSnapshot(events);
-    if (!Object.keys(newSnap).length) return;
+  let pollActive = true;
+  const schedulePoll = () => {
+    if (!pollActive) return;
+    setTimeout(async () => {
+      const events  = await fetchCurrentOdds();
+      if (!events || !Object.keys(events).length) {
+        if (pollActive) schedulePoll();
+        return;
+      }
+      const newSnap = buildOddsSnapshot(events);
+      if (!Object.keys(newSnap).length) {
+        if (pollActive) schedulePoll();
+        return;
+      }
 
-    const movements = detectMovements(prevSnapshot, newSnap);
-    prevSnapshot = newSnap;
+      const movements = detectMovements(prevSnapshot, newSnap);
+      prevSnapshot = newSnap;
 
-    send("odds", newSnap);
+      send("odds", newSnap);
 
-    for (const alert of movements) {
-      send("alert", alert);
+      for (const alert of movements) {
+        send("alert", alert);
+        const webhooks = await kv.get(`webhooks:${userId}`).catch(() => null);
+        if (webhooks?.discord) await pushDiscord(webhooks.discord, alert).catch(() => {});
+        if (webhooks?.telegram) await pushTelegram(webhooks.telegram, alert).catch(() => {});
+      }
 
-      // Push to Discord/Telegram if user has webhooks configured
-      const webhooks = await kv.get(`webhooks:${userId}`).catch(() => null);
-      if (webhooks?.discord) await pushDiscord(webhooks.discord, alert).catch(() => {});
-      if (webhooks?.telegram) await pushTelegram(webhooks.telegram, alert).catch(() => {});
-    }
-
-    await kv.set("odds:snapshot", newSnap, { ex: 7200 }).catch(() => {});
-  }, POLL_MS);
+      await kv.set("odds:snapshot", newSnap, { ex: 7200 }).catch(() => {});
+      if (pollActive) schedulePoll();
+    }, POLL_MS);
+  };
+  schedulePoll();
 
   // Cleanup on client disconnect
   req.on("close", () => {
+    pollActive = false;
     clearInterval(heartbeatTimer);
-    clearInterval(pollTimer);
   });
 
   // Keep response open

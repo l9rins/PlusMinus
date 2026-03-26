@@ -30,9 +30,14 @@ export default function RefCallout({ matchup }) {
           Referee Crew Trends
         </div>
         <div className="text-[9px] text-pitch-600 font-mono">
-          Last 50 games
+          Last 50 games {data.mock && "· Mock Data"}
         </div>
       </div>
+      {data.mock && (
+        <p className="text-[10px] text-win/60 mb-2 italic">
+          ⚠ Live ref data unavailable — showing sample assignments
+        </p>
+      )}
 
       <div className="space-y-1.5">
         {game.crew.map((ref, idx) => {

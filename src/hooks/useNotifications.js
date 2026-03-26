@@ -74,7 +74,7 @@ export function useNotifications() {
         } catch {
             // Network failure — silent, will retry next interval
         }
-    }, [isSignedIn, getToken]);
+    }, [isSignedIn, getToken, navigate]);
 
     const schedule = useCallback(() => {
         clearTimeout(timerRef.current);

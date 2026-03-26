@@ -11,10 +11,9 @@ function makeLCG(seed) {
 }
 
 const SIMS = 10_000;
-const HOME_BUMP = 35;
 
 function eloWinP(eloA, eloB, home = false) {
-  return 1 / (1 + Math.pow(10, -(eloA - eloB + (home ? HOME_BUMP : 0)) / 400));
+  return 1 / (1 + Math.pow(10, -(eloA - eloB + (home ? HOME_ADV : 0)) / 400));
 }
 
 function simGame(eloA, eloB, home, rng) {
@@ -25,7 +24,7 @@ function simSeries(teamA, teamB, rng) {
   let wA = 0, wB = 0, g = 0;
   // Compare seeds. If they are from different conferences (Finals), compare win pct.
   const aHasHome = teamA.seed < teamB.seed || (teamA.seed === teamB.seed && teamA.pct > teamB.pct);
-  
+
   const homeElo = aHasHome ? teamA.elo : teamB.elo;
   const awayElo = aHasHome ? teamB.elo : teamA.elo;
   const homeSchedule = [true, true, false, false, true, false, true];
@@ -49,8 +48,8 @@ const kv = createClient({
 const NBA_BASE = "https://stats.nba.com/stats";
 const NBA_HEADERS = {
   "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-  "Referer":    "https://www.nba.com/",
-  "Accept":     "application/json",
+  "Referer": "https://www.nba.com/",
+  "Accept": "application/json",
 };
 
 const ABBR_FIX = { SA: "SAS", WSH: "WAS", NY: "NYK", GS: "GSW", NO: "NOP", PHO: "PHX" };
@@ -69,11 +68,11 @@ function winProb(eloA, eloB) {
 
 async function fetchAllGamesViaLeagueLog(season) {
   const qs = new URLSearchParams({
-    Season:     season,
+    Season: season,
     SeasonType: "Regular Season",
-    LeagueID:   "00",
-    Direction:  "ASC",
-    Sorter:     "DATE",
+    LeagueID: "00",
+    Direction: "ASC",
+    Sorter: "DATE",
   });
   const url = `${NBA_BASE}/leaguegamelog?${qs}`;
 
@@ -89,15 +88,15 @@ async function fetchAllGamesViaLeagueLog(season) {
 
   const h = resultSet.headers;
   const rows = resultSet.rowSet;
-  const abbrIdx    = h.indexOf("TEAM_ABBREVIATION");
-  const dateIdx    = h.indexOf("GAME_DATE");
+  const abbrIdx = h.indexOf("TEAM_ABBREVIATION");
+  const dateIdx = h.indexOf("GAME_DATE");
   const matchupIdx = h.indexOf("MATCHUP");
-  const wlIdx      = h.indexOf("WL");
+  const wlIdx = h.indexOf("WL");
 
   // Each row is one team's side of a game. Collect home-team rows only
   // (MATCHUP contains "vs." for home, "@" for away).
   const games = [];
-  const seen  = new Set();
+  const seen = new Set();
 
   for (const row of rows) {
     const matchup = row[matchupIdx] ?? "";
@@ -107,19 +106,19 @@ async function fetchAllGamesViaLeagueLog(season) {
     const homeAbbr = ABBR_FIX[rawAbbr] ?? rawAbbr;
 
     // Opponent is the last token in "BOS vs. MIA" → "MIA"
-    const parts    = matchup.split(/\s+/);
-    const rawOpp   = parts[parts.length - 1];
+    const parts = matchup.split(/\s+/);
+    const rawOpp = parts[parts.length - 1];
     const awayAbbr = ABBR_FIX[rawOpp] ?? rawOpp;
 
     const date = row[dateIdx];
-    const key  = `${date}|${homeAbbr}|${awayAbbr}`;
+    const key = `${date}|${homeAbbr}|${awayAbbr}`;
     if (seen.has(key)) continue;
     seen.add(key);
 
     games.push({
       date,
-      home:    homeAbbr,
-      away:    awayAbbr,
+      home: homeAbbr,
+      away: awayAbbr,
       homeWon: row[wlIdx] === "W",
     });
   }
@@ -136,22 +135,23 @@ export default async function handler(req, res) {
 
   const season = currentSeasonStr();
   const CACHE_KEY = `elo:${season}`;
-  
+
   // FIX: Secure the rebuild endpoint
   const isRebuildRequested = req.query.rebuild === "true";
   const providedAuthToken = req.headers.authorization?.replace("Bearer ", "");
   // Support Vercel Cron's built-in CRON_SECRET header, or ADMIN_SECRET for manual triggers
-  const isAuthorized = 
+  const isAuthorized =
     (process.env.CRON_SECRET && providedAuthToken === process.env.CRON_SECRET) ||
-    (process.env.ADMIN_SECRET && providedAuthToken === process.env.ADMIN_SECRET);
-  
+    (process.env.ADMIN_SECRET && providedAuthToken === process.env.ADMIN_SECRET) ||
+    req.headers["x-vercel-cron-signature"];
+
   if (isRebuildRequested) {
     if (!isAuthorized) {
       return res.status(403).json({ error: "Forbidden: Invalid Admin Secret" });
     }
     console.log("[api/elo] Admin triggered manual rebuild");
   }
-  
+
   if (!isRebuildRequested) {
     try {
       const cached = await kv.get(CACHE_KEY);
@@ -183,9 +183,9 @@ export default async function handler(req, res) {
   const eloMap = {};
   const trajectories = {};
   const gameCounters = {};
-  
+
   for (const abbr of allTeams) {
-    eloMap[abbr]       = 1500;
+    eloMap[abbr] = 1500;
     trajectories[abbr] = [];
     gameCounters[abbr] = 0;
   }
@@ -201,7 +201,7 @@ export default async function handler(req, res) {
     const homeWinP = winProb(homeElo + HOME_ADV, awayElo);
     const newHomeElo = +(homeElo + K * ((game.homeWon ? 1 : 0) - homeWinP)).toFixed(2);
     const newAwayElo = +(awayElo + K * ((game.homeWon ? 0 : 1) - (1 - homeWinP))).toFixed(2);
-    
+
     eloMap[game.home] = newHomeElo;
     eloMap[game.away] = newAwayElo;
 
@@ -214,12 +214,12 @@ export default async function handler(req, res) {
 
   // Build final response — one entry per team
   const result = [...allTeams].map((abbr) => ({
-    team:       abbr,
-    elo:        Math.round(eloMap[abbr] ?? 1500),
-    games:      gameCounters[abbr] ?? 0,
+    team: abbr,
+    elo: Math.round(eloMap[abbr] ?? 1500),
+    games: gameCounters[abbr] ?? 0,
     trajectory: trajectories[abbr] ?? [],
-    finalsPct:  0,
-    champPct:   0,
+    finalsPct: 0,
+    champPct: 0,
   })).sort((a, b) => b.elo - a.elo);
 
   const wl = {};
@@ -252,10 +252,10 @@ export default async function handler(req, res) {
   const buildSeeds = conf => conf.slice(0, 10).map((t, i) => {
     const ed = safeEloData.find(x => x.team === t.team);
     return {
-      team:  t.team,
-      elo:   ed?.elo ?? Math.round(1500 + (t.pct - 0.5) * 400),
-      seed:  i + 1,
-      pct:   t.pct,
+      team: t.team,
+      elo: ed?.elo ?? Math.round(1500 + (t.pct - 0.5) * 400),
+      seed: i + 1,
+      pct: t.pct,
     };
   });
 
@@ -267,10 +267,10 @@ export default async function handler(req, res) {
   function simPlayIn(seeds, rng) {
     const [s7, s8, s9, s10] = seeds.slice(6, 10);
     [s7, s8, s9, s10].forEach(t => counts[t.team].pi++);
-    const seed7   = simGame(s7.elo, s8.elo, true, rng)        ? s7 : s8;
+    const seed7 = simGame(s7.elo, s8.elo, true, rng) ? s7 : s8;
     const loser78 = seed7 === s7 ? s8 : s7;
-    const w910    = simGame(s9.elo, s10.elo, true, rng)        ? s9 : s10;
-    const seed8   = simGame(loser78.elo, w910.elo, true, rng)  ? loser78 : w910;
+    const w910 = simGame(s9.elo, s10.elo, true, rng) ? s9 : s10;
+    const seed8 = simGame(loser78.elo, w910.elo, true, rng) ? loser78 : w910;
     // Wrap to avoid mutating seed across sims
     return [{ ...seed7, seed: 7 }, { ...seed8, seed: 8 }];
   }
@@ -306,12 +306,12 @@ export default async function handler(req, res) {
   result.forEach(t => {
     const c = counts[t.team];
     if (c) {
-      t.playInPct = +(c.pi     / SIMS * 100).toFixed(1);
-      t.r1Pct     = +(c.r1     / SIMS * 100).toFixed(1);
-      t.r2Pct     = +(c.r2     / SIMS * 100).toFixed(1);
-      t.confPct   = +(c.conf   / SIMS * 100).toFixed(1);
+      t.playInPct = +(c.pi / SIMS * 100).toFixed(1);
+      t.r1Pct = +(c.r1 / SIMS * 100).toFixed(1);
+      t.r2Pct = +(c.r2 / SIMS * 100).toFixed(1);
+      t.confPct = +(c.conf / SIMS * 100).toFixed(1);
       t.finalsPct = +(c.finals / SIMS * 100).toFixed(1);
-      t.champPct  = +(c.champ  / SIMS * 100).toFixed(1);
+      t.champPct = +(c.champ / SIMS * 100).toFixed(1);
     }
   });
 
@@ -327,7 +327,7 @@ export default async function handler(req, res) {
   };
 
   try {
-    const CACHE_KEY = `elo:${season}`;
+    // already declared at the top of the handler
     await kv.set(CACHE_KEY, responsePayload, { ex: 3600 }); // 1hr TTL
   } catch (e) {
     console.error("KV cache skip:", e);

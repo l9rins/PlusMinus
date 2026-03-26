@@ -61,6 +61,7 @@ export default async function handler(req, res) {
       `${ODDS_BASE}/sports/basketball_nba/odds` +
       `?apiKey=${apiKey}&regions=us&markets=h2h&oddsFormat=american&bookmakers=draftkings,fanduel,betmgm,caesars,betrivers,espnbet,barstool,pointsbetus,betparx,fliff,hardrock,mybookieag`;
 
+    console.info("[api/odds] fetching odds snapshot");
     const upstream = await fetch(url, { signal: AbortSignal.timeout(8000) });
 
     if (!upstream.ok) {

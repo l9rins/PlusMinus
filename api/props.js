@@ -319,14 +319,17 @@ export default async function handler(req, res) {
         // Update in-memory snapshot for same-Lambda subsequent calls
         // Removed `handler._prevSnapshot = result;` to purely rely on KV
 
+        // Store _moves separately in KV for notify.js, but strip from HTTP response
+        await kv.set("props_moves:latest", moves, { ex: 7200 }).catch(() => {});
+
         // Cache for 10 minutes — props move slowly intraday
         res.setHeader("Cache-Control", "s-maxage=600, stale-while-revalidate=60");
         res.setHeader("Content-Type", "application/json");
 
         // Persist to KV for fallback cache
-        await kv.set("props_cache", { ...result, _moves: moves, cachedAt: Date.now() }, { ex: 3600 }).catch(() => {});
+        await kv.set("props_cache", { ...result, cachedAt: Date.now() }, { ex: 3600 }).catch(() => {});
 
-        return res.status(200).json({ ...result, _moves: moves });
+        return res.status(200).json(result);
 
     } catch (err) {
         if (err.name === "TimeoutError") {

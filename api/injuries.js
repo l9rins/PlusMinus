@@ -115,7 +115,7 @@ export default async function handler(req, res) {
     return res.status(200).json(result);
 
   } catch (err) {
-    if (err.name === "TimeoutError") return res.status(504).json({ error: "BDL timed out" });
+    if (err.name === "TimeoutError") return res.status(503).json({ error: "BDL timed out — retrying" });
     return res.status(502).json({ error: err.message });
   }
 }

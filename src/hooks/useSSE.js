@@ -28,6 +28,18 @@ export function useSSE({ onAlert, onOdds } = {}) {
       const token = await getToken();
       if (cancelled) return;
 
+      // Probe the endpoint first to catch 401/403 before opening SSE
+      try {
+        const probe = await fetch(`/api/stream?token=${encodeURIComponent(token)}`, {
+          method: "HEAD",
+          signal: AbortSignal.timeout(5000),
+        });
+        if (probe.status === 401 || probe.status === 403) {
+          console.warn("[useSSE] Auth failed, stopping reconnect");
+          return;
+        }
+      } catch { /* network down — fall through to SSE which will retry */ }
+
       const url = `/api/stream?token=${encodeURIComponent(token)}`;
       const es  = new EventSource(url);
       esRef.current = es;
