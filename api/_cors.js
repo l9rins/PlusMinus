@@ -5,6 +5,7 @@
 const ALLOWED_ORIGINS = new Set([
   "http://localhost:3000",
   "http://localhost:5173",
+  "http://localhost:3055",
 ]);
 
 const VERCEL_PREVIEW_RE = /^https:\/\/plusminus-[a-zA-Z0-9-]+\.vercel\.app$/;

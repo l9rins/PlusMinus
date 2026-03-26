@@ -230,9 +230,9 @@ function AppInner() {
       <SignedOut>
         <main role="main" className="min-h-screen flex items-center justify-center">
           <div className="text-center mb-8">
-            <div className="font-display text-5xl tracking-widest text-accent mb-2">±</div>
-            <div className="font-display text-2xl tracking-[4px] text-pitch-50 mb-1">PLUSMINUS</div>
-            <div className="text-[11px] tracking-[2px] text-pitch-500 uppercase mb-8">NBA Analytics</div>
+            <div className="text-5xl font-bold tracking-tight text-accent mb-2">±</div>
+            <div className="text-2xl font-bold tracking-tight text-pitch-50 mb-1 uppercase">PLUSMINUS</div>
+            <div className="text-[11px] font-semibold tracking-widest text-pitch-500 uppercase mb-8">NBA Analytics</div>
             <SignIn routing="hash" />
           </div>
         </main>
@@ -279,7 +279,7 @@ function AppInner() {
 
         <ToastContainer />
         <div className="hidden sm:block fixed bottom-3 right-4 z-10 pointer-events-none select-none">
-          <div className="text-[9px] text-pitch-700 font-mono">
+          <div className="text-[9px] text-pitch-700 font-semibold uppercase tracking-widest">
             D·S·L·P·B·T·A·C &nbsp;shortcuts &nbsp;|&nbsp; / &nbsp;search
           </div>
         </div>
@@ -291,7 +291,7 @@ function AppInner() {
 
 export default function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <AppInner />
     </BrowserRouter>
   );

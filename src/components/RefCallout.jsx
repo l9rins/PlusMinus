@@ -29,7 +29,7 @@ export default function RefCallout({ matchup }) {
           <BarChartHorizontal size={10} className="text-accent" />
           Referee Crew Trends
         </div>
-        <div className="text-[9px] text-pitch-600 font-mono">
+        <div className="text-[9px] text-pitch-600 font-bold uppercase tracking-tight">
           Last 50 games {data.mock && "· Mock Data"}
         </div>
       </div>
@@ -49,12 +49,12 @@ export default function RefCallout({ matchup }) {
               </span>
               {trend ? (
                 <div className="flex gap-2">
-                  <span className={`text-[9px] px-1.2 py-0.4 rounded font-mono
+                  <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase tracking-tighter
                     ${trend.favoring === "Away" ? "text-win bg-win/8" :
                     trend.favoring === "Home" ? "text-loss bg-loss/8" : "text-pitch-500 bg-pitch-750"}`}>
                     Fav: {trend.favoring}
                   </span>
-                  <span className={`text-[9px] px-1.2 py-0.4 rounded font-mono
+                  <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase tracking-tighter
                     ${trend.overRate > "55%"  ? "text-win bg-win/8" :
                     trend.overRate < "45%"  ? "text-loss bg-loss/8" : "text-pitch-500 bg-pitch-750"}`}>
                     Over: {trend.overRate}

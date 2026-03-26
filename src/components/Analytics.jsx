@@ -20,8 +20,10 @@ import {
 } from "../data";
 import { useStandings, useLeagueTeamStats, useEnrichedPlayerStats, useEloData, useFourFactorsStats } from "../api";
 import { FreshnessTag, RowSkeleton, ErrorState, Tooltip } from "./ui";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "./ui/tabs";
 import { signed, reshapeNBAStats, lsGet, lsSet, calcPercentile } from "../utils";
 import { TrendingUp, BarChart2, Zap, Award, Info, Star, Trophy } from "lucide-react";
+import { cn } from "../lib/utils";
 import PlayoffBracket from "./PlayoffBracket";
 
 // Constants mirrored from playoffWorker.js for display purposes
@@ -38,10 +40,30 @@ function teamSeed(abbr, index) {
 }
 
 const tooltipStyle = {
-  contentStyle: { background: "rgba(255,255,255,0.95)", border: "1px solid #e5e5e5", borderRadius: "1rem", fontSize: 11, padding: "12px 16px", boxShadow: "0 10px 15px -3px rgba(0,0,0,0.1)" },
-  labelStyle: { color: "#0a0a0a", fontWeight: "800", marginBottom: 6, textTransform: "uppercase", letterSpacing: "1px" },
-  itemStyle: { color: "#666666", fontWeight: "500" },
-  cursor: { stroke: "#e5e5e5", strokeWidth: 1 },
+  contentStyle: { 
+    background: "var(--neon-bg)", 
+    border: "1px solid var(--neon-border-md)", 
+    borderRadius: "4px", 
+    fontSize: 10, 
+    padding: "8px 12px", 
+    boxShadow: "0 10px 30px rgba(0,0,0,0.5)",
+    fontFamily: "inherit"
+  },
+  labelStyle: { 
+    color: "var(--neon-text)", 
+    fontWeight: "700", 
+    marginBottom: 4, 
+    textTransform: "uppercase", 
+    letterSpacing: "1px" 
+  },
+  itemStyle: { 
+    color: "var(--neon-green)", 
+    fontWeight: "500" 
+  },
+  cursor: { 
+    stroke: "var(--neon-border)", 
+    strokeWidth: 1 
+  },
 };
 
 
@@ -135,40 +157,43 @@ function PlayoffSimView({ data }) {
   return (
     <motion.div variants={container} initial="hidden" animate="show">
       {/* Header */}
-      <motion.div variants={item} className="flex flex-wrap items-center justify-between gap-3 mb-4">
+      <motion.div variants={item} className="flex flex-wrap items-center justify-between gap-3 mb-6 border-l-2 border-[var(--neon-green-border)] pl-4">
         <div>
-          <div className="text-[10px] font-bold text-morphin-muted uppercase tracking-[3px]">Monte Carlo Playoff Simulation</div>
-          <div className="text-3xl font-display font-black text-morphin-text mt-1">
-            10,000 simulations · Elo-based win probability
+          <div className="pm-label opacity-40">Monte Carlo Playoff Simulation</div>
+          <div className="pm-number text-3xl text-[var(--neon-text)] mt-1 tracking-tight">
+            10,000 CYCLES · ELO SIGNAL
           </div>
         </div>
-        <div className="flex gap-1.5">
-          {[["all", "All"], ["East", "East"], ["West", "West"]].map(([id, lbl]) => (
+        <div className="flex gap-1 bg-[var(--neon-surface)] p-1 rounded-lg border border-[var(--neon-border)]">
+          {[["all", "ALL"], ["East", "EAST"], ["West", "WEST"]].map(([id, lbl]) => (
             <button key={id} onClick={() => setConfFilter(id)}
-              className={`pm-tab ${confFilter === id ? "active" : ""}`}>{lbl}</button>
+              className={cn(
+                 "px-3 py-1.5 rounded text-[9px] font-bold tracking-widest transition-all",
+                confFilter === id ? "bg-[var(--neon-raised)] text-[var(--neon-green)] shadow-sm" : "text-[var(--neon-dim)] hover:text-[var(--neon-text)]"
+              )}>{lbl}</button>
           ))}
         </div>
       </motion.div>
 
       {/* Stacked bar chart */}
-      <motion.div variants={item} className="pm-card p-4 mb-4">
-        <div className="text-[10px] font-bold text-morphin-muted mb-4 uppercase tracking-[2px]">Championship probability · top 16</div>
+      <motion.div variants={item} className="p-4 mb-4 rounded-lg border border-[var(--neon-border)] bg-[var(--neon-surface)]/30">
+        <div className="pm-label opacity-40 mb-4 tracking-[2px]">CHAMPIONSHIP PROBABILITY · TOP 16</div>
         <div style={{ height: 200 }}>
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={chartData} barCategoryGap="18%">
-              <CartesianGrid strokeDasharray="3 3" stroke="#e5e5e5" vertical={false} />
-              <XAxis dataKey="team" tick={{ fill: "#666666", fontSize: 10, fontWeight: "bold" }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fill: "#666666", fontSize: 10, fontWeight: "bold" }} axisLine={false} tickLine={false} tickFormatter={v => `${v}%`} />
+              <CartesianGrid strokeDasharray="2 2" stroke="var(--neon-border)" vertical={false} />
+              <XAxis dataKey="team" tick={{ fill: "var(--neon-dim)", fontSize: 10, fontFamily: "inherit" }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fill: "var(--neon-dim)", fontSize: 10, fontFamily: "inherit" }} axisLine={false} tickLine={false} tickFormatter={v => `${v}%`} />
               <RechartsTooltip {...tooltipStyle} formatter={(v, name) => [`${v.toFixed(1)}%`,
               name === "champ" ? "Championship" : name === "finals" ? "+ Finals" : "+ Conf Finals"]} />
               <Bar dataKey="conf" stackId="a" radius={[0, 0, 0, 0]}>
-                {chartData.map(e => <Cell key={e.team} fill={e.color} fillOpacity={0.18} />)}
+                {chartData.map(e => <Cell key={e.team} fill={e.color} fillOpacity={0.12} />)}
               </Bar>
               <Bar dataKey="finals" stackId="a" radius={[0, 0, 0, 0]}>
-                {chartData.map(e => <Cell key={e.team} fill={e.color} fillOpacity={0.35} />)}
+                {chartData.map(e => <Cell key={e.team} fill={e.color} fillOpacity={0.25} />)}
               </Bar>
-              <Bar dataKey="champ" stackId="a" radius={[4, 4, 0, 0]}>
-                {chartData.map(e => <Cell key={e.team} fill={e.color} fillOpacity={0.9} />)}
+              <Bar dataKey="champ" stackId="a" radius={[2, 2, 0, 0]}>
+                {chartData.map(e => <Cell key={e.team} fill={e.color} fillOpacity={0.8} />)}
               </Bar>
             </BarChart>
           </ResponsiveContainer>
@@ -178,24 +203,23 @@ function PlayoffSimView({ data }) {
       {/* Top 3 podium */}
       <motion.div variants={item} className="grid grid-cols-3 gap-3 mb-4">
         {filtered.slice(0, 3).map((t, i) => (
-          <div key={t.team} className="pm-card p-4 text-center relative overflow-hidden"
-            style={{ boxShadow: `0 0 0 1px ${t.color}30 inset` }}>
-            <div className="absolute inset-0 opacity-5"
-              style={{ background: `radial-gradient(ellipse at center, ${t.color}, transparent 70%)` }} />
-            <div className="text-[10px] text-pitch-500 font-mono mb-1">#{i + 1} favorite</div>
-            <div className="font-display text-3xl tracking-widest mb-1" style={{ color: t.color }}>{t.team}</div>
-            <div className="font-mono text-2xl font-bold text-pitch-50 tabular-nums">{t.champPct}%</div>
-            <div className="text-[10px] text-pitch-500 mt-1">
-              {t.conf} · {t.isPlayIn ? `Play-in (#${t.seed})` : `Seed #${t.seed}`}
+          <div key={t.team} className="border border-[var(--neon-border)] bg-[var(--neon-surface)] p-4 text-center relative overflow-hidden rounded-lg">
+            <div className="absolute inset-0 opacity-10"
+              style={{ background: `radial-gradient(ellipse at top, ${t.color}, transparent 70%)` }} />
+            <div className="text-[9px] text-[var(--neon-muted)] font-bold mb-1 uppercase tracking-tight">#{i + 1} FAVORITE</div>
+            <div className="pm-number text-2xl tracking-widest mb-1" style={{ color: t.color }}>{t.team}</div>
+            <div className="pm-number text-xl text-[var(--neon-text)] tabular-nums">{t.champPct}%</div>
+            <div className="text-[9px] font-bold text-[var(--neon-dim)] mt-1 uppercase tracking-widest">
+              {t.conf} · {t.isPlayIn ? `PI-${t.seed}` : `SEED ${t.seed}`}
             </div>
-            <div className="mt-2 grid grid-cols-2 gap-1 text-[9px]">
-              <div className="bg-pitch-750 rounded px-1.5 py-1">
-                <div className="text-pitch-500">Finals</div>
-                <div className="font-mono text-pitch-200">{t.finalsPct}%</div>
+            <div className="mt-3 grid grid-cols-2 gap-1 text-[8px] font-bold uppercase tracking-tight">
+              <div className="bg-[var(--neon-overlay)] rounded border border-[var(--neon-border)] px-1.5 py-1">
+                <div className="text-[var(--neon-muted)]">FINALS</div>
+                <div className="text-[var(--neon-text)]">{t.finalsPct}%</div>
               </div>
-              <div className="bg-pitch-750 rounded px-1.5 py-1">
-                <div className="text-pitch-500">Conf</div>
-                <div className="font-mono text-pitch-200">{t.confPct}%</div>
+              <div className="bg-[var(--neon-overlay)] rounded border border-[var(--neon-border)] px-1.5 py-1">
+                <div className="text-[var(--neon-muted)]">CONF</div>
+                <div className="text-[var(--neon-text)]">{t.confPct}%</div>
               </div>
             </div>
           </div>
@@ -208,16 +232,16 @@ function PlayoffSimView({ data }) {
       </motion.div>
 
       {/* Full table */}
-      <motion.div variants={item} className="pm-card overflow-x-auto">
+      <motion.div variants={item} className="border border-[var(--neon-border)] bg-[var(--neon-surface)] rounded-lg overflow-x-auto">
         <table className="w-full text-sm min-w-[680px]">
           <thead>
-            <tr className="border-b border-pitch-650">
-              <th className="px-3 py-2.5 text-left pm-label">#</th>
-              <th className="px-3 py-2.5 text-left pm-label">Team</th>
-              <th className="px-3 py-2.5 text-left pm-label">Seed</th>
+            <tr className="border-b border-[var(--neon-border-md)] bg-[var(--neon-overlay)]">
+              <th className="px-4 py-3 text-left pm-label opacity-40">#</th>
+              <th className="px-4 py-3 text-left pm-label opacity-40">TEAM</th>
+              <th className="px-4 py-3 text-left pm-label opacity-40">SEED</th>
               {COLS.map(c => (
-                <th key={c.key} className="px-3 py-2.5 text-left pm-label whitespace-nowrap">
-                   <Tooltip content={c.tip}>{c.label}</Tooltip>
+                <th key={c.key} className="px-4 py-3 text-left pm-label opacity-40 whitespace-nowrap">
+                   <Tooltip content={c.tip}>{c.label.toUpperCase()}</Tooltip>
                 </th>
               ))}
             </tr>
@@ -225,25 +249,25 @@ function PlayoffSimView({ data }) {
           <tbody>
             {filtered.map((t, i) => (
               <motion.tr key={t.team}
-                initial={{ opacity: 0, x: -4 }} animate={{ opacity: 1, x: 0 }}
+                initial={{ opacity: 0 }} animate={{ opacity: 1 }}
                 transition={{ delay: i * 0.01 }}
                 onMouseEnter={() => setHighlight(t.team)}
                 onMouseLeave={() => setHighlight(null)}
-                className={`border-b border-pitch-700/60 transition-colors
-                  ${highlight === t.team ? "bg-pitch-750" : "hover:bg-pitch-800/60"}`}>
-                <td className="px-3 py-2.5 font-mono text-[11px] text-pitch-500">{i + 1}</td>
-                <td className="px-3 py-2.5">
+                className={cn("border-b border-[var(--neon-border)]/50 transition-colors",
+                  highlight === t.team ? "bg-[var(--neon-raised)]" : "hover:bg-[var(--neon-overlay)]")}>
+                <td className="px-4 py-3 pm-label opacity-30">{i + 1}</td>
+                <td className="px-4 py-3">
                   <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: t.color }} />
-                    <span className={`font-display text-base tracking-wider
-                      ${t.champPct >= 15 ? "text-accent" : t.champPct < 1 ? "text-pitch-600" : "text-pitch-200"}`}>
+                    <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: t.color }} />
+                    <span className={cn("pm-number text-sm tracking-widest",
+                      t.champPct >= 15 ? "text-[var(--neon-green)]" : t.champPct < 1 ? "text-[var(--neon-muted)]" : "text-[var(--neon-text)]")}>
                       {t.team}
                     </span>
                   </div>
                 </td>
-                <td className="px-3 py-2.5">
-                  <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded
-                    ${t.isPlayIn ? "text-draw bg-draw/10 border border-draw/20" : "text-pitch-400 bg-pitch-750 border border-pitch-650"}`}>
+                <td className="px-4 py-3">
+                  <span className={cn("text-[9px] font-bold px-1.5 py-0.5 rounded border",
+                    t.isPlayIn ? "text-loss bg-loss/5 border-loss/20" : "text-[var(--neon-muted)] bg-[var(--neon-overlay)] border-[var(--neon-border)]")}>
                     {t.isPlayIn ? `PI-${t.seed}` : `#${t.seed}`}
                   </span>
                 </td>
@@ -251,19 +275,19 @@ function PlayoffSimView({ data }) {
                   const val = t[c.key];
                   const pct = val / (c.key === "champPct" ? maxChamp : 100);
                   return (
-                    <td key={c.key} className="px-3 py-2.5">
+                    <td key={c.key} className="px-4 py-3">
                       <div className="flex items-center gap-2">
-                        <div className="w-16 h-1.5 bg-pitch-700 rounded-full overflow-hidden flex-shrink-0">
-                          <motion.div className="h-full rounded-full"
-                            style={{ background: t.color, opacity: 0.75 }}
+                        <div className="w-12 h-1 bg-[var(--neon-overlay)] overflow-hidden flex-shrink-0">
+                          <motion.div className="h-full"
+                            style={{ background: t.color, opacity: 0.6 }}
                             initial={{ width: 0 }}
                             animate={{ width: `${Math.min(100, pct * 100)}%` }}
                             transition={{ duration: 0.6, delay: i * 0.008 }} />
                         </div>
-                        <span className={`font-mono text-[11px] tabular-nums
-                          ${c.key === "champPct" && val >= 15 ? "text-accent font-semibold"
+                        <span className={cn("pm-number text-[10px]",
+                          c.key === "champPct" && val >= 15 ? "text-[var(--neon-green)]"
                             : c.key === "champPct" && val >= 5 ? "text-win"
-                              : "text-pitch-300"}`}>
+                              : "text-[var(--neon-text)]")}>
                           {val}%
                         </span>
                       </div>
@@ -287,7 +311,7 @@ function PlayoffSimView({ data }) {
 }
 
 function PctBadge({ value, allValues, invert = false }) {
-  if (value == null || !allValues?.length) return <span className="text-pitch-600 font-mono text-[10px]">—</span>;
+  if (value == null || !allValues?.length) return <span className="text-pitch-600 text-[10px]">—</span>;
   const { pct, color } = calcPercentile(value, allValues, invert);
   return (
     <span
@@ -347,20 +371,19 @@ function FourFactorsView({ data }) {
             </BarChart>
           </ResponsiveContainer>
         </div>
-      </motion.div>
-      <motion.div variants={item} className="pm-card overflow-x-auto">
-        <table className="w-full text-sm min-w-[660px]">
+      </div>
+      <motion.div variants={item} className="border border-[var(--neon-border)] bg-[var(--neon-surface)] rounded-lg overflow-x-auto">
+        <table className="w-full text-xs min-w-[660px]">
           <thead>
-            <tr className="border-b border-pitch-650">
+            <tr className="border-b border-[var(--neon-border-md)] bg-[var(--neon-overlay)]">
               {headers.map(h => (
                 <th key={h.label} onClick={() => h.sortable && setSortKey(h.key)}
-                  className={`px-3 py-2.5 text-left pm-label font-medium whitespace-nowrap
-                    ${h.sortable ? "cursor-pointer hover:text-accent/80 transition-colors select-none" : ""}
-                    ${sortKey === h.key ? "text-accent" : ""}`}>
+                  className={cn("px-3 py-3 text-left pm-label font-bold whitespace-nowrap opacity-40",
+                    h.sortable && "cursor-pointer hover:opacity-100 transition-all select-none",
+                    sortKey === h.key && "opacity-100 text-[var(--neon-green)]")}>
                   <Tooltip content={h.tip}>
                     <span className="inline-flex items-center gap-1">
-                      {h.label}
-                      {h.tip && <span className="text-pitch-600 opacity-50">?</span>}
+                      {h.label.toUpperCase()}
                     </span>
                   </Tooltip>
                   {sortKey === h.key ? (h.key === "tov" ? " ↑" : " ↓") : ""}
@@ -371,52 +394,29 @@ function FourFactorsView({ data }) {
           <tbody>
             {sorted.map((t, i) => (
               <motion.tr key={t.team}
-                initial={{ opacity: 0, x: -4 }} animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: i * 0.012 }}
-                className={`border-b border-pitch-700/60 transition-colors
-                  ${hovered === t.team ? "bg-pitch-750" : "hover:bg-pitch-800/60"}`}
+                initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                transition={{ delay: i * 0.01 }}
+                className={cn("border-b border-[var(--neon-border)]/50 transition-colors",
+                  hovered === t.team ? "bg-[var(--neon-raised)]" : "hover:bg-[var(--neon-overlay)]")}
                 onMouseEnter={() => setHovered(t.team)} onMouseLeave={() => setHovered(null)}>
-                <td className="px-3 py-2.5 font-mono text-[11px] text-pitch-500 tabular-nums">{i + 1}</td>
-                <td className="px-3 py-2.5">
+                <td className="px-3 py-3 pm-label opacity-30">{i + 1}</td>
+                <td className="px-3 py-3">
                   <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: t.color }} />
-                    <span className={`font-display text-base tracking-wider ${i < 3 ? "text-accent" : "text-pitch-200"}`}>{t.team}</span>
-                    <span className="text-[10px] text-pitch-600 hidden sm:inline">{t.w}-{t.l}</span>
+                    <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: t.color }} />
+                    <span className={cn("pm-number text-sm tracking-wider", i < 3 ? "text-[var(--neon-green)]" : "text-[var(--neon-text)]")}>{t.team}</span>
+                    <span className="text-[9px] text-[var(--neon-muted)] opacity-60 ml-1">{t.w}-{t.l}</span>
                   </div>
                 </td>
-                <td className="px-3 py-2.5">
-                  <div className="flex items-center gap-1.5">
-                    <span className="font-mono text-pitch-200 tabular-nums">{t.efg}%</span>
-                    <PctBadge value={t.efg} allValues={allEfg} />
-                  </div>
+                <td className="px-3 py-3 pm-number text-[var(--neon-text)] opacity-80">{t.efg}%</td>
+                <td className="px-3 py-3 pm-number text-[var(--neon-text)] opacity-80">{t.tov}%</td>
+                <td className="px-3 py-3 pm-number text-[var(--neon-text)] opacity-80">{t.orb}%</td>
+                <td className="px-3 py-3 pm-number text-[var(--neon-text)] opacity-80">{t.ftRate}</td>
+                <td className={cn("px-3 py-3 pm-number text-[var(--neon-text)]",
+                  t.netRtg >= 8 ? "text-[var(--neon-green)]" : t.netRtg >= 3 ? "text-win"
+                    : t.netRtg >= 0 ? "text-[var(--neon-text)]" : t.netRtg >= -3 ? "text-loss" : "text-loss font-black")}>
+                   {t.netRtg > 0 ? "+" : ""}{t.netRtg}
                 </td>
-                <td className="px-3 py-2.5">
-                  <div className="flex items-center gap-1.5">
-                    <span className="font-mono text-pitch-300 tabular-nums">{t.tov}%</span>
-                    <PctBadge value={t.tov} allValues={allTov} invert={true} />
-                  </div>
-                </td>
-                <td className="px-3 py-2.5">
-                  <div className="flex items-center gap-1.5">
-                    <span className="font-mono text-pitch-300 tabular-nums">{t.orb}%</span>
-                    <PctBadge value={t.orb} allValues={allOrb} />
-                  </div>
-                </td>
-                <td className="px-3 py-2.5">
-                  <div className="flex items-center gap-1.5">
-                    <span className="font-mono text-pitch-300 tabular-nums">{t.ftRate}</span>
-                    <PctBadge value={t.ftRate} allValues={allFtRate} />
-                  </div>
-                </td>
-                <td className={`px-3 py-2.5 font-mono font-semibold tabular-nums
-                  ${t.netRtg >= 8 ? "text-tier-elite" : t.netRtg >= 3 ? "text-tier-good"
-                    : t.netRtg >= 0 ? "text-tier-avg" : t.netRtg >= -3 ? "text-tier-poor" : "text-tier-bad"}`}>
-                  <div className="flex items-center gap-1.5">
-                    <span>{t.netRtg > 0 ? "+" : ""}{t.netRtg}</span>
-                    <PctBadge value={t.netRtg} allValues={allNetRtg} />
-                  </div>
-                </td>
-                <td className="px-3 py-2.5 font-mono text-pitch-400 tabular-nums">{t.pct.toFixed(3)}</td>
+                <td className="px-3 py-3 pm-number text-[var(--neon-muted)] opacity-50">{t.pct.toFixed(3)}</td>
               </motion.tr>
             ))}
           </tbody>
@@ -448,18 +448,18 @@ function EloView({ data }) {
   }, [data, selectedTeams]);
   return (
     <motion.div variants={container} initial="hidden" animate="show">
-      <motion.div variants={item} className="pm-label mb-3">Elo power rankings — select up to 6 teams to compare trajectories</motion.div>
-      <motion.div variants={item} className="pm-card p-4 mb-4">
-        <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-          <div className="pm-label">Season Elo curve</div>
-          <div className="flex gap-1 flex-wrap">
+      <motion.div variants={item} className="pm-label mb-3 opacity-40 uppercase tracking-[2px]">Compare trajectories · Select up to 6 nodes</motion.div>
+      <motion.div variants={item} className="border border-[var(--neon-border)] bg-[var(--neon-surface)]/20 p-6 rounded-lg mb-6">
+        <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+          <div className="pm-label opacity-40 tracking-[2px]">SEASON ELO SIGNAL</div>
+          <div className="flex gap-1.5 flex-wrap">
             {selectedTeams.map(team => {
               const td = data.find(t => t.team === team);
               return (
                 <button key={team} onClick={() => toggle(team)}
-                  className="text-[10px] font-medium px-2 py-0.5 rounded-full border flex items-center gap-1 transition-all hover:opacity-70"
-                  style={{ borderColor: td?.color + "60", color: td?.color, background: td?.color + "18" }}>
-                  {team} <span className="opacity-50">×</span>
+                  className="px-2.5 py-1 rounded border border-[var(--neon-border-md)] bg-[var(--neon-overlay)] text-[9px] font-bold flex items-center gap-2 transition-all hover:bg-[var(--neon-raised)]"
+                  style={{ color: td?.color }}>
+                  {team} <span className="opacity-30">×</span>
                 </button>
               );
             })}
@@ -479,12 +479,10 @@ function EloView({ data }) {
                   );
                 })}
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#eeeeee" vertical={false} />
-              <XAxis dataKey="game" tick={{ fill: "#666666", fontSize: 10, fontWeight: "bold" }} axisLine={false} tickLine={false}
-                label={{ value: "Games", position: "insideBottomRight", offset: -4, fill: "#999999", fontSize: 9 }} />
-              <YAxis domain={["auto", "auto"]} tick={{ fill: "#666666", fontSize: 10, fontWeight: "bold" }} axisLine={false} tickLine={false} />
-              <ReferenceLine y={1500} stroke="#e5e5e5" strokeDasharray="4 2" strokeWidth={1}
-                label={{ value: "avg", position: "right", fill: "#999999", fontSize: 9 }} />
+              <CartesianGrid strokeDasharray="2 2" stroke="var(--neon-border)" vertical={false} />
+              <XAxis dataKey="game" tick={{ fill: "var(--neon-dim)", fontSize: 10, fontFamily: "inherit" }} axisLine={false} tickLine={false} />
+              <YAxis domain={["auto", "auto"]} tick={{ fill: "var(--neon-dim)", fontSize: 10, fontFamily: "inherit" }} axisLine={false} tickLine={false} />
+              <ReferenceLine y={1500} stroke="var(--neon-border-md)" strokeDasharray="4 2" strokeWidth={1} />
               <RechartsTooltip {...tooltipStyle} />
               {selectedTeams.map(team => {
                 const td = data.find(t => t.team === team);
@@ -496,24 +494,25 @@ function EloView({ data }) {
           </ResponsiveContainer>
         </div>
       </motion.div>
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
         {data.map((t, i) => (
           <motion.div key={t.team} variants={item} onClick={() => toggle(t.team)}
-            className={`pm-tile p-3 cursor-pointer transition-all ${selectedTeams.includes(t.team) ? "ring-1 ring-accent/30 bg-accent/5" : ""}`}>
-            <div className="flex items-center justify-between mb-1.5">
+            className={cn("p-4 rounded-lg border transition-all cursor-pointer",
+              selectedTeams.includes(t.team) ? "border-[var(--neon-green-border)] bg-[var(--neon-green-faint)]" : "border-[var(--neon-border)] bg-[var(--neon-surface)]/40 hover:border-[var(--neon-border-md)]")}>
+            <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-1.5">
-                <span className="text-[10px] text-pitch-600 font-mono">#{i + 1}</span>
-                <div className="w-2 h-2 rounded-full" style={{ background: t.color }} />
+                <span className="text-[10px] text-[var(--neon-muted)] opacity-40">#{i + 1}</span>
+                <div className="w-1.5 h-1.5 rounded-full" style={{ background: t.color }} />
               </div>
-              <span className={`text-[9px] font-medium ${t.tierColor}`}>{t.tier}</span>
+              <span className={cn("text-[9px] font-bold tracking-widest", t.tierColor)}>{t.tier.toUpperCase()}</span>
             </div>
-            <div className="font-display text-xl tracking-wider text-pitch-100 mb-1">{t.team}</div>
-            <div className="font-mono text-2xl font-bold text-pitch-50 tabular-nums">{t.elo}</div>
-            <div className="text-[10px] text-pitch-500 mt-0.5 tabular-nums">{t.w}-{t.l}</div>
-            <div className="flex items-end gap-px h-5 mt-2">
+            <div className="pm-number text-xl tracking-tight text-[var(--neon-text)] mb-1 leading-none">{t.team}</div>
+            <div className="pm-number text-2xl text-[var(--neon-text)] tabular-nums">{t.elo}</div>
+            <div className="text-[9px] font-bold text-[var(--neon-muted)] uppercase tracking-widest opacity-40 mt-1">{t.w}-{t.l}</div>
+            <div className="flex items-end gap-px h-5 mt-4 opacity-30">
               {t.trajectory.map((tp, j) => (
                 <div key={j} className="flex-1 rounded-t-sm"
-                  style={{ height: `${Math.max(2, ((tp.elo - 1300) / 400) * 20)}px`, background: tp.elo >= 1500 ? t.color : "#2e3a50", opacity: 0.4 + (j / 10) * 0.6 }} />
+                  style={{ height: `${Math.max(2, ((tp.elo - 1300) / 400) * 20)}px`, background: tp.elo >= 1500 ? t.color : "var(--neon-dim)" }} />
               ))}
             </div>
           </motion.div>
@@ -536,64 +535,64 @@ function ShotQualityView({ data, isUsingFallback }) {
   const comparison = compareIdx !== null ? data[compareIdx] : null;
   return (
     <motion.div variants={container} initial="hidden" animate="show">
-      <motion.div variants={item} className="pm-label mb-3 flex items-center gap-2">
-        <span>Offensive & defensive profiles built from roster-level advanced metrics</span>
+      <motion.div variants={item} className="pm-label mb-3 flex items-center gap-2 opacity-40 uppercase tracking-[2px]">
+        <span>Advanced Roster Capability Profiles</span>
         {isUsingFallback && (
-          <span className="pm-badge bg-draw/10 text-draw border border-draw/20 text-[9px]">
-            Using cached data
+          <span className="px-1.5 h-4 bg-loss/10 text-loss border border-loss/20 text-[9px] flex items-center rounded font-bold uppercase tracking-tight">
+            CACHED SIGNAL
           </span>
         )}
       </motion.div>
-      <motion.div variants={item} className="flex flex-wrap gap-1.5 mb-4">
+      <motion.div variants={item} className="flex flex-wrap gap-1 mb-4">
         {data.map((t, i) => (
           <button key={t.team}
             onClick={() => { if (selected === i) return; if (compareIdx === i) { setCompareIdx(null); return; } setCompareIdx(selected); setSelected(i); }}
-            className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all border
-              ${selected === i ? "border-accent/30 text-accent bg-accent/10"
+            className={cn("px-2.5 py-1 rounded border text-[10px] font-bold tracking-widest transition-all",
+              selected === i ? "border-[var(--neon-green-border)] text-[var(--neon-green)] bg-[var(--neon-green-faint)]"
                 : compareIdx === i ? "border-draw/30 text-draw bg-draw/10"
-                  : "border-pitch-650 text-pitch-400 bg-pitch-800 hover:border-pitch-500 hover:text-pitch-300"}`}>
+                  : "border-[var(--neon-border)] text-[var(--neon-dim)] bg-[var(--neon-surface)] hover:border-[var(--neon-border-md)] hover:text-[var(--neon-text)]")}>
             {t.team}
           </button>
         ))}
       </motion.div>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <motion.div variants={item} className="pm-card p-4">
-          <div className="pm-label mb-3">
-            <span style={{ color: primary.color }}>{primary.team}</span>
-            {comparison && (<><span className="text-pitch-600"> vs </span><span style={{ color: comparison.color }}>{comparison.team}</span></>)}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <motion.div variants={item} className="p-6 rounded-lg border border-[var(--neon-border)] bg-[var(--neon-surface)]/20 shadow-sm">
+          <div className="pm-label mb-6 border-l-2 border-[var(--neon-green-border)] pl-3">
+            <span className="pm-number" style={{ color: primary.color }}>{primary.team.toUpperCase()}</span>
+            {comparison && (<><span className="opacity-20 mx-3">VS</span><span className="pm-number" style={{ color: comparison.color }}>{comparison.team.toUpperCase()}</span></>)}
           </div>
           <div style={{ height: 280 }}>
             <ResponsiveContainer width="100%" height="100%">
               <RadarChart data={primary.radar.map((r, i) => ({ ...r, compare: comparison?.radar[i]?.value ?? 0 }))}>
-                <PolarGrid stroke="#e5e5e5" />
-                <PolarAngleAxis dataKey="factor" tick={{ fill: "#666666", fontSize: 10, fontWeight: "bold" }} />
-                <PolarRadiusAxis angle={30} domain={[0, 100]} tick={{ fill: "#999999", fontSize: 9 }} axisLine={false} tickCount={4} />
-                <Radar name={primary.team} dataKey="value" stroke={primary.color} fill={primary.color} fillOpacity={0.15} strokeWidth={2} />
+                <PolarGrid stroke="var(--neon-border)" />
+                <PolarAngleAxis dataKey="factor" tick={{ fill: "var(--neon-dim)", fontSize: 10, fontFamily: "inherit" }} />
+                <PolarRadiusAxis angle={30} domain={[0, 100]} tick={false} axisLine={false} />
+                <Radar name={primary.team} dataKey="value" stroke={primary.color} fill={primary.color} fillOpacity={0.12} strokeWidth={2} />
                 {comparison && <Radar name={comparison.team} dataKey="compare" stroke={comparison.color} fill={comparison.color} fillOpacity={0.05} strokeWidth={2} strokeDasharray="4 2" />}
                 <RechartsTooltip {...tooltipStyle} formatter={v => [`${Number(v).toFixed(0)}`, ""]} />
               </RadarChart>
             </ResponsiveContainer>
           </div>
         </motion.div>
-        <motion.div variants={item} className="pm-card p-4">
-          <div className="pm-label mb-4">Factor breakdown</div>
-          <div className="space-y-3">
+        <motion.div variants={item} className="p-6 rounded-lg border border-[var(--neon-border)] bg-[var(--neon-surface)]/20 shadow-sm">
+          <div className="pm-label mb-6 opacity-40 uppercase tracking-[2px]">Factor Breakdown</div>
+          <div className="space-y-4">
             {primary.radar.map((r, i) => {
               const cmpVal = comparison?.radar[i]?.value;
               return (
                 <div key={r.factor}>
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-[11px] text-pitch-300">{r.factor}</span>
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono text-xs tabular-nums" style={{ color: primary.color }}>{r.value.toFixed(0)}</span>
-                      {cmpVal !== undefined && <span className="font-mono text-xs tabular-nums" style={{ color: comparison.color }}>{cmpVal.toFixed(0)}</span>}
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-[10px] font-bold text-[var(--neon-dim)] uppercase tracking-wider">{r.factor}</span>
+                    <div className="flex items-center gap-3">
+                      <span className="pm-number text-xs tabular-nums" style={{ color: primary.color }}>{r.value.toFixed(0)}</span>
+                      {cmpVal !== undefined && <span className="pm-number text-xs tabular-nums" style={{ color: comparison.color }}>{cmpVal.toFixed(0)}</span>}
                     </div>
                   </div>
-                  <div className="h-1.5 rounded-full bg-pitch-700 overflow-hidden relative">
-                    <motion.div className="h-full rounded-full absolute top-0 left-0" style={{ background: primary.color }}
+                  <div className="h-1 bg-[var(--neon-overlay)] overflow-hidden relative">
+                    <motion.div className="h-full absolute top-0 left-0" style={{ background: primary.color }}
                       initial={{ width: 0 }} animate={{ width: `${r.value}%` }} transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1], delay: i * 0.07 }} />
                     {cmpVal !== undefined && (
-                      <motion.div className="h-full rounded-full absolute top-0 left-0 opacity-35" style={{ background: comparison.color }}
+                      <motion.div className="h-full absolute top-0 left-0 opacity-20" style={{ background: comparison.color }}
                         initial={{ width: 0 }} animate={{ width: `${cmpVal}%` }} transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1], delay: i * 0.07 + 0.1 }} />
                     )}
                   </div>
@@ -601,16 +600,18 @@ function ShotQualityView({ data, isUsingFallback }) {
               );
             })}
           </div>
-          <div className="mt-5 border-t border-pitch-700 pt-4">
-            <div className="pm-label mb-2 flex items-center gap-2"><Star size={10} /> Star player</div>
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl flex items-center justify-center text-xs font-bold"
-                style={{ background: `${primary.color}25`, color: primary.color, border: `1px solid ${primary.color}40` }}>
+          <div className="mt-8 border-t border-[var(--neon-border)] pt-6">
+            <div className="pm-label mb-4 opacity-40 flex items-center gap-2 uppercase tracking-[2px]">
+              <Zap size={12} /> Unit Highlight
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="w-10 h-10 rounded-sm bg-[var(--neon-overlay)] border border-[var(--neon-border-md)] flex items-center justify-center text-[10px] font-bold"
+                style={{ color: primary.color }}>
                 {primary.topPlayer.name.split(" ").map(w => w[0]).join("").slice(0, 2)}
               </div>
               <div>
-                <div className="text-sm text-pitch-100 font-medium">{primary.topPlayer.name}</div>
-                <div className="text-[10px] text-pitch-400">{primary.topPlayer.pts} PPG · {primary.topPlayer.ast} APG · PER {primary.topPlayer.per}</div>
+                <div className="pm-number text-base text-[var(--neon-text)] leading-none">{primary.topPlayer.name}</div>
+                <div className="pm-label opacity-40 mt-1.5 text-[9px]">{primary.topPlayer.pts} PPG · {primary.topPlayer.ast} APG · EFF {primary.topPlayer.per}</div>
               </div>
             </div>
           </div>
@@ -634,56 +635,59 @@ function PowerIndexView({ data }) {
   const maxPower = Math.max(...data.map(d => d.powerIndex));
   return (
     <motion.div variants={container} initial="hidden" animate="show">
-      <motion.div variants={item} className="pm-label mb-3">Composite Power Index = 40% Elo + 35% Net Rating + 25% Shot Quality</motion.div>
-      <motion.div variants={item} className="grid grid-cols-3 gap-3 mb-4">
+      <motion.div variants={item} className="pm-label mb-3 border-l-2 border-[var(--neon-green-border)] pl-4">
+        <div className="opacity-40 uppercase tracking-[2px] text-[10px]">Composite Power Index</div>
+        <div className="pm-number text-xl text-[var(--neon-text)]">40% ELO + 35% NET + 25% SHOT QUALITY</div>
+      </motion.div>
+      <motion.div variants={item} className="grid grid-cols-3 gap-3 mb-6">
         {data.slice(0, 3).map((t, i) => (
-          <div key={t.team} className="pm-card p-4 text-center relative overflow-hidden"
-            style={{ boxShadow: `0 0 0 1px ${t.color}30 inset` }}>
-            <div className="absolute inset-0 opacity-5" style={{ background: `radial-gradient(ellipse at center, ${t.color}, transparent 70%)` }} />
-            <div className="text-[10px] text-pitch-500 font-mono mb-1">#{i + 1}</div>
-            <div className="font-display text-3xl tracking-widest mb-1" style={{ color: t.color }}>{t.team}</div>
-            <div className="font-mono text-2xl font-bold text-pitch-50 tabular-nums">{t.powerIndex}</div>
-            <div className={`text-[10px] mt-1 ${t.tierColor}`}>{t.tier}</div>
-            <div className="text-[10px] text-pitch-500 mt-0.5 tabular-nums">{t.w}-{t.l}</div>
+          <div key={t.team} className="border border-[var(--neon-border)] bg-[var(--neon-surface)] p-6 text-center relative overflow-hidden rounded-lg">
+            <div className="absolute inset-0 opacity-10" style={{ background: `radial-gradient(ellipse at center, ${t.color}, transparent 70%)` }} />
+            <div className="text-[10px] text-[var(--neon-muted)] font-bold mb-2 uppercase tracking-tight opacity-40">RANK #{i + 1}</div>
+            <div className="pm-number text-2xl tracking-widest mb-1" style={{ color: t.color }}>{t.team}</div>
+            <div className="pm-number text-3xl text-[var(--neon-text)] tabular-nums">{t.powerIndex}</div>
+            <div className={cn("text-[10px] font-bold uppercase tracking-widest mt-2", t.tierColor)}>{t.tier}</div>
+            <div className="text-[10px] text-[var(--neon-muted)] opacity-30 mt-1">{t.w}-{t.l}</div>
           </div>
         ))}
       </motion.div>
-      <motion.div variants={item} className="pm-card overflow-x-auto">
-        <table className="w-full text-sm min-w-[580px]">
+      <motion.div variants={item} className="border border-[var(--neon-border)] bg-[var(--neon-surface)] rounded-lg overflow-x-auto">
+        <table className="w-full text-xs min-w-[580px]">
           <thead>
-            <tr className="border-b border-pitch-650">
-              {["#", "Team", "Power Index", "W-L", "Net RTG", "Elo", "Tier"].map(h => (
-                <th key={h} className="px-3 py-2.5 text-left pm-label font-medium whitespace-nowrap">{h}</th>
+            <tr className="border-b border-[var(--neon-border-md)] bg-[var(--neon-overlay)]">
+              {["#", "TEAM", "INDEX", "RECORD", "NET RTG", "ELO", "TIER"].map(h => (
+                <th key={h} className="px-4 py-3 text-left pm-label font-bold whitespace-nowrap opacity-40">{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {data.map((t, i) => (
               <motion.tr key={t.team}
-                initial={{ opacity: 0, x: -4 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.012 }}
-                className={`border-b border-pitch-700/60 transition-colors ${hovered === t.team ? "bg-pitch-750" : "hover:bg-pitch-800/60"}`}
+                initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.01 }}
+                className={cn("border-b border-[var(--neon-border)]/50 transition-colors",
+                  hovered === t.team ? "bg-[var(--neon-raised)]" : "hover:bg-[var(--neon-overlay)]")}
                 onMouseEnter={() => setHovered(t.team)} onMouseLeave={() => setHovered(null)}>
-                <td className="px-3 py-2.5 font-mono text-[11px] text-pitch-500 tabular-nums">{i + 1}</td>
-                <td className="px-3 py-2.5">
+                <td className="px-4 py-3 pm-label opacity-30">{i + 1}</td>
+                <td className="px-4 py-3">
                   <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full" style={{ background: t.color }} />
-                    <span className={`font-display text-base tracking-wider ${i < 6 ? "text-pitch-100" : "text-pitch-300"}`}>{t.team}</span>
+                    <div className="w-1.5 h-1.5 rounded-full" style={{ background: t.color }} />
+                    <span className={cn("pm-number text-sm tracking-widest", i < 6 ? "text-[var(--neon-text)]" : "text-[var(--neon-muted)]")}>{t.team}</span>
                   </div>
                 </td>
-                <td className="px-3 py-2.5">
-                  <div className="flex items-center gap-2">
-                    <div className="h-1.5 w-24 bg-pitch-700 rounded-full overflow-hidden">
-                      <div className="h-full rounded-full transition-all" style={{ width: `${(t.powerIndex / maxPower) * 100}%`, background: t.color }} />
+                <td className="px-4 py-3">
+                  <div className="flex items-center gap-3">
+                    <div className="h-1 w-16 bg-[var(--neon-overlay)] overflow-hidden">
+                      <div className="h-full transition-all" style={{ width: `${(t.powerIndex / maxPower) * 100}%`, background: t.color, opacity: 0.6 }} />
                     </div>
-                    <span className="font-mono font-semibold text-pitch-100 tabular-nums">{t.powerIndex}</span>
+                    <span className="pm-number text-[var(--neon-text)] opacity-90">{t.powerIndex}</span>
                   </div>
                 </td>
-                <td className="px-3 py-2.5 font-mono text-pitch-300 tabular-nums">{t.w}-{t.l}</td>
-                <td className={`px-3 py-2.5 font-mono font-medium tabular-nums ${t.netRtg >= 0 ? "text-win" : "text-loss"}`}>
+                <td className="px-4 py-3 pm-number text-[var(--neon-muted)] opacity-50">{t.w}-{t.l}</td>
+                <td className={cn("px-4 py-3 pm-number", t.netRtg >= 0 ? "text-win" : "text-loss")}>
                   {t.netRtg > 0 ? "+" : ""}{t.netRtg}
                 </td>
-                <td className="px-3 py-2.5 font-mono text-pitch-300 tabular-nums">{t.elo}</td>
-                <td className={`px-3 py-2.5 text-[11px] font-medium ${t.tierColor}`}>{t.tier}</td>
+                <td className="px-4 py-3 pm-number text-[var(--neon-muted)] opacity-50">{t.elo}</td>
+                <td className={cn("px-4 py-3 text-[10px] font-bold tracking-widest", t.tierColor)}>{t.tier.toUpperCase()}</td>
               </motion.tr>
             ))}
           </tbody>
@@ -701,16 +705,19 @@ function PowerIndexView({ data }) {
 function MethodologyNote({ children }) {
   const [open, setOpen] = useState(false);
   return (
-    <motion.div variants={item} className="mt-3">
+    <motion.div variants={item} className="mt-4">
       <button onClick={() => setOpen(o => !o)}
-        className="flex items-center gap-1.5 text-[10px] text-pitch-500 hover:text-pitch-300 transition-colors">
-        <Info size={10} /> Methodology {open ? "▲" : "▼"}
+        className="flex items-center gap-2 px-3 py-1.5 rounded border border-[var(--neon-border)] bg-[var(--neon-surface)]/40 text-[9px] font-bold text-[var(--neon-dim)] hover:text-[var(--neon-text)] transition-all uppercase tracking-widest">
+        <Info size={10} /> {open ? "Hide Protocol" : "View Protocol"}
       </button>
       <AnimatePresence>
         {open && (
-          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
-            <div className="mt-2 pm-card p-4 text-[11px] text-pitch-400 leading-relaxed">{children}</div>
+          <motion.div initial={{ opacity: 0, scaleY: 0.95 }} animate={{ opacity: 1, scaleY: 1 }}
+            exit={{ opacity: 0, scaleY: 0.95 }} className="origin-top">
+            <div className="mt-3 p-5 rounded border border-[var(--neon-border-md)] bg-[var(--neon-overlay)] text-[10px] text-[var(--neon-muted)] leading-relaxed font-semibold">
+              <div className="mb-2 text-[var(--neon-text)] opacity-80 underline underline-offset-4 decoration-[var(--neon-green-border)]">TELEMETRY_LOG_v2.0</div>
+              {children}
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
@@ -836,40 +843,48 @@ export default function Analytics() {
 
   return (
     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.18 }}>
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-        <div className="flex flex-wrap gap-2">
-          {TABS.map(t => {
-            const Icon = t.icon;
-            return (
-              <button key={t.id} onClick={() => handleTab(t.id)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all
-                  ${activeTab === t.id
-                    ? "bg-accent/15 text-accent border border-accent/30"
-                    : "bg-pitch-800 text-pitch-400 border border-pitch-650 hover:border-pitch-500 hover:text-pitch-300"}`}>
-                <Icon size={11} />{t.label}
-              </button>
-            );
-          })}
+      <Tabs value={activeTab} onValueChange={handleTab} className="mb-6">
+        <div className="flex flex-wrap items-center justify-between gap-3 bg-[var(--neon-surface)] p-2 rounded-lg border border-[var(--neon-border)]">
+          <TabsList className="bg-transparent border-0 p-0 h-auto gap-1">
+            {TABS.map(t => {
+              const Icon = t.icon;
+              return (
+                <TabsTrigger key={t.id} value={t.id}
+                  className="flex items-center gap-2 px-3 py-2 rounded text-[10px] font-mono font-bold tracking-widest transition-all data-[state=active]:bg-[var(--neon-raised)] data-[state=active]:text-[var(--neon-green)] data-[state=active]:shadow-sm data-[state=active]:border data-[state=active]:border-[var(--neon-border-md)]">
+                  <Icon size={12} />{t.label.toUpperCase()}
+                </TabsTrigger>
+              );
+            })}
+          </TabsList>
+          <div className="px-3 border-l border-[var(--neon-border-md)] ml-auto">
+            <FreshnessTag isFetching={isFetching} dataUpdatedAt={dataUpdatedAt} />
+          </div>
         </div>
-        <FreshnessTag isFetching={isFetching} dataUpdatedAt={dataUpdatedAt} />
-      </div>
 
-      {isError && needsStandings ? (
-        <ErrorState message="Couldn't load standings for analytics." onRetry={refetch} />
-      ) : isLoading && needsStandings ? (
-        <div className="pm-card p-4"><RowSkeleton rows={15} /></div>
-      ) : (
-        <AnimatePresence mode="wait">
-          <motion.div key={activeTab} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.16 }}>
-            {activeTab === "power" && <PowerIndexView data={powerData} />}
-            {activeTab === "factors" && <FourFactorsView data={fourFactors} />}
-            {activeTab === "elo" && <EloView data={eloData} />}
-            {activeTab === "quality" && <ShotQualityView data={shotData} isUsingFallback={isUsingFallback} />}
-            {activeTab === "playoff" && <PlayoffSimView data={playoffDataVal} />}
-          </motion.div>
-        </AnimatePresence>
-      )}
+        {isError && needsStandings ? (
+          <ErrorState message="Couldn't load standings for analytics." onRetry={refetch} />
+        ) : isLoading && needsStandings ? (
+          <div className="pm-card p-4"><RowSkeleton rows={15} /></div>
+        ) : (
+          <>
+            <TabsContent value="power" className="mt-0">
+              <PowerIndexView data={powerData} />
+            </TabsContent>
+            <TabsContent value="factors" className="mt-0">
+              <FourFactorsView data={fourFactors} />
+            </TabsContent>
+            <TabsContent value="elo" className="mt-0">
+              <EloView data={eloData} />
+            </TabsContent>
+            <TabsContent value="quality" className="mt-0">
+              <ShotQualityView data={shotData} isUsingFallback={isUsingFallback} />
+            </TabsContent>
+            <TabsContent value="playoff" className="mt-0">
+              <PlayoffSimView data={playoffDataVal} />
+            </TabsContent>
+          </>
+        )}
+      </Tabs>
     </motion.div>
   );
 }

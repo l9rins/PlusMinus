@@ -1,4 +1,10 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap');
+/* ─── PlusMinus · Neon Dark Edition ─────────────────────────────
+   Aesthetic: Neon.com-inspired dark engineering terminal.
+   Deep blacks, electric green glow, monospace grid density,
+   crisp borders, zero noise. Built for data, not marketing.
+──────────────────────────────────────────────────────────────── */
+
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -6,129 +12,523 @@
 
 @layer base {
   :root {
-    --morphin-base: #ffffff;
-    --morphin-ghost: #f9f9f9;
-    --morphin-border: #e5e5e5;
-    --morphin-accent: #000000;
-    --morphin-muted: #666666;
-    --morphin-text: #0a0a0a;
+    /* ── Neon color system ── */
+    --neon-bg: #0a0a0f;
+    /* void black — page bg */
+    --neon-surface: #0f0f1a;
+    /* card bg */
+    --neon-raised: #141422;
+    /* elevated card */
+    --neon-overlay: #1a1a2e;
+    /* hover / modal */
+    --neon-border: rgba(255, 255, 255, 0.07);
+    /* default border */
+    --neon-border-md: rgba(255, 255, 255, 0.12);
+    /* emphasized border */
+    --neon-border-hi: rgba(255, 255, 255, 0.20);
+    /* high-contrast border */
 
-    --theme-accent: #000000;
-    --theme-accent-rgb: 0, 0, 0;
+    /* text */
+    --neon-text: #e8eaf0;
+    /* primary text */
+    --neon-muted: #6b7280;
+    /* secondary text */
+    --neon-dim: #374151;
+    /* tertiary / disabled */
 
+    /* accent: electric green — Neon's signature */
+    --neon-green: #00e599;
+    --neon-green-dim: #00b377;
+    --neon-green-faint: rgba(0, 229, 153, 0.08);
+    --neon-green-glow: rgba(0, 229, 153, 0.18);
+    --neon-green-border: rgba(0, 229, 153, 0.25);
+
+    /* semantic */
     --win: #10b981;
     --loss: #f43f5e;
     --draw: #f59e0b;
+
+    /* theme-able accent (for team colors) */
+    --theme-accent: #00e599;
+    --theme-accent-rgb: 0, 229, 153;
+
+    /* grid overlay */
+    --grid-line: rgba(255, 255, 255, 0.025);
   }
 
-  /* High-end resets */
   html {
-    background-color: var(--morphin-ghost);
-    color: var(--morphin-text);
-    font-family: "Inter", sans-serif;
+    background-color: var(--neon-bg);
+    color: var(--neon-text);
+    font-family: "Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
     -webkit-font-smoothing: antialiased;
-    scroll-behavior: smooth;
+    font-size: 15px;
   }
 
   body {
-    background-color: var(--morphin-ghost);
+    background-color: var(--neon-bg);
     min-height: 100vh;
+    /* Subtle dot grid — Neon's signature background texture */
+    background-image: radial-gradient(circle, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+    background-size: 32px 32px;
   }
 
-  /* Custom Selection */
   ::selection {
-    background: rgba(0, 0, 0, 0.08); /* Minimalist selection */
-    color: inherit;
+    background: rgba(0, 229, 153, 0.15);
+    color: var(--neon-green);
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: var(--neon-border-md);
+    border-radius: 2px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--neon-border-hi);
   }
 }
 
 @layer components {
-  /* PM Primtives — Clean Light Edition */
-  
-  .pm-tile, .pm-card {
-    @apply bg-white border border-morphin-border rounded-[2.5rem] transition-all duration-300;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.02), 0 1px 2px rgba(0,0,0,0.01);
+
+  /* ── Core card ──────────────────────────────────────────────── */
+  .pm-card {
+    background: var(--neon-surface);
+    border: 1px solid var(--neon-border);
+    border-radius: 12px;
+    transition: border-color 0.2s, background 0.2s;
   }
 
-  .pm-tile:hover {
-    @apply border-black/10;
-    box-shadow: 0 20px 40px rgba(0,0,0,0.04);
-    transform: translateY(-2px);
+  .pm-card:hover {
+    border-color: var(--neon-border-md);
+    background: var(--neon-raised);
   }
 
+  /* Neon glow variant — used on key stat cards */
+  .pm-card-glow {
+    background: var(--neon-surface);
+    border: 1px solid var(--neon-green-border);
+    border-radius: 12px;
+    box-shadow: 0 0 24px var(--neon-green-faint), inset 0 1px 0 rgba(0, 229, 153, 0.06);
+  }
+
+  /* ── Label ──────────────────────────────────────────────────── */
   .pm-label {
-    @apply text-[10px] font-bold tracking-[3px] uppercase text-morphin-muted;
+    font-family: inherit;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--neon-muted);
   }
 
+  /* ── Numbers: display font for big stat numbers ─────────────── */
   .pm-number {
-    @apply font-display font-black tabular-nums;
+    font-family: inherit;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
   }
 
+  /* ── Monospaced data values ─────────────────────────────────── */
+  .pm-mono {
+    font-family: "Geist Mono", "JetBrains Mono", ui-monospace, SFMono-Regular, Roboto Mono, Menlo, Monaco, Liberation Mono, DejaVu Sans Mono, Courier New, monospace;
+    font-size: 13px;
+    font-weight: 500;
+  }
+
+  /* ── Badge ──────────────────────────────────────────────────── */
   .pm-badge {
-    @apply text-[10px] font-bold tracking-widest px-3 py-1 rounded-full uppercase border border-morphin-border bg-morphin-ghost text-morphin-muted transition-colors;
+    font-family: inherit;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    border-radius: 6px;
+    border: 1px solid var(--neon-border-md);
+    background: var(--neon-raised);
+    color: var(--neon-muted);
   }
 
+  .pm-badge-green {
+    border-color: var(--neon-green-border);
+    background: var(--neon-green-faint);
+    color: var(--neon-green);
+  }
+
+  .pm-badge-live {
+    border-color: rgba(239, 68, 68, 0.3);
+    background: rgba(239, 68, 68, 0.08);
+    color: #f87171;
+  }
+
+  /* ── Buttons ────────────────────────────────────────────────── */
   .pm-btn {
-    @apply flex items-center justify-center gap-2 px-6 py-3 rounded-2xl text-sm font-bold tracking-wider uppercase bg-black text-white hover:bg-morphin-accent/90 active:scale-95 transition-all shadow-lg shadow-black/5;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    transition: all 0.15s;
+    background: var(--neon-green);
+    color: #000;
+    border: none;
+  }
+
+  .pm-btn:hover {
+    background: #00ffa8;
+  }
+
+  .pm-btn:active {
+    transform: scale(0.97);
   }
 
   .pm-btn-ghost {
-    @apply flex items-center justify-center gap-2 px-6 py-3 rounded-2xl text-sm font-bold tracking-wider uppercase bg-white border border-morphin-border text-morphin-muted hover:border-black hover:text-black transition-all;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+    background: transparent;
+    color: var(--neon-muted);
+    border: 1px solid var(--neon-border-md);
   }
 
+  .pm-btn-ghost:hover {
+    border-color: var(--neon-border-hi);
+    color: var(--neon-text);
+    background: var(--neon-raised);
+  }
+
+  /* ── Input ──────────────────────────────────────────────────── */
   .pm-input {
-    @apply w-full bg-morphin-ghost border border-morphin-border rounded-2xl px-5 py-4 text-sm font-medium placeholder:text-morphin-muted/60 focus:outline-none focus:ring-4 focus:ring-black/5 focus:border-black transition-all;
+    width: 100%;
+    background: var(--neon-raised);
+    border: 1px solid var(--neon-border-md);
+    border-radius: 8px;
+    padding: 10px 16px;
+    font-size: 14px;
+    color: var(--neon-text);
+    transition: all 0.15s;
+    font-family: inherit;
   }
 
+  .pm-input::placeholder {
+    color: var(--neon-dim);
+  }
+
+  .pm-input:focus {
+    outline: none;
+    border-color: var(--neon-green-border);
+    box-shadow: 0 0 0 3px var(--neon-green-faint);
+  }
+
+  /* ── Tab ────────────────────────────────────────────────────── */
   .pm-tab {
-    @apply px-5 py-2.5 rounded-full text-xs font-bold tracking-widest uppercase text-morphin-muted hover:bg-white hover:text-black transition-all;
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--neon-muted);
+    transition: all 0.15s;
+    cursor: pointer;
+    font-family: inherit;
+  }
+
+  .pm-tab:hover {
+    color: var(--neon-text);
+    background: var(--neon-raised);
   }
 
   .pm-tab.active {
-    @apply bg-white text-black shadow-sm border border-morphin-border;
+    color: var(--neon-green);
+    background: var(--neon-green-faint);
+    border: 1px solid var(--neon-green-border);
   }
 
+  /* ── Skeleton ───────────────────────────────────────────────── */
   .pm-skeleton {
-    @apply bg-morphin-border/40 rounded-3xl animate-pulse;
+    background: linear-gradient(90deg,
+        var(--neon-raised) 25%,
+        var(--neon-overlay) 50%,
+        var(--neon-raised) 75%);
+    background-size: 200% 100%;
+    animation: pm-shimmer 1.8s ease-in-out infinite;
+    border-radius: 8px;
   }
 
+  @keyframes pm-shimmer {
+    0% {
+      background-position: 200% 0;
+    }
+
+    100% {
+      background-position: -200% 0;
+    }
+  }
+
+  /* ── Divider ────────────────────────────────────────────────── */
   .pm-divider {
-    @apply h-px bg-morphin-border my-8;
+    height: 1px;
+    background: var(--neon-border);
   }
 
-  /* Team Specific Glows */
+  /* ── Team glow ──────────────────────────────────────────────── */
   .glow-team {
-    box-shadow: 0 0 40px rgba(var(--theme-accent-rgb), 0.1);
+    box-shadow: 0 0 32px rgba(var(--theme-accent-rgb), 0.12);
+  }
+
+  /* ── Stat bar ───────────────────────────────────────────────── */
+  .stat-bar-track {
+    height: 3px;
+    background: var(--neon-overlay);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .stat-bar {
+    height: 100%;
+    border-radius: 2px;
+    background: var(--neon-green);
+    animation: stat-fill 0.9s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
+  }
+
+  @keyframes stat-fill {
+    from {
+      width: 0% !important;
+    }
+  }
+
+  /* ── Status badge pulse ─────────────────────────────────────── */
+  .live-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #f87171;
+    position: relative;
+    flex-shrink: 0;
+  }
+
+  .live-dot::before {
+    content: '';
+    position: absolute;
+    inset: -3px;
+    border-radius: 50%;
+    border: 1.5px solid #f87171;
+    animation: live-ring 1.8s ease-out infinite;
+  }
+
+  @keyframes live-ring {
+    0% {
+      transform: scale(1);
+      opacity: 0.6;
+    }
+
+    70% {
+      transform: scale(2);
+      opacity: 0;
+    }
+
+    100% {
+      transform: scale(2);
+      opacity: 0;
+    }
+  }
+
+  /* ── Nav ────────────────────────────────────────────────────── */
+  .pm-nav {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    height: 56px;
+    background: rgba(10, 10, 15, 0.85);
+    backdrop-filter: blur(20px);
+    border-bottom: 1px solid var(--neon-border);
+    display: flex;
+    align-items: center;
+  }
+
+  /* ── Glass panel ────────────────────────────────────────────── */
+  .glass-panel {
+    background: rgba(15, 15, 26, 0.8);
+    backdrop-filter: blur(20px);
+    border: 1px solid var(--neon-border-md);
   }
 }
 
 @layer utilities {
+
+  /* ── Legacy pitch mapping → dark neon ─────────────────────── */
+  .text-pitch-50 {
+    color: #e8eaf0;
+  }
+
+  .text-pitch-100 {
+    color: #d1d5db;
+  }
+
+  .text-pitch-200 {
+    color: #9ca3af;
+  }
+
+  .text-pitch-300 {
+    color: #6b7280;
+  }
+
+  .text-pitch-400 {
+    color: #4b5563;
+  }
+
+  .text-pitch-500 {
+    color: var(--neon-muted);
+  }
+
+  .text-pitch-600 {
+    color: var(--neon-dim);
+  }
+
+  .text-pitch-700 {
+    color: rgba(255, 255, 255, 0.08);
+  }
+
+  .bg-pitch-500 {
+    background-color: var(--neon-overlay);
+  }
+
+  .bg-pitch-600 {
+    background-color: var(--neon-raised);
+  }
+
+  .bg-pitch-700 {
+    background-color: var(--neon-surface);
+  }
+
+  .bg-pitch-750 {
+    background-color: var(--neon-surface);
+  }
+
+  .bg-pitch-800 {
+    background-color: var(--neon-surface);
+  }
+
+  .bg-pitch-900 {
+    background-color: var(--neon-bg);
+  }
+
+  .border-pitch-500 {
+    border-color: var(--neon-border-md);
+  }
+
+  .border-pitch-600 {
+    border-color: var(--neon-border);
+  }
+
+  .border-pitch-700 {
+    border-color: var(--neon-border);
+  }
+
+  /* Accent green text */
+  .text-accent {
+    color: var(--neon-green);
+  }
+
+  .bg-accent {
+    background: var(--neon-green);
+  }
+
+  .border-accent {
+    border-color: var(--neon-green-border);
+  }
+
+  /* Tier colors — keep semantic on dark bg */
+  .text-tier-elite {
+    color: #34d399;
+  }
+
+  .text-tier-good {
+    color: #6ee7b7;
+  }
+
+  .text-tier-avg {
+    color: var(--neon-muted);
+  }
+
+  .text-tier-poor {
+    color: #fbbf24;
+  }
+
+  .text-tier-bad {
+    color: #f87171;
+  }
+
+  /* Win/loss */
+  .text-win {
+    color: #34d399;
+  }
+
+  .text-loss {
+    color: #f87171;
+  }
+
+  .text-draw {
+    color: #fbbf24;
+  }
+
+  .bg-win\/10 {
+    background: rgba(52, 211, 153, 0.08);
+  }
+
+  .bg-loss\/10 {
+    background: rgba(248, 113, 113, 0.08);
+  }
+
+  /* Glow on text */
   .text-glow {
-    text-shadow: 0 0 10px rgba(var(--theme-accent-rgb), 0.3);
-  }
-  
-  .glass-panel {
-    @apply bg-white/70 backdrop-blur-xl border border-white/20 shadow-2xl;
+    text-shadow: 0 0 20px rgba(var(--theme-accent-rgb), 0.4);
   }
 
-  /* Legacy Pitch Mapping for Light Mode Compatibility */
-  .text-pitch-50  { color: #0a0a0a; }
-  .text-pitch-100 { color: #0a0a0a; }
-  .text-pitch-200 { color: #1a1a1a; }
-  .text-pitch-300 { color: #404040; }
-  .text-pitch-400 { color: #666666; }
-  .text-pitch-500 { color: #808080; }
-  .text-pitch-600 { color: #a3a3a3; }
-  .text-pitch-700 { color: #d4d4d4; }
+  .neon-glow {
+    text-shadow: 0 0 20px rgba(0, 229, 153, 0.5);
+  }
 
-  .bg-pitch-500  { background-color: #f5f5f5; }
-  .bg-pitch-600  { background-color: #f0f0f0; }
-  .bg-pitch-700  { background-color: #e5e5e5; }
-  .bg-pitch-750  { background-color: #f9f9f9; }
-  .bg-pitch-800  { background-color: #ffffff; }
-  .bg-pitch-900  { background-color: #f9f9f9; }
+  /* Section header line — Neon-style overline */
+  .neon-overline {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-family: inherit;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--neon-muted);
+  }
 
-  .border-pitch-500 { border-color: #e5e5e5; }
-  .border-pitch-600 { border-color: #e5e5e5; }
-  .border-pitch-700 { border-color: #f0f0f0; }
+  .neon-overline::before {
+    content: '';
+    display: block;
+    width: 20px;
+    height: 1px;
+    background: var(--neon-green);
+  }
 }

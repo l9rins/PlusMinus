@@ -94,10 +94,10 @@ function StatTile({ label, value, sub, color }) {
     return (
         <motion.div variants={item} className="pm-tile p-3 text-center">
             <div className="pm-label mb-1">{label}</div>
-            <div className={`font-mono text-xl font-bold tabular-nums ${color || "text-pitch-50"}`}>
+            <div className={`text-xl font-bold tabular-nums ${color || "text-pitch-50"}`}>
                 {typeof value === 'number' ? <AnimatedNumber value={value} /> : (value ?? "—")}
             </div>
-            {sub && <div className="text-[10px] text-pitch-500 mt-0.5">{sub}</div>}
+            {sub && <div className="text-[10px] font-semibold text-pitch-500 mt-0.5">{sub}</div>}
         </motion.div>
     );
 }
@@ -208,13 +208,13 @@ export default function TeamDetail() {
                     <div className="flex items-center gap-4">
                         <div className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0"
                             style={{ background: `${color}20`, border: `1.5px solid ${color}50` }}>
-                            <span className="font-display text-2xl tracking-widest" style={{ color }}>{teamAbbr}</span>
+                            <span className="text-2xl font-bold tracking-tight" style={{ color }}>{teamAbbr}</span>
                         </div>
                         <div>
-                            <div className="font-display text-3xl tracking-widest text-pitch-50">{teamName}</div>
+                            <div className="text-3xl font-bold tracking-tight text-pitch-50">{teamName}</div>
                             <div className="text-[11px] text-pitch-400 mt-0.5 flex items-center gap-2">
                                 {confSeed && (
-                                    <span className="px-1.5 py-0.5 rounded text-[10px] font-mono border"
+                                    <span className="px-1.5 py-0.5 rounded text-[10px] font-bold border"
                                         style={{ borderColor: `${color}40`, color, background: `${color}15` }}>
                                         {confSeed.conf} #{confSeed.seed}
                                         {confSeed.seed >= 7 && confSeed.seed <= 10 && (
@@ -287,7 +287,7 @@ export default function TeamDetail() {
                         <motion.div variants={item} className="pm-card p-4 lg:col-span-2">
                             <div className="pm-label mb-3 flex items-center gap-2">
                                 Season Elo Trajectory
-                                <span className={`text-[10px] font-mono flex items-center gap-1
+                                <span className={`text-[10px] font-bold flex items-center gap-1
                                     ${eloTrend > 0 ? "text-win" : eloTrend < 0 ? "text-loss" : "text-pitch-500"}`}>
                                     {eloTrend > 0 ? <TrendingUp size={10} /> : eloTrend < 0 ? <TrendingDown size={10} /> : <Minus size={10} />}
                                     {eloTrend !== 0 ? `${eloTrend > 0 ? "+" : ""}${eloTrend}` : "Flat"}
@@ -340,8 +340,8 @@ export default function TeamDetail() {
                                                         { lbl: "AST", val: starPlayer.ast },
                                                         { lbl: "REB", val: starPlayer.reb },
                                                     ].map(s => (
-                                                        <div key={s.lbl} className="bg-pitch-750 rounded-md p-2 text-center border border-pitch-650">
-                                                            <div className="font-mono font-bold text-sm text-pitch-100 tabular-nums">{s.val}</div>
+                                                        <div key={s.l} className="bg-pitch-750 rounded-md p-2 text-center border border-pitch-650">
+                                                            <div className="font-bold text-sm text-pitch-100 tabular-nums">{s.val}</div>
                                                             <div className="text-[9px] text-pitch-500 uppercase tracking-widest mt-0.5">{s.lbl}</div>
                                                         </div>
                                                     ))}
@@ -378,7 +378,7 @@ export default function TeamDetail() {
                                                             <div key={s.lbl}>
                                                                 <div className="flex justify-between text-[10px] mb-1">
                                                                     <span className="text-pitch-500">{s.lbl}</span>
-                                                                    <span className="text-pitch-200 font-mono">{s.val}</span>
+                                                                    <span className="text-pitch-200 font-bold">{s.val}</span>
                                                                 </div>
                                                                 <div className="h-1.5 bg-pitch-700 rounded-full overflow-hidden">
                                                                     <motion.div className="h-full rounded-full"
@@ -426,7 +426,7 @@ export default function TeamDetail() {
                                                 {g.isHome ? "vs" : "@"} {g.opponent}
                                             </span>
                                             {g.teamScore !== null && (
-                                                <span className={`font-mono text-[11px] tabular-nums font-medium
+                                                <span className={`text-[11px] tabular-nums font-bold
                                                     ${g.result === "W" ? "text-win" : "text-loss"}`}>
                                                     {g.teamScore}–{g.oppScore}
                                                 </span>
@@ -457,7 +457,7 @@ export default function TeamDetail() {
                                                 {g.isHome ? "vs" : "@"}{" "}
                                                 <span className="font-medium text-pitch-200">{g.opponent}</span>
                                             </span>
-                                            <span className="text-[10px] text-pitch-500 font-mono">
+                                            <span className="text-[10px] text-pitch-500 font-bold tracking-tight">
                                                 {g.detail || g.dateStr}
                                             </span>
                                         </motion.div>

@@ -37,7 +37,7 @@ function NetBar({ value, range = 20 }) {
           transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
         />
       </div>
-      <span className={`font-mono text-[10px] tabular-nums font-semibold flex-shrink-0
+      <span className={`text-[10px] tabular-nums font-bold flex-shrink-0
         ${value >= 8 ? "text-tier-elite" : value >= 3 ? "text-tier-good"
         : value >= 0 ? "text-tier-avg"   : value >= -5 ? "text-tier-poor" : "text-tier-bad"}`}>
         {value > 0 ? "+" : ""}{value}

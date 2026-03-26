@@ -19,8 +19,8 @@ export default function GameWinProb({ game, eloMap }) {
   return (
     <div className="space-y-2">
       <div className="flex justify-between text-[11px]">
-        <span className="font-mono text-pitch-200">{awayWinP}%</span>
-        <span className="font-mono text-pitch-200">{homeWinP}%</span>
+        <span className="font-bold text-pitch-200">{awayWinP}%</span>
+        <span className="font-bold text-pitch-200">{homeWinP}%</span>
       </div>
       <div className="h-1.5 rounded-full bg-pitch-700 overflow-hidden flex">
         <div className="bg-accent h-full rounded-l-full" style={{ width: `${awayWinP}%` }} />

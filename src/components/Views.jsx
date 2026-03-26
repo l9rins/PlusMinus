@@ -20,7 +20,7 @@ import {
   signed, todayStr, currentSeason, netRatingTier, netRatingColor, edgeLabel, formatShortDate, formatGameTime,
   calcPropHitRate, hitRateTier
 } from "../utils";
-import { TileSkeleton, RowSkeleton, ErrorState, FreshnessTag, EmptyState, useToast, TeamLink, CalibrationCurve } from "./ui";
+import { TileSkeleton, RowSkeleton, ErrorState, FreshnessTag, EmptyState, useToast, TeamLink, CalibrationCurve, Button } from "./ui";
 import { 
   PremiumCard, 
   PremiumCardHeader, 
@@ -30,6 +30,7 @@ import {
 } from "./ui/premium-card";
 import { Badge } from "./ui/badge";
 import { useAlerts } from "../hooks/useAlerts";
+import { cn } from "../lib/utils";
 import GameWinProb from "./GameWinProb";
 
 // ── Shared animation + tooltip config ────────────────────────────
@@ -87,11 +88,11 @@ function ArbCalculator({ game }) {
           className="pm-input w-20 py-1 text-[11px] text-right bg-pitch-900 border-win/30" />
       </div>
       <div className="grid grid-cols-2 gap-2 text-[10px] text-pitch-200">
-        <div>Bet <span className="font-mono text-pitch-50">${awayStake.toFixed(2)}</span> on {game.away}</div>
-        <div>Bet <span className="font-mono text-pitch-50">${homeStake.toFixed(2)}</span> on {game.home}</div>
+        <div>Bet <span className="font-bold text-pitch-50 tabular-nums">${awayStake.toFixed(2)}</span> on {game.away}</div>
+        <div>Bet <span className="font-bold text-pitch-50 tabular-nums">${homeStake.toFixed(2)}</span> on {game.home}</div>
       </div>
       <div className="mt-1 text-[10px] text-win pb-1">
-        Guaranteed Profit: <span className="font-mono font-bold">+${guaranteedProfit.toFixed(2)}</span>
+        Guaranteed Profit: <span className="font-bold text-win tabular-nums">+${guaranteedProfit.toFixed(2)}</span>
       </div>
     </div>
   );
@@ -147,8 +148,8 @@ export function Scores() {
     <motion.div variants={container} initial="hidden" animate="show" exit={{ opacity: 0, y: -4 }}>
       <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
         <div>
-          <div className="text-[10px] font-bold text-morphin-muted uppercase tracking-[3px]">{today}</div>
-          <div className="text-3xl font-display font-black text-morphin-text mt-1">{games.length} Games Scheduled</div>
+          <div className="text-[10px] font-bold text-morphin-muted uppercase tracking-widest">{today}</div>
+          <div className="text-3xl font-bold tracking-tight text-morphin-text mt-1">{games.length} Games Scheduled</div>
         </div>
         <div className="flex items-center gap-2">
           {oddsData?.stale && <span className="text-[9px] text-draw/70 hidden sm:inline-block border border-draw/30 bg-draw/10 px-1.5 py-0.5 rounded cursor-help">Stale Odds</span>}
@@ -168,7 +169,7 @@ export function Scores() {
             key={f.id}
             onClick={() => handleFilter(f.id)}
             className={cn(
-               "flex items-center gap-2 px-4 py-2 rounded-full text-[11px] font-bold tracking-widest uppercase transition-all",
+               "flex items-center gap-2 px-4 py-2 rounded-full text-[11px] font-bold tracking-tight uppercase transition-all",
                filter === f.id
                  ? "bg-black text-white shadow-lg"
                  : "bg-white border border-morphin-border text-morphin-muted hover:border-black hover:text-black"
@@ -180,7 +181,7 @@ export function Scores() {
             {f.label}
             {counts[f.id] > 0 && (
               <span className={cn(
-                "text-[9px] px-1.5 py-0.5 rounded-full font-black",
+                "text-[9px] px-1.5 py-0.5 rounded-full font-bold",
                 filter === f.id ? "bg-white/20 text-white" : "bg-morphin-ghost text-morphin-muted"
               )}>
                 {counts[f.id]}
@@ -217,7 +218,7 @@ export function Scores() {
                 )}
               >
                 <div className="flex justify-between items-center mb-6">
-                  <span className="text-[10px] font-bold text-morphin-muted uppercase tracking-[2px]">{g.time}</span>
+                  <span className="text-[10px] font-bold text-morphin-muted uppercase tracking-widest">{g.time}</span>
                   <div className="flex items-center gap-2">
                     {g.isFinal && (
                       <Badge variant="secondary">Final</Badge>
@@ -239,7 +240,7 @@ export function Scores() {
                 <div className="flex items-center gap-3 mb-3">
                   <div className="flex-1">
                     <TeamLink abbr={g.away}
-                      className={`font-display text-2xl tracking-widest leading-none block
+                      className={`text-2xl font-bold tracking-tight leading-none block
                         ${g.fav === "away" ? "" : "text-pitch-400"}`}
                       style={{ color: g.fav === "away" && g.fav !== null ? g.awayColor : undefined }}
                     >
@@ -256,7 +257,7 @@ export function Scores() {
                     )}
                     {/* Best odds book hint */}
                     {g.status === "scheduled" && g.bestAwayBook && (
-                      <div className="text-[9px] text-pitch-600 mt-0.5 font-mono">
+                      <div className="text-[9px] text-pitch-600 mt-0.5 font-bold uppercase tracking-tighter">
                         Best: {BOOK_LABELS[g.bestAwayBook] || g.bestAwayBook}
                         {g.bestAwayOdds && (
                           <span className="text-pitch-400 ml-1">
@@ -268,7 +269,7 @@ export function Scores() {
                   </div>
 
                   <div className="text-center flex-shrink-0">
-                    <div className="text-[10px] text-pitch-600 font-mono">
+                    <div className="text-[10px] text-pitch-400 font-bold uppercase tracking-tight">
                       {g.isFinal || g.isLive ? "—" : "vs"}
                     </div>
                     {g.total !== "—" && (
@@ -281,7 +282,7 @@ export function Scores() {
 
                   <div className="flex-1 text-right">
                     <TeamLink abbr={g.home}
-                      className={`font-display text-2xl tracking-widest leading-none block
+                      className={`text-2xl font-bold tracking-tight leading-none block
                         ${g.fav === "home" ? "" : "text-pitch-400"}`}
                       style={{ color: g.fav === "home" && g.fav !== null ? g.homeColor : undefined }}
                     >
@@ -297,7 +298,7 @@ export function Scores() {
                       </motion.div>
                     )}
                     {g.status === "scheduled" && g.bestHomeBook && (
-                      <div className="text-[9px] text-pitch-600 mt-0.5 font-mono text-right">
+                      <div className="text-[9px] text-pitch-600 mt-0.5 font-bold uppercase tracking-tighter text-right">
                         Best: {BOOK_LABELS[g.bestHomeBook] || g.bestHomeBook}
                         {g.bestHomeOdds && (
                           <span className="text-pitch-400 ml-1">
@@ -350,16 +351,16 @@ export function Scores() {
                                     className={`flex items-center justify-between px-2 py-1.5 rounded
                                       text-[10px] ${isBestHome ? "bg-win/8 border border-win/15" : "bg-pitch-750"}`}
                                   >
-                                    <span className={`font-medium ${isBestHome ? "text-win" : "text-pitch-300"}`}>
+                                    <span className={`font-semibold ${isBestHome ? "text-win" : "text-pitch-300"}`}>
                                       {BOOK_LABELS[bk.book] || bk.book}
                                       {isBestHome && <span className="ml-1 text-[8px] text-win/70">★ best</span>}
                                     </span>
-                                    <div className="flex items-center gap-3 font-mono">
-                                      <span className="text-pitch-400">
+                                    <div className="flex items-center gap-3">
+                                      <span className="text-pitch-400 font-bold tabular-nums">
                                         {g.away} {bk.awayOdds > 0 ? "+" : ""}{bk.awayOdds}
                                       </span>
-                                      <span className="text-pitch-600">|</span>
-                                      <span className={isBestHome ? "text-win" : "text-pitch-300"}>
+                                      <span className="text-pitch-650">|</span>
+                                      <span className={cn("font-bold tabular-nums", isBestHome ? "text-win" : "text-pitch-300")}>
                                         {g.home} {bk.homeOdds > 0 ? "+" : ""}{bk.homeOdds}
                                       </span>
                                     </div>
@@ -451,8 +452,8 @@ export function Standings() {
             <button key={id} onClick={() => handleConf(id)}
               className={cn(
                 "px-6 py-2.5 rounded-full text-xs font-bold tracking-widest uppercase transition-all",
-                conf === id 
-                  ? "bg-black text-white shadow-lg" 
+                conf === id
+                  ? "bg-black text-white shadow-lg"
                   : "bg-white border border-morphin-border text-morphin-muted hover:border-black hover:text-black"
               )}>
               {label}
@@ -499,12 +500,12 @@ export function Standings() {
                       className={`border-b border-pitch-700 hover:bg-pitch-750 transition-colors
                         ${t.origRank === 6 ? "border-t-2 border-t-accent/30" : ""}`}
                     >
-                      <td className="px-3 py-2.5 font-mono text-[11px] text-pitch-600">{t.origRank + 1}</td>
+                      <td className="px-3 py-2.5 text-[11px] text-pitch-600 font-bold tabular-nums">{t.origRank + 1}</td>
                       <td className="px-3 py-2.5">
                         <div className="flex items-center gap-2">
                           <div className="w-2 h-2 rounded-full flex-shrink-0"
                             style={{ background: t.color }} />
-                          <TeamLink abbr={t.team} className={`font-display text-base tracking-wider block
+                          <TeamLink abbr={t.team} className={`text-base font-bold tracking-tight block
                             ${t.isFirst ? "text-accent" : t.isPlayoff ? "text-pitch-200" : "text-pitch-400"}`}>
                             {t.team}
                           </TeamLink>
@@ -516,15 +517,15 @@ export function Standings() {
                           )}
                         </div>
                       </td>
-                      <td className="px-3 py-2.5 font-mono text-pitch-200 font-medium">{t.w}</td>
-                      <td className="px-3 py-2.5 font-mono text-pitch-400">{t.l}</td>
-                      <td className="px-3 py-2.5 font-mono text-pitch-300">{(t.pct || 0).toFixed(3).replace(/^0/, '')}</td>
-                      <td className="px-3 py-2.5 font-mono text-pitch-500 text-[11px]">
+                      <td className="px-3 py-2.5 text-pitch-200 font-bold tabular-nums">{t.w}</td>
+                      <td className="px-3 py-2.5 text-pitch-400 font-bold tabular-nums">{t.l}</td>
+                      <td className="px-3 py-2.5 text-pitch-300 font-bold tabular-nums">{(t.pct || 0).toFixed(3).replace(/^0/, '')}</td>
+                      <td className="px-3 py-2.5 text-pitch-500 text-[11px] font-bold tabular-nums">
                         {t.gb === 0 ? "—" : t.gb}
                       </td>
-                      <td className="px-3 py-2.5 font-mono text-[11px] text-pitch-400">{t.last10}</td>
-                      <td className="px-3 py-2.5 font-mono text-[11px] text-pitch-400">{t.home}</td>
-                      <td className="px-3 py-2.5 font-mono text-[11px] text-pitch-400">{t.road}</td>
+                      <td className="px-3 py-2.5 text-[11px] text-pitch-400 font-bold tabular-nums">{t.last10}</td>
+                      <td className="px-3 py-2.5 text-[11px] text-pitch-400 font-bold tabular-nums">{t.home}</td>
+                      <td className="px-3 py-2.5 text-[11px] text-pitch-400 font-bold tabular-nums">{t.road}</td>
                       <td className="px-3 py-2.5">
                         <span className={`pm-badge
                           ${t.streak?.startsWith("W")
@@ -590,7 +591,7 @@ export function Betting() {
 
     const allTeams  = [...(standingsData.east || []), ...(standingsData.west || [])];
     const elos = {};
-    allTeams.forEach(t => { 
+    allTeams.forEach(t => {
       const apiEntry = eloApiData?.teams?.find(e => e.team === t.team);
       // Fallback elo if API fails, mirrors Analytics.jsx logic
       elos[t.team] = apiEntry ? apiEntry.elo : Math.round(1500 + (t.pct - 0.5) * 600);
@@ -606,12 +607,12 @@ export function Betting() {
       const fav       = odds.homeP >= odds.awayP ? game.home : game.away;
       const dog       = fav === game.home ? game.away : game.home;
       const impliedP  = Math.max(odds.homeP, odds.awayP);
-      
+
       const homeElo   = elos[game.home] || 1500;
       const awayElo   = elos[game.away] || 1500;
       const homeWinP  = eloWinProb(awayElo, homeElo, true) * 100;
       const awayWinP  = eloWinProb(homeElo, awayElo, false) * 100;
-      
+
       const modelP    = fav === game.home ? homeWinP : awayWinP;
       const diff      = modelP !== null ? +(modelP - impliedP).toFixed(1) : null;
       const edge      = diff !== null ? edgeLabel(modelP, impliedP) : "none";
@@ -699,7 +700,7 @@ export function Betting() {
           <Info size={13} className="text-draw flex-shrink-0 mt-0.5" strokeWidth={1.8} />
           <div className="text-[11px] text-pitch-400 leading-relaxed">
             <span className="text-pitch-200 font-medium">Sample data shown.</span>
-            {" "}Set <code className="font-mono text-pitch-300 bg-pitch-700 px-1 py-0.5 rounded text-[10px]">
+            {" "}Set <code className="font-semibold text-pitch-300 bg-pitch-700 px-1 py-0.5 rounded text-[10px] tabular-nums">
               ODDS_API_KEY
             </code> in Vercel environment variables for live multi-book odds.
           </div>
@@ -727,7 +728,7 @@ export function Betting() {
 
               <div className="flex items-start justify-between mb-8">
                 <div className="min-w-0">
-                  <div className="text-lg font-black text-morphin-text truncate tracking-tight">{g.matchup}</div>
+                  <div className="text-xl font-bold text-morphin-text truncate tracking-tight">{g.matchup}</div>
                   <div className="text-[10px] text-morphin-muted mt-1.5 flex items-center gap-2 font-bold uppercase tracking-widest">
                     <span>Fav:</span>
                     <span className="text-black" style={{ color: favColor }}>{g.fav}</span>
@@ -768,7 +769,7 @@ export function Betting() {
                 ].filter(Boolean).map(s => (
                   <div key={s.label} className="flex justify-between items-center text-[11px]">
                     <span className="text-pitch-500">{s.label}</span>
-                    <span className={`pm-number ${s.cls}`}>{s.value}</span>
+                    <span className={`font-bold tabular-nums ${s.cls}`}>{s.value}</span>
                   </div>
                 ))}
               </div>
@@ -811,25 +812,25 @@ export function Betting() {
               {/* Best lines summary */}
               {isLive && g.bestHomeOdds && (
                 <div className="mb-3 grid grid-cols-2 gap-2">
-                  <div className="px-2 py-1.5 rounded bg-pitch-750 border border-pitch-700">
-                    <div className="text-[9px] text-pitch-600 mb-0.5">
-                      {g.away} · {BOOK_LABELS[g.bestAwayBook] || g.bestAwayBook}
-                    </div>
-                    <div className={`font-mono text-xs font-semibold ${
-                      g.bestAwayOdds > 0 ? "text-win" : "text-pitch-200"}`}>
-                      {g.bestAwayOdds > 0 ? "+" : ""}{g.bestAwayOdds}
-                    </div>
-                  </div>
-                  <div className="px-2 py-1.5 rounded bg-pitch-750 border border-pitch-700">
-                    <div className="text-[9px] text-pitch-600 mb-0.5">
-                      {g.home} · {BOOK_LABELS[g.bestHomeBook] || g.bestHomeBook}
-                    </div>
-                    <div className={`font-mono text-xs font-semibold ${
-                      g.bestHomeOdds > 0 ? "text-win" : "text-pitch-200"}`}>
-                      {g.bestHomeOdds > 0 ? "+" : ""}{g.bestHomeOdds}
-                    </div>
-                  </div>
-                </div>
+                   <div className="px-2 py-1.5 rounded bg-pitch-750 border border-pitch-700">
+                     <div className="text-[9px] text-pitch-600 mb-0.5 font-bold uppercase tracking-widest">
+                       {g.away} · {BOOK_LABELS[g.bestAwayBook] || g.bestAwayBook}
+                     </div>
+                     <div className={`text-xs font-bold tabular-nums ${
+                       g.bestAwayOdds > 0 ? "text-win" : "text-pitch-200"}`}>
+                       {g.bestAwayOdds > 0 ? "+" : ""}{g.bestAwayOdds}
+                     </div>
+                   </div>
+                   <div className="px-2 py-1.5 rounded bg-pitch-750 border border-pitch-700">
+                     <div className="text-[9px] text-pitch-600 mb-0.5 font-bold uppercase tracking-widest">
+                       {g.home} · {BOOK_LABELS[g.bestHomeBook] || g.bestHomeBook}
+                     </div>
+                     <div className={`text-xs font-bold tabular-nums ${
+                       g.bestHomeOdds > 0 ? "text-win" : "text-pitch-200"}`}>
+                       {g.bestHomeOdds > 0 ? "+" : ""}{g.bestHomeOdds}
+                     </div>
+                   </div>
+                 </div>
               )}
 
               {/* Expand toggle for per-book breakdown */}
@@ -1021,7 +1022,7 @@ function PropsBrowser({ onAddPropBet, bankroll }) {
           <button
             key={g.key}
             onClick={() => { setSelectedGame(g.key); setExpandedPlayer(null); setPlayerSearch(""); }}
-            className={`px-2.5 py-1 rounded text-[10px] font-mono font-medium transition-all
+            className={`px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-tight transition-all
               ${selectedGame === g.key
                 ? "bg-accent/15 text-accent border border-accent/30"
                 : "bg-pitch-750 text-pitch-400 border border-pitch-600 hover:border-pitch-500"}`}
@@ -1061,13 +1062,13 @@ function PropsBrowser({ onAddPropBet, bankroll }) {
                 className="flex items-center justify-between px-2.5 py-1.5 rounded
                   bg-draw/8 border border-draw/20 text-[10px]">
                 <span className="text-pitch-300 font-medium truncate">{m.playerName}</span>
-                <div className="flex items-center gap-2 flex-shrink-0 font-mono">
-                  <span className="text-pitch-500">{MARKET_LABELS[m.market]}</span>
-                  <span className="text-pitch-500 line-through">{m.prevLine}</span>
-                  <span className={m.direction === "up" ? "text-win" : "text-loss"}>
-                    {m.direction === "up" ? "▲" : "▼"} {m.newLine}
-                  </span>
-                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                   <span className="text-pitch-500 font-bold uppercase text-[9px] tracking-widest">{MARKET_LABELS[m.market]}</span>
+                   <span className="text-pitch-500 line-through tabular-nums">{m.prevLine}</span>
+                   <span className={`tabular-nums font-bold ${m.direction === "up" ? "text-win" : "text-loss"}`}>
+                     {m.direction === "up" ? "▲" : "▼"} {m.newLine}
+                   </span>
+                 </div>
               </div>
             ))}
         </div>
@@ -1114,20 +1115,8 @@ function PropsBrowser({ onAddPropBet, bankroll }) {
             return (
               <motion.div key={player.id} layout className="overflow-hidden">
                 {/* Main row */}
-                <div
-                  onClick={() => setExpandedPlayer(isExpanded ? null : player.id)}
-                  className={`flex items-center justify-between px-3 py-2 rounded-md cursor-pointer
-                    transition-colors text-[11px]
-                    ${isExpanded
-                      ? "bg-pitch-700 border border-pitch-600"
-                      : "bg-pitch-800 border border-pitch-700 hover:border-pitch-600"}`}
-                >
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className="font-medium text-pitch-200 truncate">{player.name}</span>
-                    {player.team && (
-                      <span className="text-[9px] text-pitch-500 font-mono flex-shrink-0">{player.team}</span>
-                    )}
-                  </div>
+                <div className="flex items-center justify-between p-3 bg-pitch-800/50 hover:bg-pitch-800/70 transition-colors cursor-pointer" onClick={() => toggleExpanded(player.id)}>
+                  <span className="text-pitch-100 font-medium truncate flex-1 min-w-0">{player.name}</span>
                   <div className="flex items-center gap-3 flex-shrink-0">
                     <span className="font-mono text-pitch-300">{m.line}</span>
                     <div className="flex gap-1.5">
@@ -1209,7 +1198,10 @@ function PropsBrowser({ onAddPropBet, bankroll }) {
 
                         {/* Bet these buttons */}
                         <div className="flex gap-2 pt-1">
-                          <button
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="flex-1 text-[10px] bg-accent/10 text-accent border-accent/25 hover:bg-accent/20"
                             onClick={(e) => {
                               e.stopPropagation();
                               onAddPropBet({
@@ -1223,13 +1215,13 @@ function PropsBrowser({ onAddPropBet, bankroll }) {
                                 matchup: currentGame ? `${currentGame.awayTeam}@${currentGame.homeTeam}` : "",
                               });
                             }}
-                            className="flex-1 py-1.5 rounded text-[10px] font-medium
-                              bg-accent/10 text-accent border border-accent/25
-                              hover:bg-accent/20 transition-colors"
                           >
                             + Bet Over
-                          </button>
-                          <button
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            className="flex-1 text-[10px] bg-pitch-700 text-pitch-300 border-pitch-600 hover:bg-pitch-650"
                             onClick={(e) => {
                               e.stopPropagation();
                               onAddPropBet({
@@ -1243,12 +1235,9 @@ function PropsBrowser({ onAddPropBet, bankroll }) {
                                 matchup: currentGame ? `${currentGame.awayTeam}@${currentGame.homeTeam}` : "",
                               });
                             }}
-                            className="flex-1 py-1.5 rounded text-[10px] font-medium
-                              bg-pitch-700 text-pitch-300 border border-pitch-600
-                              hover:bg-pitch-650 transition-colors"
                           >
                             + Bet Under
-                          </button>
+                          </Button>
                         </div>
                       </div>
                     </motion.div>

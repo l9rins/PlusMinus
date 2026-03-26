@@ -57,10 +57,6 @@ export default async function handler(req, res) {
 
     try {
         const upstream = await fetch(url, {
-            headers: {
-                "User-Agent": "Mozilla/5.0 (compatible; PlusMinus/1.0)",
-                Accept: "application/json",
-            },
             signal: AbortSignal.timeout(8000),
         });
 

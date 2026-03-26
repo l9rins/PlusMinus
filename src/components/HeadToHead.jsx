@@ -58,10 +58,10 @@ function TeamPicker({ value, onChange, exclude, label, side }) {
       >
         {value ? (
           <>
-            <span className="font-display text-3xl tracking-widest" style={{ color }}>{value}</span>
+            <span className="text-3xl font-bold tracking-tight" style={{ color }}>{value}</span>
             <div className="text-left flex-1">
-              <div className="text-sm font-medium text-pitch-100">{TEAM_NAMES[value]}</div>
-              <div className="text-[10px] text-pitch-500 uppercase tracking-wider">{label}</div>
+              <div className="text-sm font-bold text-pitch-100">{TEAM_NAMES[value]}</div>
+              <div className="text-[10px] text-pitch-500 uppercase tracking-widest">{label}</div>
             </div>
           </>
         ) : (
@@ -95,7 +95,7 @@ function TeamPicker({ value, onChange, exclude, label, side }) {
                     onClick={() => { onChange(abbr); setOpen(false); }}
                     className="w-full flex items-center gap-3 px-3 py-2 hover:bg-pitch-750 transition-colors text-left"
                   >
-                    <span className="font-display text-lg tracking-widest w-10 flex-shrink-0" style={{ color: c }}>{abbr}</span>
+                    <span className="text-lg font-bold tracking-tight w-10 flex-shrink-0" style={{ color: c }}>{abbr}</span>
                     <span className="text-sm text-pitch-300">{TEAM_NAMES[abbr]}</span>
                   </button>
                 );
@@ -128,14 +128,14 @@ function DuelBar({ label, aVal, bVal, aColor, bColor, invert = false, format = v
     <div className="mb-3">
       <div className="flex items-center justify-between mb-1">
         <span
-          className={`font-mono text-sm tabular-nums font-semibold ${aWins ? "" : "text-pitch-400"}`}
+          className={`text-sm tabular-nums font-bold ${aWins ? "" : "text-pitch-400"}`}
           style={{ color: aWins ? aColor : undefined }}
         >
           {format(aVal)}
         </span>
-        <span className="text-[10px] text-pitch-500 uppercase tracking-[1.5px] px-2">{label}</span>
+        <span className="text-[10px] text-pitch-500 uppercase tracking-[1.5px] px-2 font-semibold">{label}</span>
         <span
-          className={`font-mono text-sm tabular-nums font-semibold ${bWins ? "" : "text-pitch-400"}`}
+          className={`text-sm tabular-nums font-bold ${bWins ? "" : "text-pitch-400"}`}
           style={{ color: bWins ? bColor : undefined }}
         >
           {format(bVal)}
@@ -207,17 +207,17 @@ function WinProbArc({ teamA, teamB, probA, aColor, bColor }) {
         />
       )}
       {/* Center labels */}
-      <text x={cx - r - 2} y={cy + 18} textAnchor="end" fontSize="11" fill={aColor} fontFamily="Bebas Neue, sans-serif" letterSpacing="1">
+      <text x={cx - r - 2} y={cy + 18} textAnchor="end" fontSize="11" fill={aColor} fontWeight="800" letterSpacing="0.5">
         {teamA}
       </text>
-      <text x={cx + r + 2} y={cy + 18} textAnchor="start" fontSize="11" fill={bColor} fontFamily="Bebas Neue, sans-serif" letterSpacing="1">
+      <text x={cx + r + 2} y={cy + 18} textAnchor="start" fontSize="11" fill={bColor} fontWeight="800" letterSpacing="0.5">
         {teamB}
       </text>
       {/* Center probability */}
-      <text x={cx} y={cy - 10} textAnchor="middle" fontSize="26" fontWeight="600" fill="currentColor" fontFamily="'DM Mono', monospace">
+      <text x={cx} y={cy - 10} textAnchor="middle" fontSize="26" fontWeight="700" fill="currentColor">
         {probA}%
       </text>
-      <text x={cx} y={cy + 8} textAnchor="middle" fontSize="10" fill="#546480" fontFamily="'DM Sans', sans-serif" letterSpacing="1.5">
+      <text x={cx} y={cy + 8} textAnchor="middle" fontSize="10" fill="#546480" fontWeight="700" letterSpacing="2">
         WIN PROB
       </text>
     </svg>
@@ -412,7 +412,7 @@ export default function HeadToHead() {
               }}
             >
               {opt.id === "N" ? "Neutral" : (
-                <span className="font-display tracking-wider">{opt.label}</span>
+                <span className="font-bold tracking-tight">{opt.label}</span>
               )}
             </button>
           ))}
@@ -432,19 +432,19 @@ export default function HeadToHead() {
             <div className="grid grid-cols-[1fr_auto_1fr] gap-4 items-center">
               {/* Team A header */}
               <div className="text-left">
-                <div className="font-display text-4xl sm:text-5xl tracking-widest" style={{ color: colorA }}>
+                <div className="text-4xl sm:text-5xl font-bold tracking-tight" style={{ color: colorA }}>
                   {teamA}
                 </div>
                 <div className="text-[11px] text-pitch-400 mt-1">{TEAM_NAMES[teamA]}</div>
                 {csA && (
-                  <div className="mt-1 inline-flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.5 rounded border"
+                  <div className="mt-1 inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded border"
                     style={{ borderColor: `${colorA}40`, color: colorA, background: `${colorA}12` }}>
                     {csA.conf} #{csA.seed}
                   </div>
                 )}
                 {tA && (
                   <div className="mt-2">
-                    <div className="font-mono text-lg text-pitch-100 tabular-nums">{tA.w}-{tA.l}</div>
+                    <div className="text-lg text-pitch-100 tabular-nums font-bold">{tA.w}-{tA.l}</div>
                     <div className="text-[10px] text-pitch-500">{(tA.pct * 100).toFixed(1)}% WR</div>
                   </div>
                 )}
@@ -469,19 +469,19 @@ export default function HeadToHead() {
 
               {/* Team B header */}
               <div className="text-right">
-                <div className="font-display text-4xl sm:text-5xl tracking-widest" style={{ color: colorB }}>
+                <div className="text-4xl sm:text-5xl font-bold tracking-tight" style={{ color: colorB }}>
                   {teamB}
                 </div>
                 <div className="text-[11px] text-pitch-400 mt-1">{TEAM_NAMES[teamB]}</div>
                 {csB && (
-                  <div className="mt-1 inline-flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.5 rounded border"
+                  <div className="mt-1 inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded border"
                     style={{ borderColor: `${colorB}40`, color: colorB, background: `${colorB}12` }}>
                     {csB.conf} #{csB.seed}
                   </div>
                 )}
                 {tB && (
                   <div className="mt-2 text-right">
-                    <div className="font-mono text-lg text-pitch-100 tabular-nums">{tB.w}-{tB.l}</div>
+                    <div className="text-lg text-pitch-100 tabular-nums font-bold">{tB.w}-{tB.l}</div>
                     <div className="text-[10px] text-pitch-500">{(tB.pct * 100).toFixed(1)}% WR</div>
                   </div>
                 )}
@@ -499,9 +499,9 @@ export default function HeadToHead() {
               <div key={label} className="pm-card p-3 text-center">
                 <div className="pm-label mb-2">{label}</div>
                 <div className="flex items-center justify-between">
-                  <span className="font-mono text-sm text-pitch-100 tabular-nums" style={{ color: colorA }}>{format(aVal) ?? "—"}</span>
+                  <span className="text-sm text-pitch-100 tabular-nums font-bold" style={{ color: colorA }}>{format(aVal) ?? "—"}</span>
                   <span className="text-[9px] text-pitch-600">vs</span>
-                  <span className="font-mono text-sm text-pitch-100 tabular-nums" style={{ color: colorB }}>{format(bVal) ?? "—"}</span>
+                  <span className="text-sm text-pitch-100 tabular-nums font-bold" style={{ color: colorB }}>{format(bVal) ?? "—"}</span>
                 </div>
               </div>
             ))}
@@ -534,7 +534,7 @@ export default function HeadToHead() {
                   <ResponsiveContainer width="100%" height={220}>
                     <RadarChart data={radarData} margin={{ top: 10, right: 30, bottom: 10, left: 30 }}>
                       <PolarGrid stroke="#1e2a38" />
-                      <PolarAngleAxis dataKey="factor" tick={{ fill: "#546480", fontSize: 10, fontFamily: "DM Sans, sans-serif" }} />
+                      <PolarAngleAxis dataKey="factor" tick={{ fill: "#546480", fontSize: 10, fontFamily: "inherit" }} />
                       <PolarRadiusAxis domain={[0, 100]} tick={false} axisLine={false} />
                       <Radar dataKey="A" stroke={colorA} fill={colorA} fillOpacity={0.15} strokeWidth={1.5} dot={{ r: 2, fill: colorA }} />
                       <Radar dataKey="B" stroke={colorB} fill={colorB} fillOpacity={0.15} strokeWidth={1.5} dot={{ r: 2, fill: colorB }} />
@@ -543,11 +543,11 @@ export default function HeadToHead() {
                   <div className="flex items-center justify-center gap-4 mt-1">
                     <div className="flex items-center gap-1.5">
                       <div className="w-3 h-0.5 rounded-full" style={{ background: colorA }} />
-                      <span className="text-[10px] text-pitch-500 font-display tracking-wider">{teamA}</span>
+                      <span className="text-[10px] text-pitch-500 font-bold tracking-tight">{teamA}</span>
                     </div>
                     <div className="flex items-center gap-1.5">
                       <div className="w-3 h-0.5 rounded-full" style={{ background: colorB }} />
-                      <span className="text-[10px] text-pitch-500 font-display tracking-wider">{teamB}</span>
+                      <span className="text-[10px] text-pitch-500 font-bold tracking-tight">{teamB}</span>
                     </div>
                   </div>
                 </div>
@@ -586,8 +586,8 @@ export default function HeadToHead() {
                   </div>
                   {starA.per && (
                     <div className="mt-2 flex items-center gap-2">
-                      <span className="text-[10px] text-pitch-500">PER</span>
-                      <span className="font-mono text-sm font-semibold" style={{ color: colorA }}>{starA.per}</span>
+                      <span className="text-[10px] font-bold text-pitch-500">PER</span>
+                      <span className="text-sm font-bold" style={{ color: colorA }}>{starA.per}</span>
                       <span className="text-[9px] text-pitch-600 uppercase tracking-wider">{netRatingTier((starA.ortg ?? 115) - (starA.drtg ?? 113))}</span>
                     </div>
                   )}
@@ -607,7 +607,7 @@ export default function HeadToHead() {
                   </div>
                 )}
                 {starA?.per && starB?.per && (
-                  <div className="font-mono text-xs" style={{ color: starA.per > starB.per ? colorA : colorB }}>
+                  <div className="font-bold text-xs" style={{ color: starA.per > starB.per ? colorA : colorB }}>
                     {signed(+(starA.per - starB.per).toFixed(1))}
                   </div>
                 )}
@@ -636,9 +636,9 @@ export default function HeadToHead() {
                   </div>
                   {starB.per && (
                     <div className="mt-2 flex items-center gap-2 justify-end">
-                      <span className="text-[9px] text-pitch-600 uppercase tracking-wider">{netRatingTier((starB.ortg ?? 115) - (starB.drtg ?? 113))}</span>
-                      <span className="font-mono text-sm font-semibold" style={{ color: colorB }}>{starB.per}</span>
-                      <span className="text-[10px] text-pitch-500">PER</span>
+                      <span className="text-[9px] text-pitch-600 uppercase tracking-wider font-bold">{netRatingTier((starB.ortg ?? 115) - (starB.drtg ?? 113))}</span>
+                      <span className="text-sm font-bold" style={{ color: colorB }}>{starB.per}</span>
+                      <span className="text-[10px] font-bold text-pitch-500">PER</span>
                     </div>
                   )}
                 </div>

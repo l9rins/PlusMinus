@@ -36,13 +36,13 @@ function AnimatedValue({ value, suffix = "", prefix = "", className = "", decima
 
 function ProbBar({ probA, colorA, colorB }) {
   return (
-    <div className="space-y-1">
-      <div className="flex justify-between items-center">
-        <span className="font-display font-black text-sm tabular-nums text-morphin-text">{probA}%</span>
-        <span className="text-[9px] text-morphin-muted uppercase tracking-[3px] font-bold">Model Edge</span>
-        <span className="font-display font-black text-sm tabular-nums text-morphin-text">{(100 - probA)}%</span>
+    <div className="space-y-1.5">
+      <div className="flex justify-between items-center px-1">
+        <span className="pm-number text-sm">{probA}%</span>
+        <span className="pm-label opacity-40">Model Edge</span>
+        <span className="pm-number text-sm">{(100 - probA)}%</span>
       </div>
-      <div className="flex h-1.5 rounded-full overflow-hidden bg-morphin-ghost border border-morphin-border shadow-sm">
+      <div className="flex h-1 rounded overflow-hidden bg-[var(--neon-overlay)] border border-[var(--neon-border)]">
         <motion.div
           className="h-full"
           style={{ background: colorA }}
@@ -64,13 +64,13 @@ function ProbBar({ probA, colorA, colorB }) {
 
 function DataCell({ label, value, accent, sub }) {
   return (
-    <div className="border border-morphin-border rounded-2xl px-4 py-3 bg-morphin-ghost/50 hover:bg-white transition-colors group">
-      <div className="text-[9px] text-morphin-muted uppercase tracking-[2px] font-bold mb-1.5">{label}</div>
-      <div className={cn("font-display text-lg font-black tabular-nums leading-none", !accent && "text-morphin-text")}
+    <div className="border border-[var(--neon-border)] rounded-lg px-4 py-3 bg-[var(--neon-surface)] hover:bg-[var(--neon-raised)] transition-colors group">
+      <div className="pm-label opacity-50 mb-1.5">{label}</div>
+      <div className={cn("pm-number text-lg leading-none", !accent && "text-[var(--neon-text)]")}
         style={accent ? { color: accent } : undefined}>
         {value ?? "—"}
       </div>
-      {sub && <div className="text-[10px] text-morphin-muted mt-1 font-medium italic">{sub}</div>}
+      {sub && <div className="text-[9px] font-semibold text-[var(--neon-muted)] mt-1 uppercase tracking-widest">{sub}</div>}
     </div>
   );
 }
@@ -84,28 +84,28 @@ function DuelRow({ label, aVal, bVal, colorA, colorB, invert = false, format = v
   const bPct = Math.min(95, (Math.abs(bVal) / max) * 100);
 
   return (
-    <div className="grid grid-cols-[80px_1fr_100px_1fr_80px] items-center gap-0 py-2 border-b border-morphin-border/50 last:border-0 group">
-      <div className={cn("font-display font-black text-sm tabular-nums text-right pr-4", aWins ? "text-morphin-text" : "text-morphin-muted")}>
+    <div className="grid grid-cols-[80px_1fr_100px_1fr_80px] items-center gap-0 py-2.5 border-b border-[var(--neon-border)] last:border-0 group">
+      <div className={cn("pm-number text-xs text-right pr-4", aWins ? "text-[var(--neon-text)]" : "text-[var(--neon-dim)]")}>
         {format(aVal)}
       </div>
-      <div className="h-1 bg-morphin-ghost rounded-full overflow-hidden flex justify-end">
+      <div className="h-0.5 bg-[var(--neon-overlay)] overflow-hidden flex justify-end">
         <motion.div
-          className="h-full rounded-full"
-          style={{ background: colorA, opacity: aWins ? 1 : 0.2 }}
+          className="h-full"
+          style={{ background: colorA, opacity: aWins ? 1 : 0.15 }}
           initial={{ width: 0 }} animate={{ width: `${aPct}%` }} transition={TWEEN_DATA}
         />
       </div>
-      <div className="text-[9px] text-morphin-muted uppercase tracking-[3px] text-center font-bold px-2">
+      <div className="pm-label text-center opacity-40 px-2 tracking-[2px]">
         {label}
       </div>
-      <div className="h-1 bg-morphin-ghost rounded-full overflow-hidden">
+      <div className="h-0.5 bg-[var(--neon-overlay)] overflow-hidden">
         <motion.div
-          className="h-full rounded-full"
-          style={{ background: colorB, opacity: bWins ? 1 : 0.2 }}
+          className="h-full"
+          style={{ background: colorB, opacity: bWins ? 1 : 0.15 }}
           initial={{ width: 0 }} animate={{ width: `${bPct}%` }} transition={{ ...TWEEN_DATA, delay: 0.03 }}
         />
       </div>
-      <div className={cn("font-display font-black text-sm tabular-nums pl-4", bWins ? "text-morphin-text" : "text-morphin-muted")}>
+      <div className={cn("pm-number text-xs pl-4", bWins ? "text-[var(--neon-text)]" : "text-[var(--neon-dim)]")}>
         {format(bVal)}
       </div>
     </div>
@@ -116,21 +116,21 @@ function PlayerStrip({ player, color, align = "left" }) {
   if (!player) return null;
   const isRight = align === "right";
   return (
-    <div className={cn("flex items-center gap-4", isRight && "flex-row-reverse")}>
-      <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-xs font-black flex-shrink-0 border-2 shadow-sm"
-        style={{ background: `${color}10`, color, borderColor: `${color}20` }}>
-        {player.name.split(" ").map(w => w[0]).join("").slice(0, 2)}
+    <div className={cn("flex items-center gap-3", isRight && "flex-row-reverse")}>
+      <div className="w-10 h-10 rounded-lg flex items-center justify-center text-[10px] font-bold flex-shrink-0 border"
+        style={{ background: "var(--neon-overlay)", color, borderColor: "var(--neon-border)" }}>
+        {player.initials || player.name.split(" ").map(w => w[0]).join("").slice(0, 2)}
       </div>
       <div className={isRight ? "text-right" : ""}>
-        <div className="text-sm font-black text-morphin-text leading-tight">{player.name}</div>
+        <div className="text-sm font-bold text-[var(--neon-text)] leading-tight tracking-tight">{player.name}</div>
         <div className={cn("flex items-center gap-3 mt-1", isRight && "justify-end")}>
           {[
             { l: "P", v: player.pts },
             { l: "A", v: player.ast },
             { l: "R", v: player.reb },
           ].map(s => (
-            <span key={s.l} className="text-[10px] font-bold text-morphin-muted uppercase tracking-wider">
-               <span className="opacity-60">{s.l}</span> {s.v ?? "—"}
+            <span key={s.l} className="text-[9px] font-bold text-[var(--neon-muted)] uppercase tracking-wider">
+               <span className="opacity-40">{s.l}</span> {s.v ?? "—"}
             </span>
           ))}
         </div>
@@ -153,14 +153,16 @@ function BetButton({ team, odds, spread, color, side, onBet }) {
     <button
       onClick={handleClick}
       className={cn(
-        "flex-1 p-5 rounded-[2rem] border-2 transition-all flex items-center justify-between group overflow-hidden relative",
-        state === "idle" ? "bg-white border-morphin-border hover:border-black active:scale-[0.98]" : "bg-black border-black"
+        "flex-1 p-5 rounded-xl border transition-all flex items-center justify-between group overflow-hidden relative",
+        state === "idle" 
+          ? "bg-[var(--neon-surface)] border-[var(--neon-border)] hover:border-[var(--neon-border-md)] active:scale-[0.98]" 
+          : "bg-[var(--neon-raised)] border-[var(--neon-green-border)]"
       )}
     >
       <div className="relative z-10 flex flex-col items-start">
-        <span className={cn("font-display text-xl font-bold tracking-[3px] uppercase", state === "idle" ? "text-morphin-text" : "text-white")}>{team}</span>
+        <span className={cn("text-lg font-bold tracking-tight uppercase", state === "idle" ? "text-[var(--neon-text)]" : "text-[var(--neon-green)]")}>{team}</span>
         {spread != null && (
-          <span className={cn("text-[10px] font-bold uppercase tracking-widest mt-1", state === "idle" ? "text-morphin-muted" : "text-white/60")}>
+          <span className={cn("text-[10px] font-bold uppercase tracking-widest mt-1", state === "idle" ? "text-[var(--neon-dim)]" : "text-[var(--neon-dim)]")}>
             {side === "away" ? (spread > 0 ? `+${spread}` : spread) : (spread > 0 ? `-${spread}` : `+${Math.abs(spread)}`)}
           </span>
         )}
@@ -168,9 +170,9 @@ function BetButton({ team, odds, spread, color, side, onBet }) {
       <div className="relative z-10">
          <AnimatePresence mode="wait">
             {state === "confirmed" ? (
-              <motion.div key="c" initial={{ scale: 0 }} animate={{ scale: 1 }} className="w-10 h-10 rounded-full bg-win flex items-center justify-center text-white"><Check size={20} strokeWidth={4}/></motion.div>
+              <motion.div key="c" initial={{ scale: 0 }} animate={{ scale: 1 }} className="w-9 h-9 rounded-lg bg-[var(--neon-green-faint)] border border-[var(--neon-green-border)] flex items-center justify-center text-[var(--neon-green)]"><Check size={18} strokeWidth={3}/></motion.div>
             ) : (
-              <motion.span key="o" className={cn("font-display text-2xl font-black", state === "idle" ? "text-morphin-accent" : "text-white")}>
+              <motion.span key="o" className={cn("pm-number text-xl", state === "idle" ? "text-[var(--neon-green)]" : "text-[var(--neon-green)]")}>
                 {odds > 0 ? `+${odds}` : odds}
               </motion.span>
             )}
@@ -196,47 +198,45 @@ export default function MatchupCard({
   return (
     <MorphingDialog>
       <MorphingDialogTrigger className="w-full">
-        <div className="pm-tile group">
-          <div className="flex h-1.5 overflow-hidden rounded-t-[2.5rem]">
+        <div className="rounded-xl border border-[var(--neon-border)] bg-[var(--neon-surface)] overflow-hidden group hover:bg-[var(--neon-raised)] transition-colors">
+          <div className="flex h-1 overflow-hidden opacity-50">
             <div className="flex-1" style={{ background: colorA }} />
             <div className="flex-1" style={{ background: colorB }} />
           </div>
-          <div className="p-8 text-left">
-             <div className="flex items-center justify-between mb-8">
-                <div className="flex items-center gap-3">
-                   {isLive && <Badge variant="destructive" className="animate-pulse">LIVE</Badge>}
-                   <span className="text-[10px] font-bold text-morphin-muted uppercase tracking-[3px]">{isLive ? `Q${game.period}` : (isFinal ? "FINAL" : time)}</span>
+          <div className="p-6 text-left">
+             <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-2.5">
+                   {isLive && <Badge className="pm-badge-live animate-pulse px-1.5 h-4 text-[9px]">LIVE</Badge>}
+                   <span className="pm-label opacity-50">{isLive ? `Q${game.period}` : (isFinal ? "FINAL" : time)}</span>
                 </div>
-                {spread != null && <span className="text-[10px] font-bold text-morphin-muted uppercase tracking-[3px]">Spread: {spread > 0 ? `+${spread}` : spread}</span>}
+                {spread != null && <span className="pm-label opacity-50">SPR {spread > 0 ? `+${spread}` : spread}</span>}
              </div>
 
-             <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-6 mb-8">
-                <div className="flex flex-col items-start gap-2">
-                   <div className="w-16 h-16 rounded-3xl bg-morphin-ghost flex items-center justify-center border-2 border-transparent group-hover:border-morphin-border transition-all shadow-sm" style={{ borderBottom: `4px solid ${colorA}` }}>
-                      <span className="font-display text-3xl font-black">{away}</span>
+             <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-6 mb-6">
+                <div className="flex flex-col items-start gap-1">
+                   <div className="w-12 h-12 rounded-lg bg-[var(--neon-overlay)] flex items-center justify-center border border-[var(--neon-border)] group-hover:border-[var(--neon-border-md)] transition-all" style={{ borderBottom: `2px solid ${colorA}` }}>
+                      <span className="text-xl font-bold text-[var(--neon-text)]">{away}</span>
                    </div>
-                   <div className="flex flex-col">
-                      <span className="text-[10px] font-bold text-morphin-muted uppercase tracking-widest">{TEAM_NAMES[away]}</span>
-                      {awayScore != null && <span className="text-4xl font-display font-black text-morphin-text mt-1">{awayScore}</span>}
+                   <div className="flex flex-col mt-1">
+                      <span className="text-[9px] font-bold text-[var(--neon-dim)] uppercase tracking-wider opacity-60 truncate max-w-[80px]">{TEAM_NAMES[away]}</span>
+                      {awayScore != null && <span className="pm-number text-2xl text-[var(--neon-text)]">{awayScore}</span>}
                    </div>
                 </div>
 
-                <div className="p-4 bg-morphin-ghost rounded-full border border-morphin-border">
-                   <Activity size={20} className="text-morphin-muted" />
-                </div>
+                <div className="pm-label opacity-20">VS</div>
 
-                <div className="flex flex-col items-end gap-2">
-                   <div className="w-16 h-16 rounded-3xl bg-morphin-ghost flex items-center justify-center border-2 border-transparent group-hover:border-morphin-border transition-all shadow-sm" style={{ borderBottom: `4px solid ${colorB}` }}>
-                      <span className="font-display text-3xl font-black">{home}</span>
+                <div className="flex flex-col items-end gap-1">
+                   <div className="w-12 h-12 rounded-lg bg-[var(--neon-overlay)] flex items-center justify-center border border-[var(--neon-border)] group-hover:border-[var(--neon-border-md)] transition-all" style={{ borderBottom: `2px solid ${colorB}` }}>
+                      <span className="text-xl font-bold text-[var(--neon-text)]">{home}</span>
                    </div>
-                   <div className="flex flex-col items-end">
-                      <span className="text-[10px] font-bold text-morphin-muted uppercase tracking-widest">{TEAM_NAMES[home]}</span>
-                      {homeScore != null && <span className="text-4xl font-display font-black text-morphin-text mt-1">{homeScore}</span>}
+                   <div className="flex flex-col items-end mt-1">
+                      <span className="text-[9px] font-bold text-[var(--neon-dim)] uppercase tracking-wider opacity-60 truncate max-w-[80px]">{TEAM_NAMES[home]}</span>
+                      {homeScore != null && <span className="pm-number text-2xl text-[var(--neon-text)]">{homeScore}</span>}
                    </div>
                 </div>
              </div>
 
-             <div className="pt-6 border-t border-morphin-border">
+             <div className="pt-5 border-t border-[var(--neon-border)]">
                 <ProbBar probA={probA} colorA={colorA} colorB={colorB} />
              </div>
           </div>
@@ -244,73 +244,73 @@ export default function MatchupCard({
       </MorphingDialogTrigger>
 
       <MorphingDialogContainer>
-        <MorphingDialogContent className="max-w-2xl bg-white border border-morphin-border rounded-[3rem] overflow-hidden shadow-2xl">
-           <div className="p-10 space-y-12 overflow-y-auto max-h-[85vh] scrollbar-none">
+        <MorphingDialogContent className="max-w-2xl bg-[var(--neon-bg)] border border-[var(--neon-border)] rounded-xl overflow-hidden shadow-2xl">
+           <div className="p-8 space-y-10 overflow-y-auto max-h-[90vh] scrollbar-none">
               
               {/* Modal Header */}
               <div className="flex items-center justify-between">
-                 <div className="flex items-center gap-6">
+                 <div className="flex items-center gap-6 border-l-2 border-[var(--neon-green-border)] pl-4">
                     <div className="flex flex-col">
-                       <span className="text-[10px] font-black text-morphin-muted uppercase tracking-[4px] mb-2">Matchup</span>
-                       <h2 className="font-display text-4xl font-black tracking-tight">{away} <span className="text-morphin-muted mx-2 font-normal">@</span> {home}</h2>
+                       <span className="pm-label opacity-40 mb-1">Telemetry Node</span>
+                       <h2 className="pm-number text-3xl tracking-tight text-[var(--neon-text)]">{away} <span className="opacity-20 mx-2">@</span> {home}</h2>
                     </div>
                  </div>
-                 <Badge variant="outline" className="h-10 px-6 rounded-2xl border-morphin-border text-[11px]">Analytics Data v2.4</Badge>
+                 <Badge className="pm-badge text-[9px] opacity-60">System v4.2.0</Badge>
               </div>
 
               {/* Quick High-Level Stats */}
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                  <DataCell label="Home Elo" value={teamStats?.home?.elo || 1500} accent={colorB} />
                  <DataCell label="Away Elo" value={teamStats?.away?.elo || 1500} accent={colorA} />
-                 <DataCell label="Implied Margin" value={spread ? `${Math.abs(spread)} pts` : "—"} />
-                 <DataCell label="Strength of Schedule" value="Top 10%" accent="#f59e0b" />
+                 <DataCell label="Margin" value={spread ? `${Math.abs(spread)} PTS` : "—"} />
+                 <DataCell label="Hype Factor" value="CRITICAL" accent="#f87171" />
               </div>
 
               {/* Star Duel */}
               {(starA || starB) && (
-                <div className="p-8 bg-morphin-ghost/50 rounded-[2.5rem] border border-morphin-border/50">
+                <div className="p-6 bg-[var(--neon-surface)] rounded-xl border border-[var(--neon-border)]">
                   <div className="flex items-center justify-between mb-8">
                      <div className="flex items-center gap-2">
-                        <Flame size={18} className="text-loss" />
-                        <span className="text-[10px] font-black text-morphin-muted uppercase tracking-[3px]">Key Personnel</span>
+                        <Flame size={14} className="text-loss" />
+                        <span className="pm-label opacity-60">Impact Units</span>
                      </div>
                   </div>
-                  <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-10">
+                  <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-6">
                     <PlayerStrip player={starA} color={colorA} align="left" />
-                    <div className="w-12 h-12 rounded-full border border-morphin-border flex items-center justify-center bg-white shadow-sm font-display font-black text-sm">VS</div>
+                    <div className="w-8 h-8 rounded-full border border-[var(--neon-border-md)] flex items-center justify-center bg-[var(--neon-overlay)] font-bold text-[10px] text-[var(--neon-dim)]">VS</div>
                     <PlayerStrip player={starB} color={colorB} align="right" />
                   </div>
                 </div>
               )}
 
               {/* Deep Telemetry */}
-              <div className="space-y-6">
-                 <div className="flex items-center gap-2 px-2">
-                    <TrendingUp size={18} className="text-win" />
-                    <span className="text-[10px] font-black text-morphin-muted uppercase tracking-[3px]">Advanced Analytics</span>
+              <div className="space-y-4">
+                 <div className="flex items-center gap-2 px-1">
+                    <Activity size={14} className="text-[var(--neon-green)]" />
+                    <span className="pm-label opacity-60">Signal Profiles</span>
                  </div>
-                 <div className="bg-white rounded-[2rem] border border-morphin-border p-6 shadow-sm overflow-hidden">
+                 <div className="bg-[var(--neon-surface)] rounded-lg border border-[var(--neon-border)] p-5 overflow-hidden">
                     <DuelRow label="Efficiency" aVal={sA?.netRtg} bVal={sB?.netRtg} colorA={colorA} colorB={colorB} format={v => (v > 0 ? `+${v}` : v)} />
-                    <DuelRow label="True Shooting%" aVal={sA?.efg} bVal={sB?.efg} colorA={colorA} colorB={colorB} format={v => `${v}%`} />
-                    <DuelRow label="Ball Security" aVal={sA?.tov} bVal={sB?.tov} colorA={colorA} colorB={colorB} invert format={v => `${v}%`} />
-                    <DuelRow label="Pace Factor" aVal={sA?.pace} bVal={sB?.pace} colorA={colorA} colorB={colorB} />
+                    <DuelRow label="Shot Bio" aVal={sA?.efg} bVal={sB?.efg} colorA={colorA} colorB={colorB} format={v => `${v}%`} />
+                    <DuelRow label="Security" aVal={sA?.tov} bVal={sB?.tov} colorA={colorA} colorB={colorB} invert format={v => `${v}%`} />
+                    <DuelRow label="T-Cycle" aVal={sA?.pace} bVal={sB?.pace} colorA={colorA} colorB={colorB} />
                  </div>
               </div>
 
               {/* Market Execution */}
-              <div className="space-y-6">
-                 <div className="flex items-center gap-2 px-2">
-                    <Shield size={18} className="text-morphin-accent" />
-                    <span className="text-[10px] font-black text-morphin-muted uppercase tracking-[3px]">Smart Execution (ML)</span>
+              <div className="space-y-4">
+                 <div className="flex items-center gap-2 px-1">
+                    <Zap size={14} className="text-[var(--neon-green)]" />
+                    <span className="pm-label opacity-60">Order Execution</span>
                  </div>
-                 <div className="flex gap-4">
+                 <div className="flex gap-3">
                     <BetButton team={away} odds={odds?.awayOdds || -110} spread={odds?.spread} color={colorA} side="away" onBet={onBet} />
                     <BetButton team={home} odds={odds?.homeOdds || -110} spread={odds?.spread} color={colorB} side="home" onBet={onBet} />
                  </div>
               </div>
 
            </div>
-           <MorphingDialogClose className="absolute top-10 right-10 p-3 hover:bg-morphin-ghost rounded-2xl transition-all" />
+           <MorphingDialogClose className="absolute top-6 right-6 p-2 hover:bg-[var(--neon-raised)] rounded-lg transition-all text-[var(--neon-muted)]" />
         </MorphingDialogContent>
       </MorphingDialogContainer>
     </MorphingDialog>
