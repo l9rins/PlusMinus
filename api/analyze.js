@@ -9,9 +9,9 @@
 // Rate limit: 1 request per 10s per user via KV timestamp guard
 // Cost: ~500 input tokens + ~400 output tokens per call ≈ $0.0005 on Haiku
 
-import { handleOptions, setCORSHeaders } from "./_cors.js";
-import { getUserId } from "./_auth.js";
-import { kv } from "./_kv.js";
+import { handleOptions, setCORSHeaders } from "../lib/api/_cors.js";
+import { getUserId } from "../lib/api/_auth.js";
+import { kv } from "../lib/api/_kv.js";
 import Anthropic from "@anthropic-ai/sdk";
 
 

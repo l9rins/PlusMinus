@@ -1,10 +1,10 @@
-import bets from "./_internal/bets.js";
-import paper from "./_internal/paper.js";
-import webhooks from "./_internal/webhooks.js";
-import notify from "./_internal/notify.js";
-import odds from "./_internal/odds.js";
-import props from "./_internal/props.js";
-import log from "./_internal/log.js";
+import bets from "../lib/api/bets.js";
+import paper from "../lib/api/paper.js";
+import webhooks from "../lib/api/webhooks.js";
+import notify from "../lib/api/notify.js";
+import odds from "../lib/api/odds.js";
+import props from "../lib/api/props.js";
+import log from "../lib/api/log.js";
 
 export default async function handler(req, res) {
   try {

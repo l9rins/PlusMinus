@@ -1,5 +1,5 @@
-import { handleOptions, setCORSHeaders } from "../_cors.js";
-import { kv } from "../_kv.js";
+import { handleOptions, setCORSHeaders } from "../../lib/api/_cors.js";
+import { kv } from "../../lib/api/_kv.js";
 import crypto from 'crypto';
 
 export default async function handler(req, res) {

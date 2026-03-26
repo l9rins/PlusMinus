@@ -14,9 +14,9 @@
 // Vercel config needed in vercel.json:
 //   { "functions": { "api/stream.js": { "maxDuration": 300 } } }
 
-import { setCORSHeaders, handleOptions } from "./_cors.js";
-import { getUserIdFromQuery } from "./_auth.js";
-import { kv } from "./_kv.js";
+import { setCORSHeaders, handleOptions } from "../lib/api/_cors.js";
+import { getUserIdFromQuery } from "../lib/api/_auth.js";
+import { kv } from "../lib/api/_kv.js";
 
 const POLL_MS      = 60_000;
 const HEARTBEAT_MS = 25_000;

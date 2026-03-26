@@ -1,10 +1,10 @@
-import config from "./_internal/config.js";
-import nba from "./_internal/nba.js";
-import espn from "./_internal/espn.js";
-import bdl from "./_internal/bdl.js";
-import elo from "./_internal/elo.js";
-import injuries from "./_internal/injuries.js";
-import refs from "./_internal/refs.js";
+import config from "../lib/api/config.js";
+import nba from "../lib/api/nba.js";
+import espn from "../lib/api/espn.js";
+import bdl from "../lib/api/bdl.js";
+import elo from "../lib/api/elo.js";
+import injuries from "../lib/api/injuries.js";
+import refs from "../lib/api/refs.js";
 
 export default async function handler(req, res) {
   try {
