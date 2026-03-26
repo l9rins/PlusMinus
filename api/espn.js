@@ -47,7 +47,8 @@ export default async function handler(req, res) {
             : SCOREBOARD_BASE;
         ttl = 60;
     } else if (resource === "team_schedule") {
-        const abbr = (req.query.team || "").toUpperCase();
+        const teamParam = Array.isArray(req.query.team) ? req.query.team[0] : req.query.team;
+        const abbr = (teamParam || "").toUpperCase();
         const espnId = ESPN_TEAM_IDS[abbr];
         if (!espnId) return res.status(400).json({ error: `Unknown team: ${abbr}` });
         url = `https://site.api.espn.com/apis/site/v2/sports/basketball/nba/teams/${espnId}/schedule`;

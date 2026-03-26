@@ -1,5 +1,6 @@
 import { handleOptions, setCORSHeaders } from "../_cors.js";
 import { createClient } from "@vercel/kv";
+import crypto from 'crypto';
 
 const kv = createClient({
   url: process.env.KV_REST_API_URL,
@@ -11,8 +12,18 @@ export default async function handler(req, res) {
   setCORSHeaders(res, req.headers.origin || "");
 
   // 1. Secure the endpoint
-  const providedSecret = req.headers.authorization?.replace("Bearer ", "");
-  if (!process.env.ADMIN_SECRET || providedSecret !== process.env.ADMIN_SECRET) {
+  const providedSecret = req.headers.authorization?.replace("Bearer ", "") || "";
+  const expectedSecret = process.env.ADMIN_SECRET || "";
+  
+  if (!expectedSecret) {
+    return res.status(403).json({ error: "Forbidden (Not Configured)" });
+  }
+
+  const providedBuffer = Buffer.from(providedSecret);
+  const expectedBuffer = Buffer.from(expectedSecret);
+
+  if (providedBuffer.length !== expectedBuffer.length || 
+      !crypto.timingSafeEqual(providedBuffer, expectedBuffer)) {
     return res.status(403).json({ error: "Forbidden" });
   }
 

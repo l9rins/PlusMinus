@@ -1,3 +1,7 @@
+export const config = {
+  runtime: 'edge',
+};
+
 // api/stream.js — Server-Sent Events for real-time line movement alerts.
 //
 // The client opens one long-lived GET /api/stream connection.
@@ -171,6 +175,16 @@ export default async function handler(req, res) {
 
 // ── Discord webhook push ──────────────────────────────────────
 async function pushDiscord(webhookUrl, alert) {
+  try {
+    const url = new URL(webhookUrl);
+    if (url.hostname !== 'discord.com' && url.hostname !== 'canary.discord.com') {
+      console.warn("Invalid Discord webhook domain:", url.hostname);
+      return;
+    }
+  } catch (e) {
+    return; // Invalid URL
+  }
+
   const dir   = alert.move > 0 ? "📈" : "📉";
   const color = alert.move > 0 ? 0x00d4aa : 0xef4444;
   await fetch(webhookUrl, {

@@ -141,7 +141,11 @@ export default async function handler(req, res) {
     res.setHeader("Cache-Control", "s-maxage=900, stale-while-revalidate=60");
     res.setHeader("Content-Type", "application/json");
     
-    await kv.set("odds_cache", { data: result, cachedAt: Date.now() });
+    try {
+      await kv.set("odds_cache", { data: result, cachedAt: Date.now() });
+    } catch (e) {
+      console.error("[api/odds] Failed to write to KV cache:", e);
+    }
 
     return res.status(200).json({ data: result });
   } catch (err) {

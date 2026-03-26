@@ -90,7 +90,7 @@ export default async function handler(req, res) {
   const params = {};
   for (const key of allowed) {
     if (req.query[key] !== undefined) {
-      params[key] = req.query[key];
+      params[key] = Array.isArray(req.query[key]) ? req.query[key][0] : req.query[key];
     }
   }
 
