@@ -449,3 +449,8 @@ export function CalibrationCurve({ bets }) {
         </div>
     );
 }
+
+// ── Morphin / Framer Motion Overlays ─────────────────────────────
+export { AnimatedNumber } from "./ui/animated-number";
+export { MagneticButton } from "./ui/magnetic-button";
+export { MorphingDialog } from "./ui/morphing-dialog";

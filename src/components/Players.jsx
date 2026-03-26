@@ -5,24 +5,25 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Search, SlidersHorizontal, ChevronDown, X, LoaderCircle,
   GitCompare, TrendingUp, TrendingDown, Minus,
-  ChartColumnBig, Zap, Target, ArrowUpDown,
+  BarChart2, Zap, Target, ArrowUpDown,
 } from "lucide-react";
 import { TEAM_COLORS, TEAM_NAMES } from "../data";
 import { useEnrichedPlayerStats, usePlayerSearch, usePlayerGameLog, prefetchPlayerGameLog } from "../api";
 import { signed, netRatingTier, debounce } from "../utils";
 import { TileSkeleton, ErrorState, EmptyState } from "./ui";
+import { Badge } from "@/components/ui/badge";
 
 const POSITIONS = ["", "PG", "SG", "SF", "PF", "C"];
 
 function TierBadge({ per }) {
   if (per == null) return null;
-  const { label, color } =
-    per >= 25 ? { label: "MVP", color: "text-tier-elite bg-tier-elite/10 border-tier-elite/30" } :
-      per >= 20 ? { label: "All-Star", color: "text-tier-good bg-tier-good/10 border-tier-good/30" } :
-        per >= 15 ? { label: "Starter", color: "text-tier-avg bg-tier-avg/10 border-tier-avg/30" } :
-          per >= 10 ? { label: "Rotation", color: "text-tier-poor bg-tier-poor/10 border-tier-poor/30" } :
-            { label: "Fringe", color: "text-tier-bad bg-tier-bad/10 border-tier-bad/30" };
-  return <span className={`text-[9px] font-medium px-1.5 py-0.5 rounded border uppercase tracking-widest ${color}`}>{label}</span>;
+  const { label, variant } =
+    per >= 25 ? { label: "MVP", variant: "elite" } :
+      per >= 20 ? { label: "All-Star", variant: "good" } :
+        per >= 15 ? { label: "Starter", variant: "avg" } :
+          per >= 10 ? { label: "Rotation", variant: "poor" } :
+            { label: "Fringe", variant: "bad" };
+  return <Badge variant={variant}>{label}</Badge>;
 }
 
 function Trend({ value, baseline }) {
@@ -168,7 +169,7 @@ function PlayerCard({ player, onCompare, comparePlayer, isComparing, sortKey, is
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                   <div>
                     <div className="pm-label mb-2 flex items-center gap-2">
-                      <ChartColumnBig size={10} /> Advanced metrics
+                      <BarChart2 size={10} /> Advanced metrics
                       {comparePlayer && <span className="text-[9px] text-pitch-500 font-normal"><span style={{ color }}>{player.name.split(" ").at(-1)}</span>{" vs "}<span style={{ color: cmpColor }}>{comparePlayer.name.split(" ").at(-1)}</span></span>}
                     </div>
                     <div className="mt-2 space-y-0">

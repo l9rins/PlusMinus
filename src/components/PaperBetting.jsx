@@ -5,6 +5,9 @@ import { useAuth } from "@clerk/clerk-react";
 import { Trophy, TrendingUp, TrendingDown, Coins, RotateCcw, ChevronDown } from "lucide-react";
 import { useOdds, useTodayGames, mergeOddsIntoGames } from "../api";
 import { oddsToDecimal, calcPL } from "../utils";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
+import { MagneticButton, AnimatedNumber } from "./ui";
 
 const container = { hidden: {}, show: { transition: { staggerChildren: 0.05 } } };
 const item = { hidden: { opacity: 0, y: 8 }, show: { opacity: 1, y: 0, transition: { duration: 0.2 } } };
@@ -49,7 +52,7 @@ function LeaderboardRow({ entry, rank, isCurrentUser }) {
         </div>
       </div>
       <div className="text-right">
-        <div className="font-mono font-medium text-pitch-100">{entry.balance?.toFixed(0)} PMC</div>
+        <AnimatedNumber value={entry.balance ?? 0} format={(v) => v.toFixed(0) + " PMC"} className="font-mono font-medium text-pitch-100" />
         <div className={`text-[10px] font-mono ${entry.roi >= 0 ? "text-win" : "text-loss"}`}>
           {entry.roi >= 0 ? "+" : ""}{entry.roi?.toFixed(1)}% ROI
         </div>
@@ -124,14 +127,15 @@ function PlaceBetForm({ game, onBet, balance }) {
             </div>
           )}
         </div>
-        <button
+        <MagneticButton
           onClick={submit}
           disabled={loading}
+          strength={0.25}
           className="px-4 py-1.5 bg-accent/15 text-accent border border-accent/30 rounded-md
                      text-sm font-medium hover:bg-accent/25 transition-colors disabled:opacity-50"
         >
           {loading ? "…" : "Place"}
-        </button>
+        </MagneticButton>
       </div>
 
       {/* Quick stake buttons */}
@@ -210,6 +214,7 @@ export default function PaperBetting() {
   const { getToken, userId } = useAuth();
   const [tab, setTab] = useState("bet");
   const [bankroll, setBankroll] = useState(null);
+  const setTabValue = (v) => setTab(v);
   const [myBets, setMyBets] = useState([]);
   const [leaderboard, setLeaderboard] = useState([]);
   const [loadingLb, setLoadingLb] = useState(false);
@@ -271,106 +276,93 @@ export default function PaperBetting() {
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {[
-            { label: "Balance", value: bankroll ? `${bankroll.balance.toFixed(0)} PMC` : "—" },
-            { label: "Total bets", value: bankroll?.totalBets ?? "—" },
-            { label: "Net P&L", value: bankroll ? `${totalPL >= 0 ? "+" : ""}${totalPL.toFixed(0)} PMC` : "—", colored: true, pl: totalPL },
-            { label: "Win rate", value: winRate ? `${winRate}%` : "—" },
+            { label: "Balance", value: bankroll ? <AnimatedNumber value={bankroll.balance} format={(v) => `${v.toFixed(0)} PMC`} className="font-mono text-xl tabular-nums text-pitch-100" /> : <span className="font-mono text-xl tabular-nums text-pitch-100">—</span> },
+            { label: "Total bets", value: <span className="font-mono text-xl tabular-nums text-pitch-100">{bankroll?.totalBets ?? "—"}</span> },
+            { label: "Net P&L", value: <span className={`font-mono text-xl tabular-nums ${totalPL >= 0 ? "text-win" : "text-loss"}`}>{bankroll ? `${totalPL >= 0 ? "+" : ""}${totalPL.toFixed(0)} PMC` : "—"}</span> },
+            { label: "Win rate", value: <span className="font-mono text-xl tabular-nums text-pitch-100">{winRate ? `${winRate}%` : "—"}</span> },
           ].map(m => (
             <div key={m.label} className="text-center">
               <div className="pm-label mb-1">{m.label}</div>
-              <div className={`font-mono font-medium text-xl ${m.colored ? (m.pl >= 0 ? "text-win" : "text-loss") : "text-pitch-50"}`}>
-                {m.value}
-              </div>
+              {m.value}
             </div>
           ))}
         </div>
       </motion.div>
 
       {/* Tabs */}
-      <motion.div variants={item} className="flex gap-2 mb-4">
-        {[
-          { id: "bet", label: "Tonight's Games" },
-          { id: "mybets", label: `My Bets (${pendingBets.length} pending)` },
-          { id: "leaderboard", label: "🏆 Leaderboard" },
-        ].map(t => (
-          <button
-            key={t.id}
-            onClick={() => setTab(t.id)}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-all border
-              ${tab === t.id ? "bg-accent/15 text-accent border-accent/30" : "bg-pitch-800 text-pitch-400 border-pitch-600 hover:border-pitch-500"}`}
-          >
-            {t.label}
-          </button>
-        ))}
-      </motion.div>
-
-      {/* Bet tab */}
-      {tab === "bet" && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {games.filter(g => g.status === "scheduled").length === 0 && (
-            <div className="col-span-full text-center py-12 text-pitch-500">No games scheduled today.</div>
-          )}
-          {games.map(g => (
-            <GameCard key={g.id} game={g} onBet={placeBet} balance={bankroll?.balance ?? 0} odds={oddsData} />
-          ))}
-        </div>
-      )}
-
-      {/* My bets tab */}
-      {tab === "mybets" && (
-        <div className="space-y-2">
-          {myBets.length === 0 && <div className="text-center py-12 text-pitch-500">No bets placed yet.</div>}
-          {myBets.map(b => (
-            <motion.div key={b.id} variants={item} className="pm-tile p-4 flex items-center gap-4">
-              <div className="flex-1">
-                <div className="text-sm font-medium text-pitch-100">{b.matchup}</div>
-                <div className="text-[10px] text-pitch-400 mt-0.5">{b.pick} · {b.odds > 0 ? "+" : ""}{b.odds}</div>
-              </div>
-              <div className="text-right">
-                <div className="font-mono text-sm text-pitch-200">{b.stake} PMC</div>
-                <span className={`pm-badge border text-[10px] ${
-                  b.status === "win" ? "bg-win/10 text-win border-win/20"
-                  : b.status === "loss" ? "bg-loss/10 text-loss border-loss/20"
-                  : "bg-pitch-700 text-pitch-500 border-pitch-600"
-                }`}>
-                  {b.status === "pending" ? "PENDING"
-                    : b.status === "win" ? `+${b.settledPL} PMC`
-                    : `${b.settledPL} PMC`}
-                </span>
-              </div>
-            </motion.div>
-          ))}
-        </div>
-      )}
-
-      {/* Leaderboard tab */}
-      {tab === "leaderboard" && (
-        <motion.div variants={container} initial="hidden" animate="show" className="pm-card p-4">
-          <div className="flex items-center gap-2 mb-4">
-            <Trophy size={14} className="text-accent" />
-            <span className="pm-label">Man vs. Machine · Season standings</span>
-          </div>
-          {loadingLb ? (
-            <div className="space-y-2">{Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="h-12 bg-pitch-700 rounded-md animate-pulse" />
-            ))}</div>
-          ) : (
-            <div className="space-y-1">
-              {leaderboard.map((entry, i) => (
-                <LeaderboardRow
-                  key={entry.userId ?? "model"}
-                  entry={entry}
-                  rank={i}
-                  isCurrentUser={entry.userId === userId}
-                />
-              ))}
-              {leaderboard.length === 0 && (
-                <div className="text-center py-8 text-pitch-500 text-sm">No bets placed yet — be the first!</div>
-              )}
-            </div>
-          )}
+      <Tabs value={tab} onValueChange={setTabValue}>
+        <motion.div variants={item}>
+          <TabsList>
+            <TabsTrigger value="bet">Tonight's Games</TabsTrigger>
+            <TabsTrigger value="mybets">My Bets ({pendingBets.length})</TabsTrigger>
+            <TabsTrigger value="leaderboard">Leaderboard</TabsTrigger>
+          </TabsList>
         </motion.div>
-      )}
+
+        {/* Bet tab */}
+        <TabsContent value="bet">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {games.filter(g => g.status === "scheduled").length === 0 && (
+              <div className="col-span-full text-center py-12 text-pitch-500">No games scheduled today.</div>
+            )}
+            {games.map(g => (
+              <GameCard key={g.id} game={g} onBet={placeBet} balance={bankroll?.balance ?? 0} odds={oddsData} />
+            ))}
+          </div>
+        </TabsContent>
+
+        {/* My bets tab */}
+        <TabsContent value="mybets">
+          <div className="space-y-2">
+            {myBets.length === 0 && <div className="text-center py-12 text-pitch-500">No bets placed yet.</div>}
+            {myBets.map(b => (
+              <motion.div key={b.id} variants={item} className="pm-tile p-4 flex items-center gap-4">
+                <div className="flex-1">
+                  <div className="text-sm font-medium text-pitch-100">{b.matchup}</div>
+                  <div className="text-[10px] text-pitch-400 mt-0.5">{b.pick} · {b.odds > 0 ? "+" : ""}{b.odds}</div>
+                </div>
+                <div className="text-right">
+                  <div className="font-mono text-sm text-pitch-200 tabular-nums">{b.stake} PMC</div>
+                  <Badge variant={b.status === "win" ? "win" : b.status === "loss" ? "loss" : "default"}>
+                    {b.status === "pending" ? "PENDING"
+                      : b.status === "win" ? `+${b.settledPL} PMC`
+                      : `${b.settledPL} PMC`}
+                  </Badge>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </TabsContent>
+
+        {/* Leaderboard tab */}
+        <TabsContent value="leaderboard">
+          <motion.div variants={container} initial="hidden" animate="show" className="pm-card p-4">
+            <div className="flex items-center gap-2 mb-4">
+              <Trophy size={14} className="text-accent" />
+              <span className="pm-label">Man vs. Machine · Season standings</span>
+            </div>
+            {loadingLb ? (
+              <div className="space-y-2">{Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className="h-12 bg-pitch-700 rounded-md animate-pulse" />
+              ))}</div>
+            ) : (
+              <div className="space-y-1">
+                {leaderboard.map((entry, i) => (
+                  <LeaderboardRow
+                    key={entry.userId ?? "model"}
+                    entry={entry}
+                    rank={i}
+                    isCurrentUser={entry.userId === userId}
+                  />
+                ))}
+                {leaderboard.length === 0 && (
+                  <div className="text-center py-8 text-pitch-500 text-sm">No bets placed yet — be the first!</div>
+                )}
+              </div>
+            )}
+          </motion.div>
+        </TabsContent>
+      </Tabs>
     </motion.div>
   );
 }

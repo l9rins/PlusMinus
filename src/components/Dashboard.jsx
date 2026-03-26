@@ -2,13 +2,13 @@ import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-    TrendingUp, TrendingDown, Target, ChartColumnBig,
+    TrendingUp, TrendingDown, Target, BarChart2,
     Zap, ChevronRight, Activity, DollarSign, Flame, Shield,
 } from "lucide-react";
 import { TEAM_NAMES, ODDS_GAMES, TEAM_COLORS } from "../data";
 import { useStandings, useTodayGames, useOdds, mergeOddsIntoGames, useBets, useEloData } from "../api";
 import { formatCurrency, formatPct, lsGet, calcROI, calcPL, eloWinProb, kellyBet, DEFAULT_BANKROLL } from "../utils";
-import { TileSkeleton, RowSkeleton, ErrorState, FreshnessTag, Tooltip, TeamLink } from "./ui";
+import { TileSkeleton, RowSkeleton, ErrorState, FreshnessTag, Tooltip, TeamLink, AnimatedNumber } from "./ui";
 import GameWinProb from "./GameWinProb";
 import RefCallout from "./RefCallout";
 
@@ -52,7 +52,7 @@ function GameTile({ game, eloMap }) {
                 <div className="flex-1 text-center">
                     <div className={`font-display text-xl tracking-wider leading-none mb-0.5 ${fav === "away" ? "" : "text-pitch-300"}`} style={{ color: fav === "away" && fav !== null ? awayColor : undefined }}>{game.away}</div>
                     <div className="text-[10px] text-pitch-500 truncate px-1">{awayName}</div>
-                    {(isFinal || isLive) ? <motion.div key={game.awayScore} initial={{ scale: 1.1 }} animate={{ scale: 1 }} className="pm-number text-lg mt-1 text-pitch-100">{game.awayScore}</motion.div>
+                    {(isFinal || isLive) ? <AnimatedNumber value={game.awayScore ?? 0} className="pm-number text-lg mt-1 text-pitch-100" />
                         : game.awayP !== null
                             ? <div className="pm-number text-sm mt-1 text-pitch-400">{game.awayP}%</div>
                             : <div className="pm-number text-sm mt-1 text-pitch-600">—</div>}
@@ -64,7 +64,7 @@ function GameTile({ game, eloMap }) {
                 <div className="flex-1 text-center">
                     <div className={`font-display text-xl tracking-wider leading-none mb-0.5 ${fav === "home" ? "" : "text-pitch-300"}`} style={{ color: fav === "home" && fav !== null ? homeColor : undefined }}>{game.home}</div>
                     <div className="text-[10px] text-pitch-500 truncate px-1">{homeName}</div>
-                    {(isFinal || isLive) ? <motion.div key={game.homeScore} initial={{ scale: 1.1 }} animate={{ scale: 1 }} className="pm-number text-lg mt-1 text-pitch-100">{game.homeScore}</motion.div>
+                    {(isFinal || isLive) ? <AnimatedNumber value={game.homeScore ?? 0} className="pm-number text-lg mt-1 text-pitch-100" />
                         : game.homeP !== null
                             ? <div className="pm-number text-sm mt-1 text-pitch-400">{game.homeP}%</div>
                             : <div className="pm-number text-sm mt-1 text-pitch-600">—</div>}
@@ -263,7 +263,7 @@ export default function Dashboard() {
                     <SummaryTile label="Games Today" value={gameCount || "—"} sub={gameCount === 0 ? "No games today" : liveCount > 0 ? `${liveCount} in progress` : "Tip-off tonight"} icon={Target} trend={liveCount > 0 ? "up" : null} badge={liveCount > 0 ? { label: "LIVE", cls: "bg-win/10 text-win border border-win/20" } : null} onClick={() => navigate("/scores")} />
                     <SummaryTile label="Top Model Edge" value={edgeDiff > 0 ? `+${edgeDiff.toFixed(1)}%` : "—"} sub={topEdge.matchup} icon={TrendingUp} trend="up" color={edgeDiff >= 10 ? "text-win" : edgeDiff >= 5 ? "text-draw" : "text-pitch-50"} onClick={() => navigate("/betting")} />
                     <SummaryTile label="Best Win Prob" value={bestProb.modelP > 0 ? `${bestProb.modelP}%` : "—"} sub={bestProb.fav !== "—" ? `${bestProb.fav} · ${bestProb.matchup}` : "No data"} icon={Zap} onClick={() => navigate("/betting")} />
-                    <SummaryTile label="Net P&L" value={betStats.total > 0 ? formatCurrency(betStats.pl) : "—"} sub={betSub} icon={ChartColumnBig} color={betStats.pl > 0 ? "text-win" : betStats.pl < 0 ? "text-loss" : "text-pitch-50"} trend={betStats.pl > 0 ? "up" : betStats.pl < 0 ? "down" : null} onClick={() => navigate("/tracker")} />
+                    <SummaryTile label="Net P&L" value={betStats.total > 0 ? formatCurrency(betStats.pl) : "—"} sub={betSub} icon={BarChart2} color={betStats.pl > 0 ? "text-win" : betStats.pl < 0 ? "text-loss" : "text-pitch-50"} trend={betStats.pl > 0 ? "up" : betStats.pl < 0 ? "down" : null} onClick={() => navigate("/tracker")} />
                 </div>
             </motion.div>
 
@@ -304,7 +304,7 @@ export default function Dashboard() {
                     <div className="grid grid-cols-2 gap-2">
                         {[
                             { label: "Line Shopping", path: "/betting", icon: TrendingUp, color: "text-accent" },
-                            { label: "Bet Tracker", path: "/tracker", icon: ChartColumnBig, color: "text-win" },
+                            { label: "Bet Tracker", path: "/tracker", icon: BarChart2, color: "text-win" },
                             { label: "Four Factors", path: "/analytics?tab=factors", icon: Activity, color: "text-draw" },
                             { label: "Players", path: "/players", icon: Zap, color: "text-pitch-300" },
                         ].map(item => (
