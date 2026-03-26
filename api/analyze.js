@@ -10,25 +10,15 @@
 // Cost: ~500 input tokens + ~400 output tokens per call ≈ $0.0005 on Haiku
 
 import { handleOptions, setCORSHeaders } from "./_cors.js";
-import { createClerkClient } from "@clerk/backend";
+import { getUserId } from "./_auth.js";
 import { createClient } from "@vercel/kv";
 import Anthropic from "@anthropic-ai/sdk";
 
-const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
 const kv = createClient({
     url: process.env.KV_REST_API_URL,
     token: process.env.KV_REST_API_TOKEN,
 });
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-
-async function getUserId(req) {
-    const auth = req.headers.authorization;
-    if (!auth?.startsWith("Bearer ")) return null;
-    try {
-        const { sub } = await clerk.verifyToken(auth.slice(7));
-        return sub;
-    } catch { return null; }
-}
 
 const MARKET_LABELS = {
     player_points: "Points",

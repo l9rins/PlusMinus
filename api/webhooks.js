@@ -1,17 +1,10 @@
 // api/webhooks.js — Store/retrieve user webhook URLs
 import { handleOptions, setCORSHeaders } from "./_cors.js";
-import { createClerkClient } from "@clerk/backend";
+import { getUserId } from "./_auth.js";
 import { createClient } from "@vercel/kv";
 
 const kv    = createClient({ url: process.env.KV_REST_API_URL, token: process.env.KV_REST_API_TOKEN });
-const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
 
-async function getUserId(req) {
-  const auth = req.headers.authorization;
-  if (!auth?.startsWith("Bearer ")) return null;
-  try { const { sub } = await clerk.verifyToken(auth.slice(7)); return sub; }
-  catch { return null; }
-}
 
 // Validate Discord webhook URL format
 function isValidDiscordWebhook(url) {
@@ -71,7 +64,18 @@ export default async function handler(req, res) {
       if (body.telegram === null) {
         delete updated.telegram;
       } else {
-        updated.telegram = { botToken: body.telegram.botToken, chatId: body.telegram.chatId };
+        const { botToken, chatId } = body.telegram ?? {};
+        if (typeof botToken !== "string" || !/^\d+:[A-Za-z0-9_-]+$/.test(botToken)) {
+          return res.status(400).json({ error: "Invalid Telegram bot token format" });
+        }
+        if (typeof chatId !== "string" && typeof chatId !== "number") {
+          return res.status(400).json({ error: "Invalid Telegram chat ID" });
+        }
+        const chatIdStr = String(chatId);
+        if (!/^-?\d+$/.test(chatIdStr)) {
+          return res.status(400).json({ error: "Telegram chat ID must be numeric" });
+        }
+        updated.telegram = { botToken, chatId: chatIdStr };
       }
     }
 

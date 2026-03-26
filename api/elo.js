@@ -55,12 +55,7 @@ const NBA_HEADERS = {
 
 const ABBR_FIX = { SA: "SAS", WSH: "WAS", NY: "NYK", GS: "GSW", NO: "NOP", PHO: "PHX" };
 
-// Derive current season string e.g. "2024-25"
-function currentSeasonStr() {
-  const now = new Date();
-  const year = now.getMonth() >= 9 ? now.getFullYear() : now.getFullYear() - 1;
-  return `${year}-${String(year + 1).slice(2)}`;
-}
+import { currentSeasonStr } from "./_utils.js";
 
 // Elo helpers — K=20, home court = +100 points advantage
 const K = 20;
@@ -142,14 +137,13 @@ export default async function handler(req, res) {
   const season = currentSeasonStr();
   const CACHE_KEY = `elo:${season}`;
   
-  // FIX: Secure the rebuild backdoor
+  // FIX: Secure the rebuild endpoint
   const isRebuildRequested = req.query.rebuild === "true";
   const providedAuthToken = req.headers.authorization?.replace("Bearer ", "");
-  const providedQuerySecret = req.query.secret; // For Cron jobs (headers not supported)
-  const isAuthorized = process.env.ADMIN_SECRET && (
-    providedAuthToken === process.env.ADMIN_SECRET || 
-    providedQuerySecret === process.env.ADMIN_SECRET
-  );
+  // Support Vercel Cron's built-in CRON_SECRET header, or ADMIN_SECRET for manual triggers
+  const isAuthorized = 
+    (process.env.CRON_SECRET && providedAuthToken === process.env.CRON_SECRET) ||
+    (process.env.ADMIN_SECRET && providedAuthToken === process.env.ADMIN_SECRET);
   
   if (isRebuildRequested) {
     if (!isAuthorized) {

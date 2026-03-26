@@ -1,7 +1,3 @@
-export const config = {
-  runtime: 'edge',
-};
-
 // api/stream.js — Server-Sent Events for real-time line movement alerts.
 //
 // The client opens one long-lived GET /api/stream connection.
@@ -20,24 +16,13 @@ export const config = {
 
 import { setCORSHeaders, handleOptions } from "./_cors.js";
 import { createClient } from "@vercel/kv";
-import { createClerkClient } from "@clerk/backend";
+import { getUserIdFromQuery } from "./_auth.js";
 
-const kv    = createClient({ url: process.env.KV_REST_API_URL, token: process.env.KV_REST_API_TOKEN });
-const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
+const kv = createClient({ url: process.env.KV_REST_API_URL, token: process.env.KV_REST_API_TOKEN });
 
 const POLL_MS      = 60_000;
 const HEARTBEAT_MS = 25_000;
 const MOVEMENT_THRESHOLD = 5; // points of line movement to alert on
-
-async function getUserId(req) {
-  // SSE: token passed as ?token= query param (EventSource can't set headers)
-  const token = req.query.token;
-  if (!token) return null;
-  try {
-    const { sub } = await clerk.verifyToken(token);
-    return sub;
-  } catch { return null; }
-}
 
 async function fetchCurrentOdds() {
   const apiKey = process.env.ODDS_API_KEY;
@@ -107,7 +92,7 @@ export default async function handler(req, res) {
 
   if (req.method !== "GET") return res.status(405).end();
 
-  const userId = await getUserId(req);
+  const userId = await getUserIdFromQuery(req);
   if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
   // Set SSE headers

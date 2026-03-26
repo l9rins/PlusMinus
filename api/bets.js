@@ -13,26 +13,14 @@
 
 import { handleOptions, setCORSHeaders } from "./_cors.js";
 import { createClient } from "@vercel/kv";
-import { createClerkClient } from "@clerk/backend";
+import { getUserId } from "./_auth.js";
 
 const kv = createClient({
   url: process.env.KV_REST_API_URL,
   token: process.env.KV_REST_API_TOKEN,
 });
 
-const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
 
-async function getUserId(req) {
-  const auth = req.headers.authorization;
-  if (!auth?.startsWith("Bearer ")) return null;
-  try {
-    const token = auth.slice(7);
-    const { sub } = await clerk.verifyToken(token);
-    return sub;
-  } catch {
-    return null;
-  }
-}
 
 const VALID_RESULTS = new Set(["win", "loss", "push", "pending"]);
 

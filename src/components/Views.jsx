@@ -11,7 +11,7 @@ import {
   Settings, Layers3, Bell, Share2,
 } from "lucide-react";
 import { TEAM_NAMES, ODDS_GAMES, TEAM_COLORS } from "../data";
-import { useStandings, useTodayGames, useOdds, mergeOddsIntoGames, useBets, usePlayerProps, usePlayerPropHistory, useServerConfig, useAllPlayers } from "../api";
+import { useStandings, useTodayGames, useOdds, mergeOddsIntoGames, useBets, usePlayerProps, usePlayerPropHistory, useServerConfig, useAllPlayers, useEloData } from "../api";
 import {
   calcPL, lsGet, lsSet,
   formatCurrency, formatPct, kellyBet, DEFAULT_BANKROLL,

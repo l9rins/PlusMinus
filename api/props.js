@@ -56,11 +56,7 @@ function toDecimal(american) {
     return 1 - 100 / n;
 }
 
-function currentSeasonStr() {
-  const now  = new Date();
-  const year = now.getMonth() >= 9 ? now.getFullYear() : now.getFullYear() - 1;
-  return `${year}-${String(year + 1).slice(2)}`;
-}
+import { currentSeasonStr } from "./_utils.js";
 
 const NBA_HEADERS = {
   "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
