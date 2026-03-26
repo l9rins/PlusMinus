@@ -11,13 +11,10 @@
 
 import { handleOptions, setCORSHeaders } from "./_cors.js";
 import { getUserId } from "./_auth.js";
-import { createClient } from "@vercel/kv";
+import { kv } from "./_kv.js";
 import Anthropic from "@anthropic-ai/sdk";
 
-const kv = createClient({
-    url: process.env.KV_REST_API_URL,
-    token: process.env.KV_REST_API_TOKEN,
-});
+
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 const MARKET_LABELS = {

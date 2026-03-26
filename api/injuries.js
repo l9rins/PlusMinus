@@ -7,9 +7,7 @@
 // We cache in KV for 30 minutes — injury status changes throughout the day.
 
 import { handleOptions, setCORSHeaders } from "./_cors.js";
-import { createClient } from "@vercel/kv";
-
-const kv = createClient({ url: process.env.KV_REST_API_URL, token: process.env.KV_REST_API_TOKEN });
+import { kv } from "./_kv.js";
 
 // Rough "value" weight per player — how many Elo points the team loses
 // if this player sits out. Based on VORP-equivalent tiers.

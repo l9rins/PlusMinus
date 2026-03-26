@@ -1,11 +1,6 @@
 import { handleOptions, setCORSHeaders } from "../_cors.js";
-import { createClient } from "@vercel/kv";
+import { kv } from "../_kv.js";
 import crypto from 'crypto';
-
-const kv = createClient({
-  url: process.env.KV_REST_API_URL,
-  token: process.env.KV_REST_API_TOKEN,
-});
 
 export default async function handler(req, res) {
   if (handleOptions(req, res)) return;

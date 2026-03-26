@@ -15,11 +15,8 @@
 
 import { handleOptions, setCORSHeaders } from "./_cors.js";
 import { getUserId } from "./_auth.js";
-import { createClient } from "@vercel/kv";
-import { createClerkClient } from "@clerk/backend";
-
-const kv    = createClient({ url: process.env.KV_REST_API_URL, token: process.env.KV_REST_API_TOKEN });
-const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
+import { kv } from "./_kv.js";
+import { clerk } from "./_clerk.js";
 
 const STARTING_BALANCE = 1000;
 const MIN_STAKE        = 10;

@@ -12,13 +12,10 @@
 //         groups as query params). See vercel.json fix for the companion change.
 
 import { handleOptions, setCORSHeaders } from "./_cors.js";
-import { createClient } from "@vercel/kv";
 import { getUserId } from "./_auth.js";
+import { kv } from "./_kv.js";
 
-const kv = createClient({
-  url: process.env.KV_REST_API_URL,
-  token: process.env.KV_REST_API_TOKEN,
-});
+
 
 
 

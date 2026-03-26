@@ -43,11 +43,7 @@ const MARKET_LABELS = {
 
 import { setCORSHeaders, handleOptions } from "./_cors.js";
 import { TEAM_MAP } from "./_teams.js";
-import { createClient } from "@vercel/kv";
-const kv = createClient({
-  url:   process.env.KV_REST_API_URL,
-  token: process.env.KV_REST_API_TOKEN,
-});
+import { kv } from "./_kv.js";
 
 function toDecimal(american) {
     const n = Number(american);

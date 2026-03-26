@@ -1,9 +1,7 @@
 // api/webhooks.js — Store/retrieve user webhook URLs
 import { handleOptions, setCORSHeaders } from "./_cors.js";
 import { getUserId } from "./_auth.js";
-import { createClient } from "@vercel/kv";
-
-const kv    = createClient({ url: process.env.KV_REST_API_URL, token: process.env.KV_REST_API_TOKEN });
+import { kv } from "./_kv.js";
 
 
 // Validate Discord webhook URL format

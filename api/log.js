@@ -19,8 +19,9 @@
 //   });
 
 import { handleOptions, setCORSHeaders } from "./_cors.js";
-import { createClient } from "@vercel/kv";
 import { getUserId } from "./_auth.js";
+import { kv } from "./_kv.js";
+import crypto from "crypto";
 
 const LOG_KEY = "error_log:app";
 const MAX_ENTRIES = 100;
@@ -76,7 +77,6 @@ export default async function handler(req, res) {
 
         const provided = req.headers["x-admin-token"] ?? req.query.token;
         
-        import crypto from "crypto";
         const providedBuf = Buffer.from(provided ?? "");
         const expectedBuf = Buffer.from(adminToken ?? "");
         

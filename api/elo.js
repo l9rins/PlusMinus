@@ -1,6 +1,6 @@
 import { handleOptions, setCORSHeaders } from "./_cors.js";
-import { createClient } from "@vercel/kv";
 import { EAST_STANDINGS, WEST_STANDINGS } from "./_fallbacks.js";
+import { kv } from "./_kv.js";
 
 function makeLCG(seed) {
   let s = (seed ^ 0xdeadbeef) >>> 0;
@@ -40,10 +40,7 @@ function simSeries(teamA, teamB, rng) {
   return wA === 4;
 }
 
-const kv = createClient({
-  url: process.env.KV_REST_API_URL,
-  token: process.env.KV_REST_API_TOKEN,
-});
+
 
 const NBA_BASE = "https://stats.nba.com/stats";
 const NBA_HEADERS = {

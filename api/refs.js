@@ -1,10 +1,5 @@
 import { handleOptions, setCORSHeaders } from "./_cors.js";
-import { createClient } from "@vercel/kv";
-
-const kv = createClient({
-  url: process.env.KV_REST_API_URL,
-  token: process.env.KV_REST_API_TOKEN,
-});
+import { kv } from "./_kv.js";
 
 /**
  * Fetches today's official NBA referee assignments.
